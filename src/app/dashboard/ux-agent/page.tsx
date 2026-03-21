@@ -276,57 +276,63 @@ export default function UXAgent() {
       </div>
 
       {/* ══════════════════════════════════════════════════════
-          POPUP: Nuevo Análisis (loading)
+          POPUP: Análisis — streaming + resultado unificado
          ══════════════════════════════════════════════════════ */}
-      {analysisPopup === 'loading' && (
-        <Overlay onClose={() => {}}>
+      {(analysisPopup === 'loading' || analysisPopup === 'result') && (
+        <Overlay onClose={() => analysisPopup === 'result' ? setAnalysisPopup(null) : undefined}>
           <div style={{ padding: '1.5rem' }}>
+            {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '1rem' }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 8px #22c55e', animation: 'pulse 1.5s ease-in-out infinite' }}></div>
-              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f1f5f9' }}>Groq Agent — Streaming</span>
-              <span style={{ fontSize: '0.65rem', color: '#475569', marginLeft: 'auto' }}>llama-3.3-70b</span>
+              <div style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: analysisPopup === 'loading' ? '#f59e0b' : '#22c55e',
+                boxShadow: analysisPopup === 'loading' ? '0 0 8px #f59e0b' : '0 0 8px #22c55e',
+                animation: analysisPopup === 'loading' ? 'pulse 1.5s ease-in-out infinite' : 'none',
+              }}></div>
+              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f1f5f9' }}>
+                {analysisPopup === 'loading' ? 'Groq Agent — Streaming' : 'Análisis completado'}
+              </span>
+              <span style={{ fontSize: '0.62rem', color: '#475569', fontFamily: "'JetBrains Mono', monospace", marginLeft: 'auto' }}>llama-3.3-70b</span>
+              {analysisPopup === 'result' && (
+                <button onClick={() => setAnalysisPopup(null)} style={{ background: 'rgba(255,255,255,0.06)', border: 'none', color: '#94a3b8', width: 28, height: 28, borderRadius: 6, cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+              )}
             </div>
+
+            {/* Terminal output */}
             <div style={{
-              background: '#0a0d14', border: '1px solid rgba(0,229,176,0.15)', borderRadius: 10,
-              padding: '1rem', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.72rem',
-              color: '#22c55e', lineHeight: 1.8, whiteSpace: 'pre-wrap', minHeight: 200, maxHeight: '55vh',
-              overflow: 'auto', position: 'relative',
+              background: '#0a0d14', border: `1px solid ${analysisPopup === 'loading' ? 'rgba(245,158,11,0.2)' : 'rgba(34,197,94,0.2)'}`,
+              borderRadius: 10, padding: '1rem', fontSize: '0.75rem',
+              color: '#e2e8f0', lineHeight: 1.8, whiteSpace: 'pre-wrap',
+              minHeight: 180, maxHeight: '55vh', overflow: 'auto',
+              fontFamily: "'JetBrains Mono', monospace",
+              transition: 'border-color 0.3s',
             }}>
               <div style={{ color: '#475569', marginBottom: 8 }}>$ groq analyze --site smconnection.cl --mode ux</div>
-              {analysisResult || <span style={{ color: '#475569' }}>Esperando respuesta<AnimatedDots /></span>}
-              <span style={{ display: 'inline-block', width: 7, height: 14, background: '#22c55e', marginLeft: 2, animation: 'blink 1s step-end infinite', verticalAlign: 'text-bottom' }}></span>
+              {analysisResult || <span style={{ color: '#475569' }}>Conectando con Groq<AnimatedDots /></span>}
+              {analysisPopup === 'loading' && (
+                <span style={{ display: 'inline-block', width: 7, height: 14, background: '#f59e0b', marginLeft: 2, animation: 'blink 1s step-end infinite', verticalAlign: 'text-bottom' }}></span>
+              )}
             </div>
+
+            {/* Actions — only when done */}
+            {analysisPopup === 'result' && (
+              <div style={{ display: 'flex', gap: 8, marginTop: '1rem', justifyContent: 'flex-end' }}>
+                <button onClick={() => navigator.clipboard.writeText(analysisResult)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#64748b', padding: '8px 14px', borderRadius: 8, fontWeight: 600, fontSize: '0.72rem', cursor: 'pointer', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', gap: 4 }}>
+                  📋 Copiar
+                </button>
+                <button onClick={() => setAnalysisPopup(null)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#94a3b8', padding: '8px 14px', borderRadius: 8, fontWeight: 600, fontSize: '0.72rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>
+                  Cerrar
+                </button>
+                <button onClick={() => { setAnalysisPopup(null); loadInsights(); }} style={{ background: 'linear-gradient(135deg, #00e5b0, #00c49a)', color: '#0a0d14', border: 'none', padding: '8px 18px', borderRadius: 8, fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>
+                  Guardar mejoras
+                </button>
+              </div>
+            )}
+
             <style>{`
               @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
               @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
             `}</style>
-          </div>
-        </Overlay>
-      )}
-
-      {/* ══════════════════════════════════════════════════════
-          POPUP: Resultado del análisis
-         ══════════════════════════════════════════════════════ */}
-      {analysisPopup === 'result' && (
-        <Overlay onClose={() => setAnalysisPopup(null)}>
-          <div style={{ padding: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: '1rem' }}>✨</span> Resultado del análisis
-              </div>
-              <button onClick={() => setAnalysisPopup(null)} style={{ background: 'rgba(255,255,255,0.06)', border: 'none', color: '#94a3b8', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
-            </div>
-            <div style={{ background: '#0a0d14', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '1.25rem', fontSize: '0.8rem', color: '#cbd5e1', lineHeight: 1.7, whiteSpace: 'pre-wrap', maxHeight: '50vh', overflow: 'auto', fontFamily: "'Inter', system-ui, sans-serif" }}>
-              {typeof analysisResult === 'string' ? analysisResult : JSON.stringify(analysisResult, null, 2)}
-            </div>
-            <div style={{ display: 'flex', gap: 10, marginTop: '1.25rem', justifyContent: 'flex-end' }}>
-              <button onClick={() => setAnalysisPopup(null)} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#94a3b8', padding: '10px 20px', borderRadius: 10, fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif" }}>
-                Cerrar
-              </button>
-              <button onClick={() => { setAnalysisPopup(null); }} style={{ background: 'linear-gradient(135deg, #00e5b0, #00c49a)', color: '#0a0d14', border: 'none', padding: '10px 20px', borderRadius: 10, fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif" }}>
-                Guardar mejoras
-              </button>
-            </div>
           </div>
         </Overlay>
       )}
