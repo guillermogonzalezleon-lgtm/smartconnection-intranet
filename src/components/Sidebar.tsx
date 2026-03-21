@@ -45,8 +45,9 @@ export default function Sidebar({ user }: { user: string }) {
         flexDirection: 'column',
         zIndex: 100,
         fontFamily: "'Inter', system-ui, sans-serif",
-        transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s',
         overflow: 'hidden',
+        boxShadow: expanded ? '8px 0 30px rgba(0,0,0,0.5)' : 'none',
       }}
     >
       {/* Logo */}
