@@ -135,7 +135,7 @@ export default function AgentsWorkspace() {
                   transition: 'all 0.15s',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {isHoku ? <span style={{ fontSize: '0.75rem' }}>🐾</span> : <span style={{ width: 7, height: 7, borderRadius: '50%', background: a.color, boxShadow: sel ? `0 0 6px ${a.color}60` : 'none', flexShrink: 0 }}></span>}
+                    {isHoku ? <img src="/img/hoku.jpg" alt="Hoku" style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} /> : <span style={{ width: 7, height: 7, borderRadius: '50%', background: a.color, boxShadow: sel ? `0 0 6px ${a.color}60` : 'none', flexShrink: 0 }}></span>}
                     <span style={{ fontSize: '0.75rem', fontWeight: 700, color: sel ? a.color : '#e2e8f0' }}>{a.name}</span>
                     {isHoku && <span style={{ fontSize: '0.45rem', fontWeight: 800, padding: '1px 4px', borderRadius: 3, background: 'linear-gradient(135deg, #ff6b6b, #8b5cf6)', color: '#fff' }}>4in1</span>}
                   </div>
@@ -177,7 +177,7 @@ export default function AgentsWorkspace() {
             {!output && !running ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#1e293b' }}>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.8rem', marginBottom: 10, opacity: 0.3 }}>🐾</div>
+                  <img src="/img/hoku.jpg" alt="Hoku" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', marginBottom: 10, opacity: 0.6 }} />
                   <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#334155' }}>Selecciona un agente y escribe tu tarea</div>
                 </div>
               </div>

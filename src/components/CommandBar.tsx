@@ -21,7 +21,8 @@ export default function CommandBar() {
 
   const commands: Command[] = [
     // Quick actions
-    { id: 'run-agent', icon: '⚡', label: 'Ejecutar agente...', group: 'Acciones', action: () => { setOpen(false); router.push('/dashboard/labs'); }, shortcut: '⌘E' },
+    { id: 'run-agent', icon: '⚡', label: 'Ejecutar agente...', group: 'Acciones', action: () => { setOpen(false); router.push('/dashboard/agents'); }, shortcut: '⌘E' },
+    { id: 'deploy', icon: '🚀', label: 'Deploy a producción', group: 'Acciones', action: () => { setOpen(false); router.push('/dashboard/deploy'); }, color: '#3b82f6' },
     { id: 'new-project', icon: '📋', label: 'Nuevo proyecto', group: 'Acciones', action: () => { setOpen(false); router.push('/dashboard/projects'); }, color: '#8b5cf6' },
     { id: 'new-lead', icon: '👤', label: 'Nuevo lead', group: 'Acciones', action: () => { setOpen(false); router.push('/dashboard/leads'); }, color: '#3b82f6' },
     // Navigate

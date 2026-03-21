@@ -125,8 +125,8 @@ export default function UXAgent() {
             <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#f1f5f9' }}>Insights UX — Ciclo {Math.max(1, ...insights.map(i => i.ciclo || 1))}</div>
             <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4 }}>Análisis continuo de experiencia y conversión</div>
           </div>
-          <a href="/dashboard/agents" style={{ background: 'linear-gradient(135deg, #00e5b0, #00c49a)', color: '#0a0d14', border: 'none', padding: '10px 20px', borderRadius: 10, fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 4px 20px rgba(0,229,176,0.25)', textDecoration: 'none' }}>
-            🐾 Nuevo análisis con Hoku
+          <a href="/dashboard/agents" style={{ background: 'linear-gradient(135deg, #00e5b0, #00c49a)', color: '#0a0d14', border: 'none', padding: '8px 18px', borderRadius: 10, fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 20px rgba(0,229,176,0.25)', textDecoration: 'none' }}>
+            <img src="/img/hoku.jpg" alt="Hoku" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} /> Nuevo análisis con Hoku
           </a>
         </div>
 
