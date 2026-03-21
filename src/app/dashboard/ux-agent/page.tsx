@@ -340,7 +340,7 @@ export default function UXAgent() {
 
       {/* ═══ TAB: Workspace Agentes ═══ */}
       {tab === 'workspace' && (
-        <div style={{ display: 'flex', flex: 1, height: 'calc(100vh - 90px)', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flex: 1, height: 'calc(100vh - 126px)', overflow: 'hidden' }}>
           {/* Left: Agent selector */}
           <div style={{ width: 240, minWidth: 200, background: '#0a0d14', borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
             <div style={{ padding: '12px 12px 8px' }}>
@@ -391,6 +391,24 @@ export default function UXAgent() {
                 {wsRunning ? <><span style={{ width: 8, height: 8, border: '2px solid #475569', borderTopColor: agent.color, borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }}></span> {fmtTime(elapsed)}</> : <>▶ Run</>}
               </button>
               {wsRunning && <button onClick={() => { if (timerRef.current) clearInterval(timerRef.current); setWsRunning(false); }} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', padding: '5px 10px', borderRadius: 7, fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>⏹</button>}
+              {/* Pipeline button in topbar — always visible */}
+              {!wsRunning && output && pipeline === 'idle' && (
+                <>
+                  <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.08)', margin: '0 4px' }}></div>
+                  <select value={targetRepo} onChange={e => setTargetRepo(e.target.value)} style={{ background: '#0a0d14', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '4px 8px', color: '#94a3b8', fontSize: '0.62rem', fontFamily: "'Inter', system-ui", outline: 'none', cursor: 'pointer' }}>
+                    {repos.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+                  </select>
+                  <button onClick={runPipeline} style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 7, fontWeight: 700, fontSize: '0.65rem', cursor: 'pointer', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', gap: 5, boxShadow: '0 2px 12px rgba(59,130,246,0.3)', whiteSpace: 'nowrap' }}>
+                    🚀 Deploy
+                  </button>
+                </>
+              )}
+              {/* Pipeline running indicator in topbar */}
+              {pipeline !== 'idle' && (
+                <span style={{ fontSize: '0.62rem', fontWeight: 600, color: pipeline === 'done' ? '#22c55e' : pipeline === 'error' ? '#ef4444' : '#3b82f6', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {pipeline === 'done' ? '✅ Live' : pipeline === 'error' ? '❌ Error' : <><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', animation: 'pulse 1s infinite' }}></span> Deploying...</>}
+                </span>
+              )}
             </div>
 
             {/* Task input */}
