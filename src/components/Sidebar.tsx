@@ -1,11 +1,29 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 
 export default function Sidebar({ user }: { user: string }) {
   const [expanded, setExpanded] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const pathname = usePathname();
+
+  useEffect(() => {
+    const saved = localStorage.getItem('sc-theme') as 'dark' | 'light' | null;
+    if (saved) setTheme(saved);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('sc-theme', theme);
+    document.documentElement.setAttribute('data-theme', theme);
+    if (theme === 'light') {
+      document.body.style.background = '#f8fafc';
+      document.body.style.color = '#0f172a';
+    } else {
+      document.body.style.background = '#0a0d14';
+      document.body.style.color = '#f1f5f9';
+    }
+  }, [theme]);
 
   const handleLogout = () => {
     fetch('/api/auth', { method: 'DELETE' }).then(() => { window.location.href = '/'; });
@@ -206,6 +224,42 @@ export default function Sidebar({ user }: { user: string }) {
           ))}
         </div>
       )}
+
+      {/* Theme Toggle */}
+      <div style={{ padding: expanded ? '6px 12px' : '6px 0', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: expanded ? 'flex-start' : 'center', gap: 8 }}>
+        {expanded ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 2, width: '100%' }}>
+            <button onClick={() => setTheme('dark')} style={{
+              flex: 1, padding: '5px 0', borderRadius: 6, border: 'none', cursor: 'pointer',
+              background: theme === 'dark' ? 'rgba(0,229,176,0.12)' : 'transparent',
+              color: theme === 'dark' ? '#00e5b0' : '#475569',
+              fontSize: '0.65rem', fontWeight: 600, fontFamily: "'Inter', system-ui",
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+              transition: 'all 0.15s',
+            }}>
+              <i className="bi bi-moon-stars-fill" style={{ fontSize: '0.7rem' }}></i> Oscuro
+            </button>
+            <button onClick={() => setTheme('light')} style={{
+              flex: 1, padding: '5px 0', borderRadius: 6, border: 'none', cursor: 'pointer',
+              background: theme === 'light' ? 'rgba(245,158,11,0.12)' : 'transparent',
+              color: theme === 'light' ? '#f59e0b' : '#475569',
+              fontSize: '0.65rem', fontWeight: 600, fontFamily: "'Inter', system-ui",
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+              transition: 'all 0.15s',
+            }}>
+              <i className="bi bi-sun-fill" style={{ fontSize: '0.7rem' }}></i> Claro
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} style={{
+            background: 'none', border: 'none', cursor: 'pointer', padding: 6,
+            color: theme === 'dark' ? '#475569' : '#f59e0b', fontSize: '0.9rem',
+            transition: 'color 0.15s',
+          }} title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
+            <i className={theme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill'}></i>
+          </button>
+        )}
+      </div>
 
       {/* User */}
       <div style={{ padding: expanded ? '0.75rem' : '0.75rem 0', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10, justifyContent: expanded ? 'flex-start' : 'center' }}>
