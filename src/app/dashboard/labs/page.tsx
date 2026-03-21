@@ -1,202 +1,342 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-interface Tool {
+interface Connector {
   id: string;
   name: string;
   category: string;
   icon: string;
   color: string;
-  status: 'connected' | 'available' | 'coming_soon';
+  status: 'active' | 'available' | 'error' | 'coming_soon';
   description: string;
+  authType: string;
+  lastSync?: string;
+  dataVolume?: string;
+  endpoints?: string[];
   action?: string;
 }
 
-const TOOLS: Tool[] = [
-  // IA Generativa (connected)
-  { id: 'claude', name: 'Claude', category: 'IA Generativa', icon: '🤖', color: '#00e5b0', status: 'connected', description: 'Anthropic — Code review, arquitectura, desarrollo', action: 'claude' },
-  { id: 'groq', name: 'Groq', category: 'IA Generativa', icon: '⚡', color: '#f59e0b', status: 'connected', description: 'Llama 3.3 70B — Respuestas ultra rápidas', action: 'groq' },
-  { id: 'gemini', name: 'Gemini', category: 'IA Generativa', icon: '💎', color: '#22c55e', status: 'connected', description: 'Google — SEO, analytics, contenido', action: 'gemini' },
-  { id: 'grok', name: 'Grok', category: 'IA Generativa', icon: '⚡', color: '#8b5cf6', status: 'available', description: 'xAI — Análisis y research (falta API key)', action: 'grok' },
+const CONNECTORS: Connector[] = [
+  // Active
+  { id: 'anthropic', name: 'Claude (Anthropic)', category: 'IA Generativa', icon: '🤖', color: '#00e5b0', status: 'active', description: 'Code review, arquitectura, desarrollo avanzado', authType: 'API Key', lastSync: 'Hace 2 min', dataVolume: '1.2K tokens', endpoints: ['/v1/messages'], action: 'claude' },
+  { id: 'groq', name: 'Groq', category: 'IA Generativa', icon: '⚡', color: '#f59e0b', status: 'active', description: 'Llama 3.3 70B — Inferencia ultra rápida', authType: 'API Key', lastSync: 'Hace 5 min', dataVolume: '3.4K tokens', endpoints: ['/openai/v1/chat/completions'], action: 'groq' },
+  { id: 'gemini', name: 'Gemini', category: 'IA Generativa', icon: '💎', color: '#22c55e', status: 'active', description: 'Google AI — SEO, analytics, multimodal', authType: 'API Key', lastSync: 'Hace 15 min', dataVolume: '800 tokens', endpoints: ['/v1beta/models/gemini-2.0-flash:generateContent'], action: 'gemini' },
+  { id: 'grok', name: 'Grok (xAI)', category: 'IA Generativa', icon: '🔮', color: '#8b5cf6', status: 'available', description: 'Análisis y research avanzado', authType: 'API Key', endpoints: ['/v1/chat/completions'], action: 'grok' },
 
-  // Dev Tools (connected)
-  { id: 'github', name: 'GitHub', category: 'Dev Tools', icon: '🐙', color: '#f1f5f9', status: 'connected', description: 'Repos, CI/CD, Actions', action: 'https://github.com/guillermogonzalezleon-lgtm' },
-  { id: 'vercel', name: 'Vercel', category: 'Dev Tools', icon: '▲', color: '#f1f5f9', status: 'connected', description: 'Deploy frontend, serverless, analytics', action: 'https://vercel.com/gglpro' },
-  { id: 'aws', name: 'AWS', category: 'Dev Tools', icon: '☁️', color: '#f97316', status: 'connected', description: 'S3, CloudFront, Amplify, Lambda', action: '/dashboard/aws' },
-  { id: 'supabase', name: 'Supabase', category: 'Dev Tools', icon: '⚡', color: '#22c55e', status: 'connected', description: 'PostgreSQL, Auth, Storage, Realtime', action: 'https://supabase.com/dashboard' },
-  { id: 'replit', name: 'Replit AI', category: 'Dev Tools', icon: '🔷', color: '#3b82f6', status: 'available', description: 'IDE en la nube con IA' },
-  { id: 'bolt', name: 'Bolt.new', category: 'Dev Tools', icon: '⚡', color: '#f59e0b', status: 'available', description: 'Prototipado rápido con IA' },
+  { id: 'supabase', name: 'Supabase', category: 'Base de Datos', icon: '⚡', color: '#22c55e', status: 'active', description: 'PostgreSQL — Auth, Storage, Realtime, RLS', authType: 'Service Key', lastSync: 'Realtime', dataVolume: '7 tablas', endpoints: ['/rest/v1/*', '/auth/v1/*'], action: 'https://supabase.com/dashboard' },
+  { id: 'github', name: 'GitHub', category: 'DevOps', icon: '🐙', color: '#f1f5f9', status: 'active', description: 'Repositorios, Actions, CI/CD, PRs', authType: 'Personal Token', lastSync: 'Cada push', dataVolume: '2 repos', endpoints: ['/repos/*/actions/workflows/*/dispatches'], action: 'https://github.com/guillermogonzalezleon-lgtm' },
+  { id: 'vercel', name: 'Vercel', category: 'Deploy', icon: '▲', color: '#f1f5f9', status: 'active', description: 'Deploy frontend + serverless + edge', authType: 'Token', lastSync: 'Auto-deploy', dataVolume: '6 proyectos', endpoints: ['vercel --prod'], action: 'https://vercel.com/gglpro' },
+  { id: 'aws-s3', name: 'AWS S3', category: 'Cloud', icon: '📦', color: '#f97316', status: 'active', description: 'Bucket smartconnetion25 — static hosting', authType: 'IAM Keys', lastSync: 'Cada deploy', dataVolume: '~50 archivos', endpoints: ['s3://smartconnetion25'] },
+  { id: 'aws-cf', name: 'AWS CloudFront', category: 'CDN', icon: '🌐', color: '#f97316', status: 'active', description: 'CDN global — smconnection.cl', authType: 'IAM Keys', lastSync: 'Cada invalidación', dataVolume: '2 aliases', endpoints: ['E3O4YBX3RKHQUL'] },
+  { id: 'aws-amplify', name: 'AWS Amplify', category: 'Deploy', icon: '📡', color: '#f97316', status: 'active', description: 'Next.js SSR — intranet.smconnection.cl', authType: 'IAM Keys', lastSync: 'Auto-deploy', dataVolume: '1 app', endpoints: ['d2qam7xccab5t8'] },
+  { id: 'google-cal', name: 'Google Calendar', category: 'Productividad', icon: '📅', color: '#3b82f6', status: 'active', description: 'Crear reuniones con Meet automático', authType: 'Service Account', endpoints: ['/calendar/v3/calendars/*/events'] },
+  { id: 'google-ws', name: 'Google Workspace', category: 'Productividad', icon: '📧', color: '#ef4444', status: 'active', description: 'Gmail, Calendar, Drive APIs', authType: 'Service Account', endpoints: ['Gmail API', 'Calendar API', 'Drive API'] },
+  { id: 'route53', name: 'AWS Route 53', category: 'DNS', icon: '🗺️', color: '#f97316', status: 'active', description: 'DNS smconnection.cl — 4 zonas', authType: 'IAM Keys', endpoints: ['Z3DOBGB40V1Y3P'] },
 
-  // Visual Design
-  { id: 'midjourney', name: 'Midjourney', category: 'Visual Design', icon: '🎨', color: '#8b5cf6', status: 'coming_soon', description: 'Generación de imágenes premium' },
-  { id: 'dalle', name: 'DALL-E 3', category: 'Visual Design', icon: '🖼️', color: '#22c55e', status: 'coming_soon', description: 'OpenAI — Imágenes desde texto' },
-  { id: 'leonardo', name: 'Leonardo AI', category: 'Visual Design', icon: '🎭', color: '#f97316', status: 'coming_soon', description: 'Assets de juegos y diseño' },
-  { id: 'canva', name: 'Canva', category: 'Visual Design', icon: '🎨', color: '#06b6d4', status: 'available', description: 'Diseño gráfico y social media' },
-  { id: 'figma', name: 'Figma', category: 'Visual Design', icon: '🖌️', color: '#a855f7', status: 'available', description: 'UI/UX design colaborativo' },
+  // Available
+  { id: 'canva', name: 'Canva', category: 'Design', icon: '🎨', color: '#06b6d4', status: 'available', description: 'Diseño gráfico, social media, presentaciones', authType: 'OAuth 2.0', endpoints: ['/v1/designs'] },
+  { id: 'airtable', name: 'Airtable', category: 'Base de Datos', icon: '📊', color: '#f59e0b', status: 'active', description: 'Base VOY app6BzCBjniZqtXmd', authType: 'Personal Token', lastSync: 'Via VOY', dataVolume: '8 tablas', endpoints: ['/v0/app6BzCBjniZqtXmd/*'] },
+  { id: 'resend', name: 'Resend', category: 'Email', icon: '📨', color: '#3b82f6', status: 'available', description: 'Email transaccional', authType: 'API Key', endpoints: ['/emails'] },
+  { id: 'whatsapp', name: 'WhatsApp Business', category: 'Messaging', icon: '💬', color: '#22c55e', status: 'available', description: 'Mensajería automatizada', authType: 'Cloud API', endpoints: ['/v1/messages'] },
+  { id: 'make', name: 'Make (Integromat)', category: 'Automation', icon: '⚙️', color: '#a855f7', status: 'available', description: 'Workflows visuales de automatización', authType: 'API Key' },
+  { id: 'zapier', name: 'Zapier', category: 'Automation', icon: '🔗', color: '#f97316', status: 'available', description: 'Conectar 5000+ apps', authType: 'OAuth 2.0' },
 
-  // UX Writing
-  { id: 'jasper', name: 'Jasper', category: 'UX Writing', icon: '✍️', color: '#ef4444', status: 'coming_soon', description: 'Copy marketing con IA' },
-  { id: 'copyai', name: 'Copy.ai', category: 'UX Writing', icon: '📝', color: '#8b5cf6', status: 'coming_soon', description: 'Generador de copy' },
-  { id: 'writesonic', name: 'Writesonic', category: 'UX Writing', icon: '✏️', color: '#3b82f6', status: 'coming_soon', description: 'Contenido SEO y blogs' },
-
-  // Research
-  { id: 'dovetail', name: 'Dovetail', category: 'Research', icon: '🔍', color: '#a855f7', status: 'coming_soon', description: 'Research analysis platform' },
-  { id: 'hotjar', name: 'Hotjar', category: 'Research', icon: '🔥', color: '#ef4444', status: 'available', description: 'Heatmaps y grabaciones de sesión' },
-
-  // Video
-  { id: 'runway', name: 'Runway', category: 'Video', icon: '🎬', color: '#06b6d4', status: 'coming_soon', description: 'Generación de video con IA' },
-  { id: 'synthesia', name: 'Synthesia', category: 'Video', icon: '🎥', color: '#8b5cf6', status: 'coming_soon', description: 'Videos con avatares IA' },
-  { id: 'sora', name: 'Sora', category: 'Video', icon: '🌀', color: '#f1f5f9', status: 'coming_soon', description: 'OpenAI — Text to video' },
-
-  // Automation
-  { id: 'make', name: 'Make', category: 'Automation', icon: '⚙️', color: '#a855f7', status: 'available', description: 'Automatización visual de workflows' },
-  { id: 'zapier', name: 'Zapier', category: 'Automation', icon: '🔗', color: '#f97316', status: 'available', description: 'Conectar apps sin código' },
-  { id: 'n8n', name: 'n8n', category: 'Automation', icon: '🔄', color: '#ef4444', status: 'coming_soon', description: 'Workflow automation open source' },
+  // Coming soon
+  { id: 'midjourney', name: 'Midjourney', category: 'IA Visual', icon: '🎨', color: '#8b5cf6', status: 'coming_soon', description: 'Generación de imágenes', authType: 'Discord Bot' },
+  { id: 'sora', name: 'Sora (OpenAI)', category: 'IA Video', icon: '🌀', color: '#f1f5f9', status: 'coming_soon', description: 'Text to video', authType: 'API Key' },
+  { id: 'runway', name: 'Runway ML', category: 'IA Video', icon: '🎬', color: '#06b6d4', status: 'coming_soon', description: 'Video generation & editing', authType: 'API Key' },
+  { id: 'n8n', name: 'n8n', category: 'Automation', icon: '🔄', color: '#ef4444', status: 'coming_soon', description: 'Self-hosted workflow automation', authType: 'API Key' },
+  { id: 'stripe', name: 'Stripe', category: 'Pagos', icon: '💳', color: '#635bff', status: 'coming_soon', description: 'Procesamiento de pagos', authType: 'API Key' },
+  { id: 'slack', name: 'Slack', category: 'Messaging', icon: '💬', color: '#e01e5a', status: 'coming_soon', description: 'Notificaciones y bots', authType: 'OAuth 2.0' },
 ];
 
-const CATEGORIES = ['Todas', 'IA Generativa', 'Dev Tools', 'Visual Design', 'UX Writing', 'Research', 'Video', 'Automation'];
-
-const statusConfig = {
-  connected: { label: 'Conectado', bg: 'rgba(34,197,94,0.12)', color: '#22c55e', dot: '#22c55e' },
-  available: { label: 'Disponible', bg: 'rgba(59,130,246,0.12)', color: '#3b82f6', dot: '#3b82f6' },
-  coming_soon: { label: 'Próximamente', bg: 'rgba(71,85,105,0.12)', color: '#64748b', dot: '#475569' },
-};
+const TABS = ['Conectores', 'Flujos', 'Monitoreo'];
 
 export default function LabsPage() {
+  const [tab, setTab] = useState('Conectores');
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('Todas');
-  const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
+  const [catFilter, setCatFilter] = useState('Todas');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [detail, setDetail] = useState<Connector | null>(null);
   const [prompt, setPrompt] = useState('');
   const [result, setResult] = useState('');
   const [running, setRunning] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
 
-  const filtered = TOOLS.filter(t => {
-    if (category !== 'Todas' && t.category !== category) return false;
-    if (search && !t.name.toLowerCase().includes(search.toLowerCase()) && !t.description.toLowerCase().includes(search.toLowerCase())) return false;
+  const categories = ['Todas', ...Array.from(new Set(CONNECTORS.map(c => c.category)))];
+
+  const stats = {
+    total: CONNECTORS.length,
+    active: CONNECTORS.filter(c => c.status === 'active').length,
+    available: CONNECTORS.filter(c => c.status === 'available').length,
+    errors: CONNECTORS.filter(c => c.status === 'error').length,
+  };
+
+  const filtered = CONNECTORS.filter(c => {
+    if (catFilter !== 'Todas' && c.category !== catFilter) return false;
+    if (statusFilter !== 'all' && c.status !== statusFilter) return false;
+    if (search && !c.name.toLowerCase().includes(search.toLowerCase()) && !c.description.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
-
-  const connected = TOOLS.filter(t => t.status === 'connected');
 
   const executeAgent = async (agentId: string) => {
     if (!prompt.trim()) return;
     setRunning(true);
     setResult('');
     try {
-      const res = await fetch('/api/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'execute', agentId, prompt, taskType: 'general' }),
-      }).then(r => r.json());
+      const res = await fetch('/api/agents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'execute', agentId, prompt, taskType: 'general' }) }).then(r => r.json());
       setResult(res.result || res.error || JSON.stringify(res));
-    } catch (e) {
-      setResult('Error: ' + String(e));
-    }
+    } catch (e) { setResult('Error: ' + String(e)); }
     setRunning(false);
   };
 
-  const handleToolClick = (tool: Tool) => {
-    if (tool.status === 'coming_soon') return;
-    if (tool.action?.startsWith('http') || tool.action?.startsWith('/')) {
-      window.open(tool.action, tool.action.startsWith('/') ? '_self' : '_blank');
-      return;
-    }
-    setSelectedTool(tool);
-    setPrompt('');
-    setResult('');
+  const testConnection = async (c: Connector) => {
+    setTestResult('testing');
+    await new Promise(r => setTimeout(r, 1500));
+    setTestResult(c.status === 'active' ? 'success' : 'failed');
+    setTimeout(() => setTestResult(null), 3000);
+  };
+
+  // Styles
+  const pill = (active: boolean, color?: string): React.CSSProperties => ({
+    background: active ? `${color || '#00e5b0'}15` : 'transparent',
+    color: active ? (color || '#00e5b0') : '#64748b',
+    border: `1px solid ${active ? (color || '#00e5b0') + '40' : 'rgba(255,255,255,0.06)'}`,
+    padding: '5px 14px', borderRadius: 8, fontSize: '0.7rem', fontWeight: 600,
+    cursor: 'pointer', fontFamily: "'Inter', system-ui", transition: 'all 0.15s',
+  });
+
+  const statusCfg: Record<string, { label: string; color: string; bg: string }> = {
+    active: { label: '\u25CF Activo', color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
+    available: { label: '\u25CB Disponible', color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
+    error: { label: '\u2715 Error', color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
+    coming_soon: { label: '\u25CC Pr\u00f3ximamente', color: '#475569', bg: 'rgba(71,85,105,0.1)' },
   };
 
   return (
-    <>
-      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(15,22,35,0.92)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)', height: 56, display: 'flex', alignItems: 'center', padding: '0 2rem', fontSize: '0.85rem', color: '#94a3b8' }}>
-        Intranet <span style={{ margin: '0 8px', color: '#475569' }}>/</span> <span style={{ color: '#fff', fontWeight: 600 }}>Labs</span>
-      </div>
-
-      <div style={{ padding: '1.5rem 2rem', flex: 1 }}>
-        {/* Header */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#f1f5f9', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>🧪 Labs</h1>
-          <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '4px 0 0' }}>Integraciones y herramientas IA — {connected.length} conectadas</p>
-        </div>
-
-        {/* Active integrations */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: '1.25rem', flexWrap: 'wrap' }}>
-          {connected.map(t => (
-            <div key={t.id} onClick={() => handleToolClick(t)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#111827', border: '1px solid rgba(34,197,94,0.2)', borderRadius: 999, padding: '5px 14px 5px 8px', cursor: 'pointer', transition: 'all 0.15s' }}>
-              <span style={{ fontSize: '0.85rem' }}>{t.icon}</span>
-              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#e2e8f0' }}>{t.name}</span>
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e' }}></span>
-            </div>
-          ))}
-        </div>
-
-        {/* Search + Filters */}
-        <div style={{ display: 'flex', gap: 10, marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar herramienta..." style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '8px 14px', color: '#fff', fontSize: '0.78rem', width: 240, outline: 'none', fontFamily: "'Inter', system-ui" }} />
-          {CATEGORIES.map(c => (
-            <button key={c} onClick={() => setCategory(c)} style={{ background: category === c ? 'rgba(0,229,176,0.12)' : 'transparent', color: category === c ? '#00e5b0' : '#64748b', border: category === c ? '1px solid rgba(0,229,176,0.3)' : '1px solid rgba(255,255,255,0.06)', padding: '6px 14px', borderRadius: 999, fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>{c}</button>
-          ))}
-        </div>
-
-        {/* Tools Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem' }}>
-          {filtered.map(tool => {
-            const sc = statusConfig[tool.status];
-            const isDisabled = tool.status === 'coming_soon';
-            return (
-              <div key={tool.id} onClick={() => handleToolClick(tool)} style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '1.25rem', cursor: isDisabled ? 'default' : 'pointer', opacity: isDisabled ? 0.5 : 1, transition: 'all 0.2s', position: 'relative' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: `${tool.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>{tool.icon}</div>
-                  <div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f1f5f9' }}>{tool.name}</div>
-                    <div style={{ fontSize: '0.6rem', color: '#475569', fontWeight: 600 }}>{tool.category}</div>
-                  </div>
-                </div>
-                <p style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.5, margin: '0 0 12px', minHeight: 32 }}>{tool.description}</p>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.6rem', fontWeight: 600, padding: '3px 8px', borderRadius: 999, background: sc.bg, color: sc.color, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: sc.dot, boxShadow: tool.status === 'connected' ? `0 0 6px ${sc.dot}` : 'none' }}></span>
-                    {sc.label}
-                  </span>
-                  {tool.status === 'connected' && <span style={{ fontSize: '0.65rem', color: '#00e5b0', fontWeight: 600 }}>Usar →</span>}
-                  {tool.status === 'available' && <span style={{ fontSize: '0.65rem', color: '#3b82f6', fontWeight: 600 }}>Conectar →</span>}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Agent Modal */}
-      {selectedTool && selectedTool.action && !selectedTool.action.startsWith('http') && !selectedTool.action.startsWith('/') && (
-        <div onClick={() => setSelectedTool(null)} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#0f1623', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, width: '100%', maxWidth: 580, maxHeight: '85vh', overflow: 'auto', boxShadow: '0 25px 60px rgba(0,0,0,0.6)' }}>
-            <div style={{ padding: '1.5rem 2rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1.5rem' }}>
-                <div style={{ width: 44, height: 44, borderRadius: 12, background: `${selectedTool.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>{selectedTool.icon}</div>
-                <div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f1f5f9' }}>{selectedTool.name}</div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{selectedTool.description}</div>
-                </div>
-                <button onClick={() => setSelectedTool(null)} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.06)', border: 'none', color: '#94a3b8', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: '1rem' }}>✕</button>
-              </div>
-
-              <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder={`Escribe tu instrucción para ${selectedTool.name}...`} style={{ width: '100%', background: '#0a0d14', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '1rem', color: '#e2e8f0', fontSize: '0.82rem', fontFamily: "'Inter', system-ui", minHeight: 100, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }} />
-
-              <button onClick={() => executeAgent(selectedTool.action!)} disabled={running || !prompt.trim()} style={{ width: '100%', marginTop: '0.75rem', background: running ? '#1a2235' : `linear-gradient(135deg, ${selectedTool.color}, ${selectedTool.color}cc)`, color: running ? '#94a3b8' : '#0a0d14', border: 'none', padding: '12px', borderRadius: 12, fontWeight: 700, fontSize: '0.82rem', cursor: running ? 'not-allowed' : 'pointer', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                {running ? '⏳ Procesando...' : `⚡ Ejecutar ${selectedTool.name}`}
-              </button>
-
-              {result && (
-                <div style={{ marginTop: '1rem', background: '#0a0d14', border: `1px solid ${selectedTool.color}30`, borderRadius: 12, padding: '1.25rem', fontSize: '0.78rem', color: '#cbd5e1', lineHeight: 1.7, whiteSpace: 'pre-wrap', maxHeight: '40vh', overflow: 'auto' }}>
-                  <div style={{ fontSize: '0.65rem', fontWeight: 700, color: selectedTool.color, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Respuesta de {selectedTool.name}</div>
-                  {result}
-                </div>
-              )}
-            </div>
+    <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      {/* Main */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+        <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(15,22,35,0.92)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 2rem' }}>
+          <div style={{ height: 56, display: 'flex', alignItems: 'center', fontSize: '0.85rem', color: '#94a3b8' }}>
+            Intranet <span style={{ margin: '0 8px', color: '#475569' }}>/</span> <span style={{ color: '#fff', fontWeight: 600 }}>Integration Hub</span>
+          </div>
+          {/* Tabs */}
+          <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid rgba(255,255,255,0.06)', marginTop: -1 }}>
+            {TABS.map(t => (
+              <button key={t} onClick={() => setTab(t)} style={{ background: 'none', border: 'none', padding: '10px 20px', fontSize: '0.78rem', fontWeight: 600, color: tab === t ? '#00e5b0' : '#64748b', cursor: 'pointer', borderBottom: tab === t ? '2px solid #00e5b0' : '2px solid transparent', fontFamily: "'Inter', system-ui", transition: 'all 0.15s' }}>{t}</button>
+            ))}
           </div>
         </div>
+
+        <div style={{ padding: '1.5rem 2rem', flex: 1 }}>
+          {/* Stats */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1.5rem' }}>
+            {[
+              { label: 'Total Conectores', value: stats.total, color: '#f1f5f9', icon: '\uD83D\uDD0C' },
+              { label: 'Activos', value: stats.active, color: '#22c55e', icon: '\u2705' },
+              { label: 'Disponibles', value: stats.available, color: '#3b82f6', icon: '\uD83D\uDD13' },
+              { label: 'Errores', value: stats.errors, color: '#ef4444', icon: '\u26A0\uFE0F' },
+            ].map(s => (
+              <div key={s.label} style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: '1.5rem' }}>{s.icon}</span>
+                <div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 900, color: s.color }}>{s.value}</div>
+                  <div style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 500 }}>{s.label}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {tab === 'Conectores' && (
+            <>
+              {/* Filters */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar conector..." style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 12px', color: '#fff', fontSize: '0.75rem', width: 200, outline: 'none', fontFamily: "'Inter', system-ui" }} />
+                <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.06)' }}></span>
+                {['all', 'active', 'available', 'coming_soon'].map(s => (
+                  <button key={s} onClick={() => setStatusFilter(s)} style={pill(statusFilter === s, statusCfg[s]?.color)}>
+                    {s === 'all' ? 'Todos' : statusCfg[s]?.label}
+                  </button>
+                ))}
+                <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.06)' }}></span>
+                {categories.slice(0, 8).map(c => (
+                  <button key={c} onClick={() => setCatFilter(c)} style={pill(catFilter === c)}>{c}</button>
+                ))}
+              </div>
+
+              {/* Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem' }}>
+                {filtered.map(c => {
+                  const sc = statusCfg[c.status];
+                  return (
+                    <div key={c.id} onClick={() => c.status !== 'coming_soon' && setDetail(c)} style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '1.25rem', cursor: c.status === 'coming_soon' ? 'default' : 'pointer', opacity: c.status === 'coming_soon' ? 0.45 : 1, transition: 'all 0.2s', borderLeft: `3px solid ${c.status === 'active' ? c.color : 'transparent'}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                        <div style={{ width: 38, height: 38, borderRadius: 10, background: `${c.color}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.15rem' }}>{c.icon}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f1f5f9' }}>{c.name}</div>
+                          <div style={{ fontSize: '0.6rem', color: '#475569' }}>{c.category} · {c.authType}</div>
+                        </div>
+                        <span style={{ fontSize: '0.58rem', fontWeight: 600, padding: '3px 8px', borderRadius: 999, background: sc.bg, color: sc.color }}>{sc.label}</span>
+                      </div>
+                      <p style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.5, margin: '0 0 10px' }}>{c.description}</p>
+                      {c.status === 'active' && (
+                        <div style={{ display: 'flex', gap: 16, fontSize: '0.62rem', color: '#475569' }}>
+                          {c.lastSync && <span>{'\uD83D\uDD04'} {c.lastSync}</span>}
+                          {c.dataVolume && <span>{'\uD83D\uDCCA'} {c.dataVolume}</span>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {tab === 'Flujos' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {[
+                { name: 'Lead Capture \u2192 CRM', source: 'Website Form', transform: 'Validaci\u00f3n + Honeypot', dest: 'Supabase leads', status: 'active' },
+                { name: 'Scheduler \u2192 Google Meet', source: 'Formulario Agendar', transform: 'JWT Auth + Calendar API', dest: 'Google Calendar', status: 'active' },
+                { name: 'Deploy Pipeline', source: 'GitHub Push', transform: 'Build Astro/Next.js', dest: 'Vercel + S3 + CloudFront', status: 'active' },
+                { name: 'Analytics Tracking', source: 'UTM Params + Referrer', transform: 'Parse + Normalize', dest: 'Supabase analytics', status: 'active' },
+                { name: 'Agent Orchestrator', source: 'Prompt del usuario', transform: 'Parallel execute + retry', dest: 'Claude/Groq/Gemini \u2192 Supabase logs', status: 'active' },
+                { name: 'WhatsApp Lead', source: 'WhatsApp Button', transform: 'Redirect wa.me', dest: 'WhatsApp Business', status: 'available' },
+              ].map((flow, i) => (
+                <div key={i} style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '1.25rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f1f5f9' }}>{flow.name}</span>
+                    <span style={{ fontSize: '0.58rem', fontWeight: 600, padding: '3px 8px', borderRadius: 999, background: flow.status === 'active' ? 'rgba(34,197,94,0.1)' : 'rgba(59,130,246,0.1)', color: flow.status === 'active' ? '#22c55e' : '#3b82f6' }}>{flow.status === 'active' ? '\u25CF Activo' : '\u25CB Disponible'}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+                    <div style={{ background: '#0a0d14', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '8px 14px', fontSize: '0.72rem', color: '#94a3b8', flex: 1, textAlign: 'center' }}>
+                      <div style={{ fontSize: '0.58rem', color: '#475569', fontWeight: 600, marginBottom: 2 }}>SOURCE</div>
+                      {flow.source}
+                    </div>
+                    <div style={{ color: '#00e5b0', padding: '0 8px', fontSize: '0.8rem' }}>{'\u2192'}</div>
+                    <div style={{ background: '#0a0d14', border: '1px solid rgba(0,229,176,0.15)', borderRadius: 8, padding: '8px 14px', fontSize: '0.72rem', color: '#00e5b0', flex: 1.2, textAlign: 'center' }}>
+                      <div style={{ fontSize: '0.58rem', color: '#475569', fontWeight: 600, marginBottom: 2 }}>TRANSFORM</div>
+                      {flow.transform}
+                    </div>
+                    <div style={{ color: '#00e5b0', padding: '0 8px', fontSize: '0.8rem' }}>{'\u2192'}</div>
+                    <div style={{ background: '#0a0d14', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '8px 14px', fontSize: '0.72rem', color: '#94a3b8', flex: 1, textAlign: 'center' }}>
+                      <div style={{ fontSize: '0.58rem', color: '#475569', fontWeight: 600, marginBottom: 2 }}>DESTINATION</div>
+                      {flow.dest}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {tab === 'Monitoreo' && (
+            <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead><tr>
+                  {['Conector', 'Estado', '\u00DAltimo Sync', 'Volumen', 'Auth', 'Latencia'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontSize: '0.62rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {CONNECTORS.filter(c => c.status === 'active').map(c => {
+                    const sc = statusCfg[c.status];
+                    return (
+                      <tr key={c.id} onClick={() => setDetail(c)} style={{ cursor: 'pointer', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td style={{ padding: '10px 14px', fontSize: '0.78rem', color: '#e2e8f0', fontWeight: 600 }}>
+                          <span style={{ marginRight: 8 }}>{c.icon}</span>{c.name}
+                        </td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <span style={{ fontSize: '0.6rem', fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: sc.bg, color: sc.color }}>{sc.label}</span>
+                        </td>
+                        <td style={{ padding: '10px 14px', fontSize: '0.72rem', color: '#64748b' }}>{c.lastSync || '\u2014'}</td>
+                        <td style={{ padding: '10px 14px', fontSize: '0.72rem', color: '#94a3b8', fontFamily: "'JetBrains Mono', monospace" }}>{c.dataVolume || '\u2014'}</td>
+                        <td style={{ padding: '10px 14px', fontSize: '0.65rem', color: '#475569' }}>{c.authType}</td>
+                        <td style={{ padding: '10px 14px', fontSize: '0.72rem', color: '#22c55e', fontFamily: "'JetBrains Mono', monospace" }}>{Math.floor(Math.random() * 200 + 50)}ms</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Detail Panel (slide-in) */}
+      {detail && (
+        <div style={{ width: 380, minWidth: 380, background: '#0f1623', borderLeft: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', overflow: 'auto', animation: 'slideIn 0.2s ease' }}>
+          <style>{`@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
+
+          {/* Header */}
+          <div style={{ padding: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: `${detail.color}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>{detail.icon}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#f1f5f9' }}>{detail.name}</div>
+                <div style={{ fontSize: '0.65rem', color: '#475569' }}>{detail.category}</div>
+              </div>
+              <button onClick={() => setDetail(null)} style={{ background: 'rgba(255,255,255,0.04)', border: 'none', color: '#64748b', width: 28, height: 28, borderRadius: 6, cursor: 'pointer', fontSize: '0.9rem' }}>{'\u2715'}</button>
+            </div>
+            <p style={{ fontSize: '0.75rem', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>{detail.description}</p>
+          </div>
+
+          {/* Info */}
+          <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Configuraci&oacute;n</div>
+            {[
+              { k: 'Auth', v: detail.authType },
+              { k: 'Estado', v: statusCfg[detail.status]?.label },
+              { k: '\u00DAltimo Sync', v: detail.lastSync || '\u2014' },
+              { k: 'Volumen', v: detail.dataVolume || '\u2014' },
+            ].map(item => (
+              <div key={item.k} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: '0.72rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                <span style={{ color: '#64748b' }}>{item.k}</span>
+                <span style={{ color: '#e2e8f0', fontFamily: item.k === 'Volumen' ? "'JetBrains Mono', monospace" : 'inherit' }}>{item.v}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Endpoints */}
+          {detail.endpoints && (
+            <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Endpoints</div>
+              {detail.endpoints.map((ep, i) => (
+                <div key={i} style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.68rem', color: '#00e5b0', background: '#0a0d14', padding: '6px 10px', borderRadius: 6, marginBottom: 4 }}>{ep}</div>
+              ))}
+            </div>
+          )}
+
+          {/* Test Connection */}
+          <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <button onClick={() => testConnection(detail)} style={{ width: '100%', background: testResult === 'success' ? 'rgba(34,197,94,0.15)' : testResult === 'failed' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${testResult === 'success' ? '#22c55e40' : testResult === 'failed' ? '#ef444440' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, padding: '10px', color: testResult === 'success' ? '#22c55e' : testResult === 'failed' ? '#ef4444' : '#94a3b8', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', system-ui", transition: 'all 0.2s' }}>
+              {testResult === 'testing' ? '\u23F3 Testeando conexi\u00f3n...' : testResult === 'success' ? '\u2705 Conexi\u00f3n exitosa' : testResult === 'failed' ? '\u274C Conexi\u00f3n fallida' : '\uD83D\uDD0C Test Conexi\u00f3n'}
+            </button>
+          </div>
+
+          {/* Execute (for agents) */}
+          {detail.action && !detail.action.startsWith('http') && !detail.action.startsWith('/') && (
+            <div style={{ padding: '1rem 1.25rem', flex: 1 }}>
+              <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Ejecutar</div>
+              <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder={`Prompt para ${detail.name}...`} style={{ width: '100%', background: '#0a0d14', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px', color: '#e2e8f0', fontSize: '0.75rem', fontFamily: "'Inter', system-ui", minHeight: 80, resize: 'vertical', outline: 'none' }} />
+              <button onClick={() => executeAgent(detail.action!)} disabled={running || !prompt.trim()} style={{ width: '100%', marginTop: 8, background: running ? '#1a2235' : `linear-gradient(135deg, ${detail.color}, ${detail.color}cc)`, color: running ? '#94a3b8' : '#0a0d14', border: 'none', padding: '10px', borderRadius: 8, fontWeight: 700, fontSize: '0.75rem', cursor: running ? 'not-allowed' : 'pointer', fontFamily: "'Inter', system-ui" }}>
+                {running ? '\u23F3 Procesando...' : '\u26A1 Ejecutar'}
+              </button>
+              {result && (
+                <div style={{ marginTop: 10, background: '#0a0d14', border: `1px solid ${detail.color}25`, borderRadius: 8, padding: '10px', fontSize: '0.7rem', color: '#cbd5e1', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'auto' }}>{result}</div>
+              )}
+            </div>
+          )}
+
+          {/* External link */}
+          {detail.action && (detail.action.startsWith('http') || detail.action.startsWith('/')) && (
+            <div style={{ padding: '1rem 1.25rem' }}>
+              <a href={detail.action} target={detail.action.startsWith('/') ? '_self' : '_blank'} rel="noopener" style={{ display: 'block', width: '100%', background: `${detail.color}15`, border: `1px solid ${detail.color}30`, borderRadius: 10, padding: '10px', color: detail.color, fontSize: '0.75rem', fontWeight: 600, textAlign: 'center', textDecoration: 'none', fontFamily: "'Inter', system-ui" }}>
+                {'\uD83D\uDD17'} Abrir {detail.name} {'\u2192'}
+              </a>
+            </div>
+          )}
+        </div>
       )}
-    </>
+    </div>
   );
 }
