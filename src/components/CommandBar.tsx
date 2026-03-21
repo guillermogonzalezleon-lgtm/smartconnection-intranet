@@ -34,9 +34,10 @@ export default function CommandBar() {
     { id: 'nav-labs', icon: '🧪', label: 'Labs', group: 'Navegar', action: () => { setOpen(false); router.push('/dashboard/labs'); }, shortcut: '⌘7' },
     { id: 'nav-aws', icon: '☁', label: 'AWS Panel', group: 'Navegar', action: () => { setOpen(false); router.push('/dashboard/aws'); } },
     // Agents
-    { id: 'agent-claude', icon: '●', label: 'Claude — Code Review & Dev', group: 'Agentes', action: () => { setOpen(false); router.push('/dashboard/labs'); }, color: '#00e5b0' },
-    { id: 'agent-groq', icon: '●', label: 'Groq — Inferencia rápida', group: 'Agentes', action: () => { setOpen(false); router.push('/dashboard/labs'); }, color: '#f59e0b' },
-    { id: 'agent-gemini', icon: '●', label: 'Gemini — SEO & Analytics', group: 'Agentes', action: () => { setOpen(false); router.push('/dashboard/labs'); }, color: '#22c55e' },
+    { id: 'agent-hoku', icon: '🔥', label: 'Hoku — Fusión de 4 agentes', group: 'Agentes', action: () => { setOpen(false); router.push('/dashboard/ux-agent?tab=workspace'); }, color: '#ff6b6b' },
+    { id: 'agent-claude', icon: '●', label: 'Claude — Code Review & Dev', group: 'Agentes', action: () => { setOpen(false); router.push('/dashboard/ux-agent?tab=workspace'); }, color: '#00e5b0' },
+    { id: 'agent-groq', icon: '●', label: 'Groq — Inferencia rápida', group: 'Agentes', action: () => { setOpen(false); router.push('/dashboard/ux-agent?tab=workspace'); }, color: '#f59e0b' },
+    { id: 'agent-gemini', icon: '●', label: 'Gemini — SEO & Analytics', group: 'Agentes', action: () => { setOpen(false); router.push('/dashboard/ux-agent?tab=workspace'); }, color: '#22c55e' },
   ];
 
   const filtered = query.trim()

@@ -25,6 +25,7 @@ const estadoColors: Record<string, { bg: string; text: string }> = {
 const catColors: Record<string, string> = { 'Conversión': '#ef4444', SEO: '#8b5cf6', Contenido: '#f59e0b', Navegación: '#3b82f6', WhatsApp: '#22c55e', i18n: '#00e5b0', Checkout: '#f97316' };
 
 const AGENTS = [
+  { id: 'hoku', name: 'Hoku', model: 'fusión 4 agentes', color: '#ff6b6b', role: 'Síntesis — ejecuta los 4 agentes y combina lo mejor', special: true },
   { id: 'groq', name: 'Groq', model: 'llama-3.3-70b', color: '#f59e0b', role: 'Inferencia ultra rápida' },
   { id: 'claude', name: 'Claude', model: 'claude-sonnet-4-5', color: '#00e5b0', role: 'Desarrollo & Code Review' },
   { id: 'gemini', name: 'Gemini', model: 'gemini-2.0-flash', color: '#22c55e', role: 'SEO & Analytics' },
@@ -32,6 +33,7 @@ const AGENTS = [
 ];
 
 const PLACEHOLDERS: Record<string, string> = {
+  hoku: 'Analiza smconnection.cl desde todos los ángulos: código, SEO, UX, mercado...',
   groq: 'Analiza UX del sitio smconnection.cl...',
   claude: 'Revisa el código y sugiere mejoras de rendimiento...',
   gemini: 'Genera mejoras SEO para la landing page...',
@@ -364,21 +366,32 @@ export default function UXAgent() {
               <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Agentes</div>
             </div>
             <div style={{ padding: '0 8px', flex: 1 }}>
-              {AGENTS.map(a => (
-                <div key={a.id} onClick={() => setSelectedAgent(a.id)} style={{
-                  padding: '10px 12px', borderRadius: 10, marginBottom: 3, cursor: 'pointer',
-                  background: selectedAgent === a.id ? `${a.color}10` : 'transparent',
-                  border: selectedAgent === a.id ? `1px solid ${a.color}30` : '1px solid transparent',
-                  transition: 'all 0.15s',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: a.color, boxShadow: selectedAgent === a.id ? `0 0 8px ${a.color}60` : 'none' }}></span>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: selectedAgent === a.id ? a.color : '#e2e8f0' }}>{a.name}</span>
+              {AGENTS.map(a => {
+                const isHoku = a.id === 'hoku';
+                const selected = selectedAgent === a.id;
+                return (
+                  <div key={a.id} onClick={() => setSelectedAgent(a.id)} style={{
+                    padding: '10px 12px', borderRadius: 10, marginBottom: isHoku ? 8 : 3, cursor: 'pointer',
+                    background: isHoku
+                      ? (selected ? 'linear-gradient(135deg, rgba(255,107,107,0.15), rgba(139,92,246,0.15))' : 'linear-gradient(135deg, rgba(255,107,107,0.06), rgba(139,92,246,0.06))')
+                      : (selected ? `${a.color}10` : 'transparent'),
+                    border: selected ? `1px solid ${a.color}40` : isHoku ? '1px solid rgba(255,107,107,0.15)' : '1px solid transparent',
+                    transition: 'all 0.15s',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {isHoku ? (
+                        <span style={{ fontSize: '0.85rem' }}>🔥</span>
+                      ) : (
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: a.color, boxShadow: selected ? `0 0 8px ${a.color}60` : 'none' }}></span>
+                      )}
+                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: selected ? a.color : '#e2e8f0' }}>{a.name}</span>
+                      {isHoku && <span style={{ fontSize: '0.5rem', fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: 'linear-gradient(135deg, #ff6b6b, #8b5cf6)', color: '#fff', letterSpacing: '0.05em' }}>FUSION</span>}
+                    </div>
+                    <div style={{ fontSize: '0.6rem', color: '#475569', marginTop: 3, fontFamily: "'JetBrains Mono', monospace" }}>{a.model}</div>
+                    <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: 2 }}>{a.role}</div>
                   </div>
-                  <div style={{ fontSize: '0.6rem', color: '#475569', marginTop: 3, fontFamily: "'JetBrains Mono', monospace" }}>{a.model}</div>
-                  <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: 2 }}>{a.role}</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             {/* How to use */}
             <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,0.04)', fontSize: '0.6rem', color: '#334155', lineHeight: 1.6 }}>
