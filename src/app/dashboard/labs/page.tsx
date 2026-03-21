@@ -14,40 +14,54 @@ interface Connector {
   dataVolume?: string;
   endpoints?: string[];
   action?: string;
+  businessValue?: number; // 1-5, higher = more valuable
 }
 
 const CONNECTORS: Connector[] = [
-  // Active
-  { id: 'anthropic', name: 'Claude (Anthropic)', category: 'IA Generativa', icon: '🤖', color: '#00e5b0', status: 'active', description: 'Code review, arquitectura, desarrollo avanzado', authType: 'API Key', lastSync: 'Hace 2 min', dataVolume: '1.2K tokens', endpoints: ['/v1/messages'], action: 'claude' },
-  { id: 'groq', name: 'Groq', category: 'IA Generativa', icon: '⚡', color: '#f59e0b', status: 'active', description: 'Llama 3.3 70B — Inferencia ultra rápida', authType: 'API Key', lastSync: 'Hace 5 min', dataVolume: '3.4K tokens', endpoints: ['/openai/v1/chat/completions'], action: 'groq' },
-  { id: 'gemini', name: 'Gemini', category: 'IA Generativa', icon: '💎', color: '#22c55e', status: 'active', description: 'Google AI — SEO, analytics, multimodal', authType: 'API Key', lastSync: 'Hace 15 min', dataVolume: '800 tokens', endpoints: ['/v1beta/models/gemini-2.0-flash:generateContent'], action: 'gemini' },
-  { id: 'grok', name: 'Grok (xAI)', category: 'IA Generativa', icon: '🔮', color: '#8b5cf6', status: 'available', description: 'Análisis y research avanzado', authType: 'API Key', endpoints: ['/v1/chat/completions'], action: 'grok' },
+  // SAP Connectors
+  { id: 'sap-btp', name: 'SAP BTP', category: 'SAP', icon: '🔷', color: '#0070f2', status: 'available', description: 'Business Technology Platform — Integration hub, extensiones y desarrollo cloud', authType: 'OAuth 2.0', endpoints: ['/api/v1/btp/services', '/api/v1/btp/subaccounts'], businessValue: 5 },
+  { id: 'sap-s4hana', name: 'SAP S/4HANA Cloud', category: 'SAP', icon: '🏢', color: '#0070f2', status: 'available', description: 'ERP Cloud — Finanzas, logística, manufactura, ventas', authType: 'OAuth 2.0', endpoints: ['/sap/opu/odata/sap/*', '/api/v1/s4hana/'], businessValue: 5 },
+  { id: 'sap-analytics', name: 'SAP Analytics Cloud', category: 'SAP', icon: '📈', color: '#0070f2', status: 'available', description: 'Analytics & Planning — BI, predicción, planificación financiera', authType: 'OAuth 2.0', endpoints: ['/api/v1/stories', '/api/v1/models'], businessValue: 4 },
+  { id: 'sap-integration-suite', name: 'SAP Integration Suite', category: 'SAP', icon: '🔀', color: '#0070f2', status: 'available', description: 'iPaaS — Integración A2A, B2B, API Management, Event Mesh', authType: 'OAuth 2.0', endpoints: ['/api/v1/IntegrationDesigntimeArtifacts', '/api/v1/MessageProcessingLogs'], businessValue: 4 },
+  { id: 'sap-build', name: 'SAP Build', category: 'SAP', icon: '🧩', color: '#0070f2', status: 'available', description: 'Low-code/No-code — Apps, Process Automation, Work Zone', authType: 'API Key', endpoints: ['/api/v1/build/apps', '/api/v1/build/processes'], businessValue: 3 },
+  { id: 'sap-datasphere', name: 'SAP Datasphere', category: 'SAP', icon: '🗄️', color: '#0070f2', status: 'available', description: 'Data Warehouse Cloud — Modelado, federación, data marketplace', authType: 'OAuth 2.0', endpoints: ['/api/v1/datasphere/spaces', '/api/v1/datasphere/views'], businessValue: 4 },
 
-  { id: 'supabase', name: 'Supabase', category: 'Base de Datos', icon: '⚡', color: '#22c55e', status: 'active', description: 'PostgreSQL — Auth, Storage, Realtime, RLS', authType: 'Service Key', lastSync: 'Realtime', dataVolume: '7 tablas', endpoints: ['/rest/v1/*', '/auth/v1/*'], action: 'https://supabase.com/dashboard' },
-  { id: 'github', name: 'GitHub', category: 'DevOps', icon: '🐙', color: '#f1f5f9', status: 'active', description: 'Repositorios, Actions, CI/CD, PRs', authType: 'Personal Token', lastSync: 'Cada push', dataVolume: '2 repos', endpoints: ['/repos/*/actions/workflows/*/dispatches'], action: 'https://github.com/guillermogonzalezleon-lgtm' },
-  { id: 'vercel', name: 'Vercel', category: 'Deploy', icon: '▲', color: '#f1f5f9', status: 'active', description: 'Deploy frontend + serverless + edge', authType: 'Token', lastSync: 'Auto-deploy', dataVolume: '6 proyectos', endpoints: ['vercel --prod'], action: 'https://vercel.com/gglpro' },
-  { id: 'aws-s3', name: 'AWS S3', category: 'Cloud', icon: '📦', color: '#f97316', status: 'active', description: 'Bucket smartconnetion25 — static hosting', authType: 'IAM Keys', lastSync: 'Cada deploy', dataVolume: '~50 archivos', endpoints: ['s3://smartconnetion25'] },
-  { id: 'aws-cf', name: 'AWS CloudFront', category: 'CDN', icon: '🌐', color: '#f97316', status: 'active', description: 'CDN global — smconnection.cl', authType: 'IAM Keys', lastSync: 'Cada invalidación', dataVolume: '2 aliases', endpoints: ['E3O4YBX3RKHQUL'] },
-  { id: 'aws-amplify', name: 'AWS Amplify', category: 'Deploy', icon: '📡', color: '#f97316', status: 'active', description: 'Next.js SSR — intranet.smconnection.cl', authType: 'IAM Keys', lastSync: 'Auto-deploy', dataVolume: '1 app', endpoints: ['d2qam7xccab5t8'] },
-  { id: 'google-cal', name: 'Google Calendar', category: 'Productividad', icon: '📅', color: '#3b82f6', status: 'active', description: 'Crear reuniones con Meet automático', authType: 'Service Account', endpoints: ['/calendar/v3/calendars/*/events'] },
-  { id: 'google-ws', name: 'Google Workspace', category: 'Productividad', icon: '📧', color: '#ef4444', status: 'active', description: 'Gmail, Calendar, Drive APIs', authType: 'Service Account', endpoints: ['Gmail API', 'Calendar API', 'Drive API'] },
-  { id: 'route53', name: 'AWS Route 53', category: 'DNS', icon: '🗺️', color: '#f97316', status: 'active', description: 'DNS smconnection.cl — 4 zonas', authType: 'IAM Keys', endpoints: ['Z3DOBGB40V1Y3P'] },
+  // Business Tools
+  { id: 'proposal-gen', name: 'Generador de Propuestas (IA)', category: 'Business', icon: '📝', color: '#f59e0b', status: 'active', description: 'Genera propuestas de consultoría SAP con IA (Groq) — scoping, estimaciones, entregables', authType: 'API Key', lastSync: 'On demand', dataVolume: '~15 propuestas', endpoints: ['/api/agents'], action: 'proposal-gen', businessValue: 5 },
+  { id: 'client-reports', name: 'Generador de Reportes', category: 'Business', icon: '📊', color: '#3b82f6', status: 'active', description: 'Reportes automáticos de clientes desde Supabase — estado proyectos, KPIs, hitos', authType: 'Service Key', lastSync: 'Hace 1 hora', dataVolume: '12 reportes', endpoints: ['/api/reports'], action: 'client-reports', businessValue: 5 },
+  { id: 'competitor-analysis', name: 'Análisis de Competencia', category: 'Business', icon: '🎯', color: '#8b5cf6', status: 'active', description: 'Research de mercado con IA — tendencias SAP, posicionamiento, oportunidades', authType: 'API Key', lastSync: 'Semanal', dataVolume: '8 análisis', endpoints: ['/api/agents'], action: 'competitor-analysis', businessValue: 4 },
+
+  // Active
+  { id: 'anthropic', name: 'Claude (Anthropic)', category: 'IA Generativa', icon: '🤖', color: '#00e5b0', status: 'active', description: 'Code review, arquitectura, desarrollo avanzado', authType: 'API Key', lastSync: 'Hace 2 min', dataVolume: '1.2K tokens', endpoints: ['/v1/messages'], action: 'claude', businessValue: 4 },
+  { id: 'groq', name: 'Groq', category: 'IA Generativa', icon: '⚡', color: '#f59e0b', status: 'active', description: 'Llama 3.3 70B — Inferencia ultra rápida', authType: 'API Key', lastSync: 'Hace 5 min', dataVolume: '3.4K tokens', endpoints: ['/openai/v1/chat/completions'], action: 'groq', businessValue: 4 },
+  { id: 'gemini', name: 'Gemini', category: 'IA Generativa', icon: '💎', color: '#22c55e', status: 'active', description: 'Google AI — SEO, analytics, multimodal', authType: 'API Key', lastSync: 'Hace 15 min', dataVolume: '800 tokens', endpoints: ['/v1beta/models/gemini-2.0-flash:generateContent'], action: 'gemini', businessValue: 3 },
+  { id: 'grok', name: 'Grok (xAI)', category: 'IA Generativa', icon: '🔮', color: '#8b5cf6', status: 'available', description: 'Análisis y research avanzado', authType: 'API Key', endpoints: ['/v1/chat/completions'], action: 'grok', businessValue: 2 },
+
+  { id: 'supabase', name: 'Supabase', category: 'Base de Datos', icon: '⚡', color: '#22c55e', status: 'active', description: 'PostgreSQL — Auth, Storage, Realtime, RLS', authType: 'Service Key', lastSync: 'Realtime', dataVolume: '7 tablas', endpoints: ['/rest/v1/*', '/auth/v1/*'], action: 'https://supabase.com/dashboard', businessValue: 4 },
+  { id: 'github', name: 'GitHub', category: 'DevOps', icon: '🐙', color: '#f1f5f9', status: 'active', description: 'Repositorios, Actions, CI/CD, PRs', authType: 'Personal Token', lastSync: 'Cada push', dataVolume: '2 repos', endpoints: ['/repos/*/actions/workflows/*/dispatches'], action: 'https://github.com/guillermogonzalezleon-lgtm', businessValue: 3 },
+  { id: 'vercel', name: 'Vercel', category: 'Deploy', icon: '▲', color: '#f1f5f9', status: 'active', description: 'Deploy frontend + serverless + edge', authType: 'Token', lastSync: 'Auto-deploy', dataVolume: '6 proyectos', endpoints: ['vercel --prod'], action: 'https://vercel.com/gglpro', businessValue: 3 },
+  { id: 'aws-s3', name: 'AWS S3', category: 'Cloud', icon: '📦', color: '#f97316', status: 'active', description: 'Bucket smartconnetion25 — static hosting', authType: 'IAM Keys', lastSync: 'Cada deploy', dataVolume: '~50 archivos', endpoints: ['s3://smartconnetion25'], businessValue: 2 },
+  { id: 'aws-cf', name: 'AWS CloudFront', category: 'CDN', icon: '🌐', color: '#f97316', status: 'active', description: 'CDN global — smconnection.cl', authType: 'IAM Keys', lastSync: 'Cada invalidación', dataVolume: '2 aliases', endpoints: ['E3O4YBX3RKHQUL'], businessValue: 2 },
+  { id: 'aws-amplify', name: 'AWS Amplify', category: 'Deploy', icon: '📡', color: '#f97316', status: 'active', description: 'Next.js SSR — intranet.smconnection.cl', authType: 'IAM Keys', lastSync: 'Auto-deploy', dataVolume: '1 app', endpoints: ['d2qam7xccab5t8'], businessValue: 3 },
+  { id: 'google-cal', name: 'Google Calendar', category: 'Productividad', icon: '📅', color: '#3b82f6', status: 'active', description: 'Crear reuniones con Meet automático', authType: 'Service Account', endpoints: ['/calendar/v3/calendars/*/events'], businessValue: 2 },
+  { id: 'google-ws', name: 'Google Workspace', category: 'Productividad', icon: '📧', color: '#ef4444', status: 'active', description: 'Gmail, Calendar, Drive APIs', authType: 'Service Account', endpoints: ['Gmail API', 'Calendar API', 'Drive API'], businessValue: 3 },
+  { id: 'route53', name: 'AWS Route 53', category: 'DNS', icon: '🗺️', color: '#f97316', status: 'active', description: 'DNS smconnection.cl — 4 zonas', authType: 'IAM Keys', endpoints: ['Z3DOBGB40V1Y3P'], businessValue: 1 },
 
   // Available
-  { id: 'canva', name: 'Canva', category: 'Design', icon: '🎨', color: '#06b6d4', status: 'available', description: 'Diseño gráfico, social media, presentaciones', authType: 'OAuth 2.0', endpoints: ['/v1/designs'] },
-  { id: 'airtable', name: 'Airtable', category: 'Base de Datos', icon: '📊', color: '#f59e0b', status: 'active', description: 'Base VOY app6BzCBjniZqtXmd', authType: 'Personal Token', lastSync: 'Via VOY', dataVolume: '8 tablas', endpoints: ['/v0/app6BzCBjniZqtXmd/*'] },
-  { id: 'resend', name: 'Resend', category: 'Email', icon: '📨', color: '#3b82f6', status: 'available', description: 'Email transaccional', authType: 'API Key', endpoints: ['/emails'] },
-  { id: 'whatsapp', name: 'WhatsApp Business', category: 'Messaging', icon: '💬', color: '#22c55e', status: 'available', description: 'Mensajería automatizada', authType: 'Cloud API', endpoints: ['/v1/messages'] },
-  { id: 'make', name: 'Make (Integromat)', category: 'Automation', icon: '⚙️', color: '#a855f7', status: 'available', description: 'Workflows visuales de automatización', authType: 'API Key' },
-  { id: 'zapier', name: 'Zapier', category: 'Automation', icon: '🔗', color: '#f97316', status: 'available', description: 'Conectar 5000+ apps', authType: 'OAuth 2.0' },
+  { id: 'canva', name: 'Canva', category: 'Design', icon: '🎨', color: '#06b6d4', status: 'available', description: 'Diseño gráfico, social media, presentaciones', authType: 'OAuth 2.0', endpoints: ['/v1/designs'], businessValue: 2 },
+  { id: 'airtable', name: 'Airtable', category: 'Base de Datos', icon: '📊', color: '#f59e0b', status: 'active', description: 'Base VOY app6BzCBjniZqtXmd', authType: 'Personal Token', lastSync: 'Via VOY', dataVolume: '8 tablas', endpoints: ['/v0/app6BzCBjniZqtXmd/*'], businessValue: 3 },
+  { id: 'resend', name: 'Resend', category: 'Email', icon: '📨', color: '#3b82f6', status: 'available', description: 'Email transaccional', authType: 'API Key', endpoints: ['/emails'], businessValue: 2 },
+  { id: 'whatsapp', name: 'WhatsApp Business', category: 'Messaging', icon: '💬', color: '#22c55e', status: 'available', description: 'Mensajería automatizada', authType: 'Cloud API', endpoints: ['/v1/messages'], businessValue: 3 },
+  { id: 'make', name: 'Make (Integromat)', category: 'Automation', icon: '⚙️', color: '#a855f7', status: 'available', description: 'Workflows visuales de automatización', authType: 'API Key', businessValue: 2 },
+  { id: 'zapier', name: 'Zapier', category: 'Automation', icon: '🔗', color: '#f97316', status: 'available', description: 'Conectar 5000+ apps', authType: 'OAuth 2.0', businessValue: 2 },
 
   // Coming soon
-  { id: 'midjourney', name: 'Midjourney', category: 'IA Visual', icon: '🎨', color: '#8b5cf6', status: 'coming_soon', description: 'Generación de imágenes', authType: 'Discord Bot' },
-  { id: 'sora', name: 'Sora (OpenAI)', category: 'IA Video', icon: '🌀', color: '#f1f5f9', status: 'coming_soon', description: 'Text to video', authType: 'API Key' },
-  { id: 'runway', name: 'Runway ML', category: 'IA Video', icon: '🎬', color: '#06b6d4', status: 'coming_soon', description: 'Video generation & editing', authType: 'API Key' },
-  { id: 'n8n', name: 'n8n', category: 'Automation', icon: '🔄', color: '#ef4444', status: 'coming_soon', description: 'Self-hosted workflow automation', authType: 'API Key' },
-  { id: 'stripe', name: 'Stripe', category: 'Pagos', icon: '💳', color: '#635bff', status: 'coming_soon', description: 'Procesamiento de pagos', authType: 'API Key' },
-  { id: 'slack', name: 'Slack', category: 'Messaging', icon: '💬', color: '#e01e5a', status: 'coming_soon', description: 'Notificaciones y bots', authType: 'OAuth 2.0' },
+  { id: 'midjourney', name: 'Midjourney', category: 'IA Visual', icon: '🎨', color: '#8b5cf6', status: 'coming_soon', description: 'Generación de imágenes', authType: 'Discord Bot', businessValue: 1 },
+  { id: 'sora', name: 'Sora (OpenAI)', category: 'IA Video', icon: '🌀', color: '#f1f5f9', status: 'coming_soon', description: 'Text to video', authType: 'API Key', businessValue: 1 },
+  { id: 'runway', name: 'Runway ML', category: 'IA Video', icon: '🎬', color: '#06b6d4', status: 'coming_soon', description: 'Video generation & editing', authType: 'API Key', businessValue: 1 },
+  { id: 'n8n', name: 'n8n', category: 'Automation', icon: '🔄', color: '#ef4444', status: 'coming_soon', description: 'Self-hosted workflow automation', authType: 'API Key', businessValue: 2 },
+  { id: 'stripe', name: 'Stripe', category: 'Pagos', icon: '💳', color: '#635bff', status: 'coming_soon', description: 'Procesamiento de pagos', authType: 'API Key', businessValue: 3 },
+  { id: 'slack', name: 'Slack', category: 'Messaging', icon: '💬', color: '#e01e5a', status: 'coming_soon', description: 'Notificaciones y bots', authType: 'OAuth 2.0', businessValue: 2 },
 ];
 
 const TABS = ['Conectores', 'Flujos', 'Monitoreo'];
@@ -77,7 +91,7 @@ export default function LabsPage() {
     if (statusFilter !== 'all' && c.status !== statusFilter) return false;
     if (search && !c.name.toLowerCase().includes(search.toLowerCase()) && !c.description.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
-  });
+  }).sort((a, b) => (b.businessValue || 0) - (a.businessValue || 0));
 
   const executeAgent = async (agentId: string) => {
     if (!prompt.trim()) return;
@@ -160,7 +174,7 @@ export default function LabsPage() {
                   </button>
                 ))}
                 <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.06)' }}></span>
-                {categories.slice(0, 8).map(c => (
+                {categories.slice(0, 10).map(c => (
                   <button key={c} onClick={() => setCatFilter(c)} style={pill(catFilter === c)}>{c}</button>
                 ))}
               </div>
@@ -170,7 +184,12 @@ export default function LabsPage() {
                 {filtered.map(c => {
                   const sc = statusCfg[c.status];
                   return (
-                    <div key={c.id} onClick={() => c.status !== 'coming_soon' && setDetail(c)} style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '1.25rem', cursor: c.status === 'coming_soon' ? 'default' : 'pointer', opacity: c.status === 'coming_soon' ? 0.45 : 1, transition: 'all 0.2s', borderLeft: `3px solid ${c.status === 'active' ? c.color : 'transparent'}` }}>
+                    <div key={c.id} onClick={() => c.status !== 'coming_soon' && setDetail(c)} style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '1.25rem', cursor: c.status === 'coming_soon' ? 'default' : 'pointer', opacity: c.status === 'coming_soon' ? 0.45 : 1, transition: 'all 0.2s', borderLeft: `3px solid ${c.status === 'active' ? c.color : 'transparent'}`, position: 'relative' }}>
+                      {(c.businessValue || 0) >= 4 && (
+                        <span style={{ position: 'absolute', top: 10, right: 10, fontSize: '0.52rem', fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', letterSpacing: '0.03em' }}>
+                          {'★'.repeat(c.businessValue || 0)} VALUE
+                        </span>
+                      )}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
                         <div style={{ width: 38, height: 38, borderRadius: 10, background: `${c.color}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.15rem' }}>{c.icon}</div>
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -196,6 +215,10 @@ export default function LabsPage() {
           {tab === 'Flujos' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {[
+                { name: 'SAP \u2192 Analytics Pipeline', source: 'SAP S/4HANA / BTP', transform: 'ETL + Datasphere', dest: 'SAP Analytics Cloud', status: 'available' },
+                { name: 'Client Onboarding \u2192 CRM', source: 'Formulario Web', transform: 'Validación + Enrich IA', dest: 'Supabase CRM + Calendar', status: 'active' },
+                { name: 'Proposal Generation \u2192 PDF \u2192 Email', source: 'Brief del cliente', transform: 'Groq IA + Template', dest: 'PDF + Resend Email', status: 'active' },
+                { name: 'SAP BTP \u2192 Custom App Deploy', source: 'SAP BTP Cockpit', transform: 'CI/CD + Build Apps', dest: 'Cloud Foundry / Kyma', status: 'available' },
                 { name: 'Lead Capture \u2192 CRM', source: 'Website Form', transform: 'Validaci\u00f3n + Honeypot', dest: 'Supabase leads', status: 'active' },
                 { name: 'Scheduler \u2192 Google Meet', source: 'Formulario Agendar', transform: 'JWT Auth + Calendar API', dest: 'Google Calendar', status: 'active' },
                 { name: 'Deploy Pipeline', source: 'GitHub Push', transform: 'Build Astro/Next.js', dest: 'Vercel + S3 + CloudFront', status: 'active' },
@@ -288,10 +311,11 @@ export default function LabsPage() {
               { k: 'Estado', v: statusCfg[detail.status]?.label },
               { k: '\u00DAltimo Sync', v: detail.lastSync || '\u2014' },
               { k: 'Volumen', v: detail.dataVolume || '\u2014' },
+              { k: 'Valor Negocio', v: detail.businessValue ? '★'.repeat(detail.businessValue) + '☆'.repeat(5 - detail.businessValue) : '—' },
             ].map(item => (
               <div key={item.k} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: '0.72rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                 <span style={{ color: '#64748b' }}>{item.k}</span>
-                <span style={{ color: '#e2e8f0', fontFamily: item.k === 'Volumen' ? "'JetBrains Mono', monospace" : 'inherit' }}>{item.v}</span>
+                <span style={{ color: item.k === 'Valor Negocio' ? '#f59e0b' : '#e2e8f0', fontFamily: item.k === 'Volumen' ? "'JetBrains Mono', monospace" : 'inherit' }}>{item.v}</span>
               </div>
             ))}
           </div>

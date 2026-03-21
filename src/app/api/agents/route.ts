@@ -68,6 +68,41 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
+    // Create project
+    if (action === 'create_project' && body.project) {
+      const p = body.project;
+      const record = await supabaseInsert('projects', {
+        name: p.name,
+        description: p.description || '',
+        status: p.status || 'backlog',
+        priority: p.priority || 'medium',
+        progress: p.progress || 0,
+        owner: p.owner || 'Guillermo',
+        members: p.members || [],
+        tags: p.tags || [],
+        category: p.category || '',
+        due_date: p.due_date || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      return NextResponse.json({ success: true, data: record });
+    }
+
+    // Edit project
+    if (action === 'edit_project' && body.projectId && body.updates) {
+      await supabaseQuery('projects', 'PATCH', {
+        filter: `id=eq.${body.projectId}`,
+        body: { ...body.updates, updated_at: new Date().toISOString() },
+      });
+      return NextResponse.json({ success: true });
+    }
+
+    // Delete project
+    if (action === 'delete_project' && body.projectId) {
+      await supabaseQuery('projects', 'DELETE', { filter: `id=eq.${body.projectId}` });
+      return NextResponse.json({ success: true });
+    }
+
     return NextResponse.json({ error: 'Acción no válida' }, { status: 400 });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

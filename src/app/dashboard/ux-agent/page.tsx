@@ -89,42 +89,62 @@ export default function UXAgent() {
 
   const currentCiclo = insights.length > 0 ? Math.max(...insights.map(i => i.ciclo || 1)) : 1;
 
-  /* ── Run new analysis ──────────────────────────────── */
+  /* ── Stream helper ────────────────────────────────── */
+  const streamAgent = async (prompt: string, taskType: string, onChunk: (text: string) => void, onDone: () => void) => {
+    try {
+      const res = await fetch('/api/agents/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, taskType, agentId: 'groq' }),
+      });
+      if (!res.ok || !res.body) { onChunk(`Error: ${res.status}`); onDone(); return; }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data: ')) continue;
+          const data = trimmed.slice(6);
+          if (data === '[DONE]') continue;
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.content) onChunk(parsed.content);
+            if (parsed.error) onChunk(`\nError: ${parsed.error}`);
+          } catch {}
+        }
+      }
+    } catch (err) { onChunk(`\nError: ${String(err)}`); }
+    onDone();
+  };
+
+  /* ── Run new analysis (streaming) ───────────────── */
   const runAnalysis = async () => {
     setAnalysisPopup('loading');
     setAnalysisResult('');
-    try {
-      const res = await api({
-        action: 'execute',
-        agentId: 'groq',
-        prompt: 'Analiza el sitio smconnection.cl y genera 3 mejoras UX concretas para mejorar conversión, SEO y experiencia de usuario. Para cada mejora incluye: título, descripción detallada, categoría (Conversión/SEO/Contenido/Navegación/WhatsApp), e impacto estimado. Responde de forma clara y estructurada.',
-        taskType: 'seo',
-      });
-      setAnalysisResult(res.result || res.response || res.data || JSON.stringify(res, null, 2));
-      setAnalysisPopup('result');
-      loadInsights();
-    } catch (err) {
-      setAnalysisResult('Error al ejecutar el análisis: ' + String(err));
-      setAnalysisPopup('result');
-    }
+    await streamAgent(
+      'Analiza el sitio smconnection.cl y genera 3 mejoras UX concretas para mejorar conversión, SEO y experiencia de usuario. Para cada mejora incluye: título, descripción detallada, categoría (Conversión/SEO/Contenido/Navegación/WhatsApp), e impacto estimado. Responde de forma clara y estructurada.',
+      'seo',
+      (chunk) => setAnalysisResult(prev => prev + chunk),
+      () => { setAnalysisPopup('result'); loadInsights(); },
+    );
   };
 
-  /* ── Run agent on specific insight ─────────────────── */
+  /* ── Run agent on specific insight (streaming) ──── */
   const runAgentOnInsight = async (insight: Insight) => {
     setAgentRunning(true);
     setAgentResult('');
-    try {
-      const res = await api({
-        action: 'execute',
-        agentId: 'groq',
-        prompt: `Analiza esta mejora UX para smconnection.cl y da recomendaciones detalladas de implementación:\n\nTítulo: ${insight.titulo}\nDescripción: ${insight.descripcion}\nCategoría: ${insight.categoria}\nImpacto: ${insight.impacto}\n\nDa pasos concretos, código si es necesario, y priorización.`,
-        taskType: 'seo',
-      });
-      setAgentResult(res.result || res.response || res.data || JSON.stringify(res, null, 2));
-    } catch (err) {
-      setAgentResult('Error: ' + String(err));
-    }
-    setAgentRunning(false);
+    await streamAgent(
+      `Analiza esta mejora UX para smconnection.cl y da recomendaciones detalladas de implementación:\n\nTítulo: ${insight.titulo}\nDescripción: ${insight.descripcion}\nCategoría: ${insight.categoria}\nImpacto: ${insight.impacto}\n\nDa pasos concretos, código si es necesario, y priorización.`,
+      'seo',
+      (chunk) => setAgentResult(prev => prev + chunk),
+      () => setAgentRunning(false),
+    );
   };
 
   const updateEstado = (id: string, newEstado: string) => {
@@ -260,17 +280,26 @@ export default function UXAgent() {
          ══════════════════════════════════════════════════════ */}
       {analysisPopup === 'loading' && (
         <Overlay onClose={() => {}}>
-          <div style={{ padding: '3rem', textAlign: 'center' }}>
-            <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(0,229,176,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', animation: 'pulse 1.5s ease-in-out infinite' }}>
-              <span style={{ fontSize: '1.5rem' }}>⚡</span>
+          <div style={{ padding: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '1rem' }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 8px #22c55e', animation: 'pulse 1.5s ease-in-out infinite' }}></div>
+              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f1f5f9' }}>Groq Agent — Streaming</span>
+              <span style={{ fontSize: '0.65rem', color: '#475569', marginLeft: 'auto' }}>llama-3.3-70b</span>
             </div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f1f5f9', marginBottom: 8 }}>
-              Analizando sitio<AnimatedDots />
+            <div style={{
+              background: '#0a0d14', border: '1px solid rgba(0,229,176,0.15)', borderRadius: 10,
+              padding: '1rem', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.72rem',
+              color: '#22c55e', lineHeight: 1.8, whiteSpace: 'pre-wrap', minHeight: 200, maxHeight: '55vh',
+              overflow: 'auto', position: 'relative',
+            }}>
+              <div style={{ color: '#475569', marginBottom: 8 }}>$ groq analyze --site smconnection.cl --mode ux</div>
+              {analysisResult || <span style={{ color: '#475569' }}>Esperando respuesta<AnimatedDots /></span>}
+              <span style={{ display: 'inline-block', width: 7, height: 14, background: '#22c55e', marginLeft: 2, animation: 'blink 1s step-end infinite', verticalAlign: 'text-bottom' }}></span>
             </div>
-            <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-              El agente Groq está evaluando UX, conversión y SEO
-            </div>
-            <style>{`@keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } }`}</style>
+            <style>{`
+              @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+              @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+            `}</style>
           </div>
         </Overlay>
       )}
@@ -379,11 +408,19 @@ export default function UXAgent() {
               {agentRunning ? (<>Ejecutando agente<AnimatedDots /></>) : (<><span>🤖</span> Ejecutar agente sobre este insight</>)}
             </button>
 
-            {/* Agent result */}
-            {agentResult && (
-              <div style={{ marginTop: '1rem', background: '#0a0d14', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 12, padding: '1.25rem', fontSize: '0.78rem', color: '#cbd5e1', lineHeight: 1.7, whiteSpace: 'pre-wrap', maxHeight: '35vh', overflow: 'auto' }}>
-                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#f59e0b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>🤖 Respuesta del agente</div>
-                {typeof agentResult === 'string' ? agentResult : JSON.stringify(agentResult, null, 2)}
+            {/* Agent result — terminal streaming */}
+            {(agentResult || agentRunning) && (
+              <div style={{ marginTop: '1rem', background: '#0a0d14', border: '1px solid rgba(245,158,11,0.15)', borderRadius: 12, padding: '1rem', maxHeight: '40vh', overflow: 'auto' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  {agentRunning && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b', boxShadow: '0 0 6px #f59e0b', animation: 'pulse 1.5s ease-in-out infinite' }}></div>}
+                  <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Groq Agent Output</span>
+                  {!agentRunning && agentResult && <span style={{ fontSize: '0.6rem', color: '#22c55e', marginLeft: 'auto' }}>Completado</span>}
+                </div>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.7rem', color: '#e2e8f0', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
+                  {agentResult || <span style={{ color: '#475569' }}>Iniciando agente<AnimatedDots /></span>}
+                  {agentRunning && <span style={{ display: 'inline-block', width: 6, height: 13, background: '#f59e0b', marginLeft: 2, animation: 'blink 1s step-end infinite', verticalAlign: 'text-bottom' }}></span>}
+                </div>
+                <style>{`@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } } @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
               </div>
             )}
           </div>

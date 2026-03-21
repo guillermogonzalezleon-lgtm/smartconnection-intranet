@@ -63,6 +63,11 @@ export default function ProjectsPage() {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [modalStatus, setModalStatus] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ name: '', description: '', priority: 'medium', category: '', owner: 'Guillermo', tags: '', due_date: '', status: 'backlog' });
 
   useEffect(() => {
     fetch('/api/agents', {
@@ -97,7 +102,69 @@ export default function ProjectsPage() {
   const closeModal = () => {
     setSelectedProject(null);
     setModalStatus('');
+    setEditMode(false);
+    setConfirmDelete(false);
   };
+
+  const api = (payload: Record<string, unknown>) =>
+    fetch('/api/agents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json());
+
+  const resetForm = () => setForm({ name: '', description: '', priority: 'medium', category: '', owner: 'Guillermo', tags: '', due_date: '', status: 'backlog' });
+
+  const createProject = async () => {
+    if (!form.name.trim()) return;
+    setSaving(true);
+    try {
+      const res = await api({
+        action: 'create_project',
+        project: { ...form, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean), members: [form.owner] },
+      });
+      if (res.success && res.data?.[0]) setProjects(prev => [res.data[0], ...prev]);
+      setShowCreate(false);
+      resetForm();
+    } catch {}
+    setSaving(false);
+  };
+
+  const editProject = async () => {
+    if (!selectedProject || !form.name.trim()) return;
+    setSaving(true);
+    try {
+      await api({
+        action: 'edit_project',
+        projectId: selectedProject.id,
+        updates: { name: form.name, description: form.description, priority: form.priority, category: form.category, owner: form.owner, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean), due_date: form.due_date || null },
+      });
+      setProjects(prev => prev.map(p => p.id === selectedProject.id ? { ...p, name: form.name, description: form.description, priority: form.priority, category: form.category, owner: form.owner, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean), due_date: form.due_date } : p));
+      setEditMode(false);
+    } catch {}
+    setSaving(false);
+  };
+
+  const deleteProject = async () => {
+    if (!selectedProject) return;
+    setSaving(true);
+    try {
+      await api({ action: 'delete_project', projectId: selectedProject.id });
+      setProjects(prev => prev.filter(p => p.id !== selectedProject.id));
+      closeModal();
+    } catch {}
+    setSaving(false);
+  };
+
+  const startEdit = () => {
+    if (!selectedProject) return;
+    setForm({
+      name: selectedProject.name, description: selectedProject.description,
+      priority: selectedProject.priority, category: selectedProject.category,
+      owner: selectedProject.owner, tags: (selectedProject.tags || []).join(', '),
+      due_date: selectedProject.due_date?.split('T')[0] || '', status: selectedProject.status,
+    });
+    setEditMode(true);
+  };
+
+  const inputStyle: React.CSSProperties = { width: '100%', background: '#0a0d14', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', color: '#e2e8f0', fontSize: '0.8rem', fontFamily: "'Inter', system-ui, sans-serif", outline: 'none' };
+  const labelStyle: React.CSSProperties = { fontSize: '0.65rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 6, display: 'block' };
 
   const updateProjectStatus = (projectId: string, newStatus: string) => {
     setProjects(prev => prev.map(p => p.id === projectId ? { ...p, status: newStatus } : p));
@@ -127,7 +194,7 @@ export default function ProjectsPage() {
       <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(10,13,20,0.92)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.06)', height: 56, display: 'flex', alignItems: 'center', padding: '0 2rem', fontSize: '0.85rem', color: '#94a3b8' }}>
         Intranet <span style={{ margin: '0 8px', color: '#475569' }}>/</span> <span style={{ color: '#fff', fontWeight: 600 }}>Proyectos</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-          <button style={{ background: 'linear-gradient(135deg, #00e5b0 0%, #00c49a 100%)', border: 'none', borderRadius: 8, padding: '6px 16px', color: '#0a0d14', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button onClick={() => { resetForm(); setShowCreate(true); }} style={{ background: 'linear-gradient(135deg, #00e5b0 0%, #00c49a 100%)', border: 'none', borderRadius: 8, padding: '6px 16px', color: '#0a0d14', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}>
             <i className="bi bi-plus-lg" style={{ fontSize: '0.8rem' }}></i> Nuevo Proyecto
           </button>
         </div>
@@ -422,7 +489,7 @@ export default function ProjectsPage() {
               )}
 
               {/* Timeline */}
-              <div style={{ marginBottom: 8 }}>
+              <div style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Timeline</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                   {[
@@ -438,6 +505,87 @@ export default function ProjectsPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: 8, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 16 }}>
+                <button onClick={startEdit} style={{ flex: 1, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: '#3b82f6', padding: '10px', borderRadius: 10, fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  <i className="bi bi-pencil"></i> Editar
+                </button>
+                <button onClick={() => setConfirmDelete(true)} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', padding: '10px 16px', borderRadius: 10, fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <i className="bi bi-trash3"></i>
+                </button>
+              </div>
+
+              {/* Confirm delete */}
+              {confirmDelete && (
+                <div style={{ marginTop: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.78rem', color: '#ef4444', fontWeight: 600 }}>¿Eliminar este proyecto?</span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => setConfirmDelete(false)} style={{ background: 'rgba(255,255,255,0.06)', border: 'none', color: '#94a3b8', padding: '6px 14px', borderRadius: 8, fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>Cancelar</button>
+                    <button onClick={deleteProject} disabled={saving} style={{ background: '#ef4444', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 8, fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>{saving ? 'Eliminando...' : 'Sí, eliminar'}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Create / Edit Modal ═══ */}
+      {(showCreate || editMode) && (
+        <div onClick={() => { setShowCreate(false); setEditMode(false); }} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#111827', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', width: '100%', maxWidth: 520, maxHeight: '85vh', overflow: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
+            <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#f1f5f9' }}>{editMode ? 'Editar Proyecto' : 'Nuevo Proyecto'}</h2>
+              <button onClick={() => { setShowCreate(false); setEditMode(false); }} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', fontSize: '1rem' }}>
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={labelStyle}>Nombre *</label>
+                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Nombre del proyecto" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Descripción</label>
+                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Descripción breve" rows={3} style={{ ...inputStyle, resize: 'vertical' as const }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Prioridad</label>
+                  <select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))} style={inputStyle}>
+                    <option value="high">Alta</option>
+                    <option value="medium">Media</option>
+                    <option value="low">Baja</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Categoría</label>
+                  <input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder="ej: SAP, Web, IA" style={inputStyle} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Responsable</label>
+                  <input value={form.owner} onChange={e => setForm(f => ({ ...f, owner: e.target.value }))} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Fecha límite</label>
+                  <input type="date" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} style={inputStyle} />
+                </div>
+              </div>
+              <div>
+                <label style={labelStyle}>Tags (separados por coma)</label>
+                <input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} placeholder="SAP, BTP, Next.js" style={inputStyle} />
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <button onClick={() => { setShowCreate(false); setEditMode(false); }} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#94a3b8', padding: '10px 20px', borderRadius: 10, fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>
+                  Cancelar
+                </button>
+                <button onClick={editMode ? editProject : createProject} disabled={saving || !form.name.trim()} style={{ background: saving ? '#1a2235' : 'linear-gradient(135deg, #00e5b0, #00c49a)', color: saving ? '#94a3b8' : '#0a0d14', border: 'none', padding: '10px 24px', borderRadius: 10, fontWeight: 700, fontSize: '0.78rem', cursor: saving ? 'not-allowed' : 'pointer', fontFamily: "'Inter', system-ui" }}>
+                  {saving ? 'Guardando...' : editMode ? 'Guardar cambios' : 'Crear proyecto'}
+                </button>
               </div>
             </div>
           </div>
