@@ -57,8 +57,20 @@ function Overlay({ children, onClose }: { children: React.ReactNode; onClose: ()
 
 /* ═══════════════════════════════════════════════════════ */
 export default function UXAgent() {
-  // Tab state
+  // Tab state — check URL param and sessionStorage for connector context
   const [tab, setTab] = useState<'insights' | 'workspace'>('insights');
+  const [fromConnector, setFromConnector] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check if coming from Labs with tab=workspace
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('tab') === 'workspace') setTab('workspace');
+    // Check connector context
+    try {
+      const c = sessionStorage.getItem('labs-connector');
+      if (c) { setFromConnector(c); sessionStorage.removeItem('labs-connector'); }
+    } catch {}
+  }, []);
 
   // Insights state
   const [insights, setInsights] = useState<Insight[]>([]);
@@ -79,7 +91,7 @@ export default function UXAgent() {
   const outputRef = useRef<HTMLDivElement>(null);
 
   // Pipeline state
-  type PipelineStep = 'idle' | 'pushing' | 'deploying' | 'done' | 'error';
+  type PipelineStep = 'idle' | 'confirm' | 'pushing' | 'deploying' | 'done' | 'error';
   const [pipeline, setPipeline] = useState<PipelineStep>('idle');
   const [pipelineLog, setPipelineLog] = useState<string[]>([]);
 
@@ -176,6 +188,11 @@ export default function UXAgent() {
     { id: 'smartconnection-astro', label: 'Astro (Vercel)', repo: 'guillermogonzalezleon-lgtm/smartconnection-astro', url: 'https://www.smconnection.cl' },
     { id: 'smartconnection-intranet', label: 'Intranet (AWS)', repo: 'guillermogonzalezleon-lgtm/smartconnection-intranet', url: 'https://intranet.smconnection.cl' },
   ];
+
+  const startPipeline = () => {
+    setPipeline('confirm');
+    setPipelineLog([]);
+  };
 
   const runPipeline = async () => {
     const target = repos.find(r => r.id === targetRepo) || repos[0];
@@ -398,7 +415,7 @@ export default function UXAgent() {
                   <select value={targetRepo} onChange={e => setTargetRepo(e.target.value)} style={{ background: '#0a0d14', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '4px 8px', color: '#94a3b8', fontSize: '0.62rem', fontFamily: "'Inter', system-ui", outline: 'none', cursor: 'pointer' }}>
                     {repos.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
                   </select>
-                  <button onClick={runPipeline} style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 7, fontWeight: 700, fontSize: '0.65rem', cursor: 'pointer', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', gap: 5, boxShadow: '0 2px 12px rgba(59,130,246,0.3)', whiteSpace: 'nowrap' }}>
+                  <button onClick={startPipeline} style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 7, fontWeight: 700, fontSize: '0.65rem', cursor: 'pointer', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', gap: 5, boxShadow: '0 2px 12px rgba(59,130,246,0.3)', whiteSpace: 'nowrap' }}>
                     🚀 Deploy
                   </button>
                 </>
@@ -410,6 +427,16 @@ export default function UXAgent() {
                 </span>
               )}
             </div>
+
+            {/* Connector context banner */}
+            {fromConnector && (
+              <div style={{ padding: '8px 16px', background: 'rgba(0,229,176,0.06)', borderBottom: '1px solid rgba(0,229,176,0.1)', display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.68rem' }}>
+                <span style={{ color: '#00e5b0', fontWeight: 700 }}>🔗 Desde Labs:</span>
+                <span style={{ color: '#94a3b8' }}>{fromConnector}</span>
+                <span style={{ color: '#475569' }}>— Escribe qué quieres hacer con este conector</span>
+                <button onClick={() => setFromConnector(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: '0.7rem' }}>×</button>
+              </div>
+            )}
 
             {/* Task input */}
             <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -462,25 +489,33 @@ export default function UXAgent() {
               }}>
                 {pipeline === 'idle' && (
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    {/* Repo selector */}
-                    <select value={targetRepo} onChange={e => setTargetRepo(e.target.value)} style={{
-                      background: '#0a0d14', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
-                      padding: '8px 12px', color: '#e2e8f0', fontSize: '0.72rem', fontFamily: "'Inter', system-ui",
-                      outline: 'none', cursor: 'pointer', minWidth: 160,
-                    }}>
+                    <select value={targetRepo} onChange={e => setTargetRepo(e.target.value)} style={{ background: '#0a0d14', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', color: '#e2e8f0', fontSize: '0.72rem', fontFamily: "'Inter', system-ui", outline: 'none', cursor: 'pointer', minWidth: 160 }}>
                       {repos.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
                     </select>
-                    {/* Pipeline button */}
-                    <button onClick={runPipeline} style={{
-                      flex: 1, background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-                      color: '#fff', border: 'none',
-                      padding: '10px 20px', borderRadius: 10, fontWeight: 700, fontSize: '0.75rem',
-                      cursor: 'pointer', fontFamily: "'Inter', system-ui",
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                      boxShadow: '0 4px 20px rgba(59,130,246,0.3)',
-                    }}>
-                      🚀 Guardar → Commit GitHub → Deploy → Ver mejora
+                    <button onClick={startPipeline} style={{ flex: 1, background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 10, fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 20px rgba(59,130,246,0.3)' }}>
+                      🚀 Aplicar cambios → Deploy
                     </button>
+                  </div>
+                )}
+
+                {/* Confirmation step */}
+                {pipeline === 'confirm' && (
+                  <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 10, padding: '14px' }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f1f5f9', marginBottom: 8 }}>¿Aplicar estos cambios?</div>
+                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', lineHeight: 1.6, marginBottom: 10 }}>
+                      Se va a:<br/>
+                      1. Guardar la mejora como insight en Supabase<br/>
+                      2. Commit a <strong style={{ color: '#e2e8f0' }}>{repos.find(r => r.id === targetRepo)?.repo}</strong> (main)<br/>
+                      3. Auto-deploy en {repos.find(r => r.id === targetRepo)?.label}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => setPipeline('idle')} style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#94a3b8', padding: '8px', borderRadius: 8, fontWeight: 600, fontSize: '0.72rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>
+                        Cancelar
+                      </button>
+                      <button onClick={runPipeline} style={{ flex: 2, background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: '#fff', border: 'none', padding: '8px', borderRadius: 8, fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        ✅ Confirmar y ejecutar pipeline
+                      </button>
+                    </div>
                   </div>
                 )}
 

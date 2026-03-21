@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface Connector {
   id: string;
@@ -104,11 +105,21 @@ export default function LabsPage() {
     setRunning(false);
   };
 
+  const router = useRouter();
+  const [nextSteps, setNextSteps] = useState(false);
+
   const testConnection = async (c: Connector) => {
     setTestResult('testing');
     await new Promise(r => setTimeout(r, 1500));
-    setTestResult(c.status === 'active' ? 'success' : 'failed');
-    setTimeout(() => setTestResult(null), 3000);
+    const result = c.status === 'active' ? 'success' : 'failed';
+    setTestResult(result);
+    if (result === 'success') setNextSteps(true);
+  };
+
+  const goToWorkspace = (connectorName: string) => {
+    // Store connector context for workspace
+    try { sessionStorage.setItem('labs-connector', connectorName); } catch {}
+    router.push('/dashboard/ux-agent?tab=workspace');
   };
 
   // Styles
@@ -129,6 +140,7 @@ export default function LabsPage() {
 
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
       {/* Main */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
         <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(15,22,35,0.92)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 2rem' }}>
@@ -332,9 +344,37 @@ export default function LabsPage() {
 
           {/* Test Connection */}
           <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <button onClick={() => testConnection(detail)} style={{ width: '100%', background: testResult === 'success' ? 'rgba(34,197,94,0.15)' : testResult === 'failed' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${testResult === 'success' ? '#22c55e40' : testResult === 'failed' ? '#ef444440' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, padding: '10px', color: testResult === 'success' ? '#22c55e' : testResult === 'failed' ? '#ef4444' : '#94a3b8', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', system-ui", transition: 'all 0.2s' }}>
-              {testResult === 'testing' ? '\u23F3 Testeando conexi\u00f3n...' : testResult === 'success' ? '\u2705 Conexi\u00f3n exitosa' : testResult === 'failed' ? '\u274C Conexi\u00f3n fallida' : '\uD83D\uDD0C Test Conexi\u00f3n'}
+            <button onClick={() => { setNextSteps(false); testConnection(detail); }} style={{ width: '100%', background: testResult === 'success' ? 'rgba(34,197,94,0.15)' : testResult === 'failed' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${testResult === 'success' ? '#22c55e40' : testResult === 'failed' ? '#ef444440' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, padding: '10px', color: testResult === 'success' ? '#22c55e' : testResult === 'failed' ? '#ef4444' : '#94a3b8', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', system-ui", transition: 'all 0.2s' }}>
+              {testResult === 'testing' ? '⏳ Testeando conexión...' : testResult === 'success' ? '✅ Conexión exitosa' : testResult === 'failed' ? '❌ Conexión fallida' : '🔌 Test Conexión'}
             </button>
+
+            {/* Next steps after successful test */}
+            {nextSteps && testResult === 'success' && (
+              <div style={{ marginTop: 10, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 10, padding: '12px', animation: 'fadeIn 0.3s ease' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#22c55e', marginBottom: 8 }}>Próximos pasos</div>
+                <div style={{ fontSize: '0.65rem', color: '#94a3b8', lineHeight: 1.6, marginBottom: 10 }}>
+                  {detail.name} está conectado. Puedes usar un agente IA para trabajar con este conector.
+                </div>
+                <button onClick={() => goToWorkspace(detail.name)} style={{
+                  width: '100%', background: 'linear-gradient(135deg, #00e5b0, #00c49a)',
+                  color: '#0a0d14', border: 'none', padding: '10px', borderRadius: 8,
+                  fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer', fontFamily: "'Inter', system-ui",
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}>
+                  ⚡ Ir al Workspace de Agentes →
+                </button>
+              </div>
+            )}
+
+            {/* Next steps after failed test */}
+            {testResult === 'failed' && (
+              <div style={{ marginTop: 10, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 10, padding: '12px' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>Conexión fallida</div>
+                <div style={{ fontSize: '0.65rem', color: '#94a3b8', lineHeight: 1.6 }}>
+                  Verifica las credenciales y la configuración del conector. Para conectores en estado &quot;Disponible&quot;, primero necesitas configurar las API keys.
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Execute (for agents) */}
