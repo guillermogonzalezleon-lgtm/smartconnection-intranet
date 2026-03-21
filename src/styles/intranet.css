@@ -63,6 +63,109 @@
   --text-muted: #94a3b8;
 }
 
+/* Light mode: override inline hardcoded colors on all elements */
+[data-theme="light"] main {
+  background: #f8fafc !important;
+}
+[data-theme="light"] main div,
+[data-theme="light"] main section,
+[data-theme="light"] main article {
+  transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+}
+/* Cards and surfaces: #111827 → white */
+[data-theme="light"] [style*="background: #111827"],
+[data-theme="light"] [style*="background:#111827"],
+[data-theme="light"] [style*="background: rgb(17, 24, 39)"] {
+  background: #ffffff !important;
+  border-color: rgba(0,0,0,0.08) !important;
+}
+/* Base bg: #0a0d14 → light slate */
+[data-theme="light"] [style*="background: #0a0d14"],
+[data-theme="light"] [style*="background:#0a0d14"],
+[data-theme="light"] [style*="background: rgb(10, 13, 20)"] {
+  background: #f1f5f9 !important;
+}
+/* Elevated: #1a2235 → lighter */
+[data-theme="light"] [style*="background: #1a2235"],
+[data-theme="light"] [style*="background:#1a2235"] {
+  background: #e2e8f0 !important;
+}
+/* Overlay/darker surfaces: #0f1623 */
+[data-theme="light"] [style*="background: #0f1623"],
+[data-theme="light"] [style*="background:#0f1623"] {
+  background: #ffffff !important;
+}
+/* Breadcrumb/topbar with rgba dark bg */
+[data-theme="light"] [style*="rgba(15,22,35"],
+[data-theme="light"] [style*="rgba(10,13,20"],
+[data-theme="light"] [style*="rgba(17,24,39"] {
+  background: rgba(255,255,255,0.92) !important;
+  backdrop-filter: blur(12px) !important;
+}
+/* Text colors */
+[data-theme="light"] [style*="color: #f1f5f9"],
+[data-theme="light"] [style*="color:#f1f5f9"] {
+  color: #0f172a !important;
+}
+[data-theme="light"] [style*="color: #e2e8f0"],
+[data-theme="light"] [style*="color:#e2e8f0"] {
+  color: #1e293b !important;
+}
+[data-theme="light"] [style*="color: #cbd5e1"],
+[data-theme="light"] [style*="color:#cbd5e1"] {
+  color: #334155 !important;
+}
+[data-theme="light"] [style*="color: #94a3b8"],
+[data-theme="light"] [style*="color:#94a3b8"] {
+  color: #475569 !important;
+}
+[data-theme="light"] [style*="color: #64748b"],
+[data-theme="light"] [style*="color:#64748b"] {
+  color: #64748b !important;
+}
+[data-theme="light"] [style*="color: #475569"],
+[data-theme="light"] [style*="color:#475569"] {
+  color: #94a3b8 !important;
+}
+[data-theme="light"] [style*="color: #334155"],
+[data-theme="light"] [style*="color:#334155"] {
+  color: #94a3b8 !important;
+}
+[data-theme="light"] [style*="color: #fff"],
+[data-theme="light"] [style*="color:#fff"],
+[data-theme="light"] [style*="color: white"] {
+  color: #0f172a !important;
+}
+/* Borders: rgba white → rgba black */
+[data-theme="light"] [style*="rgba(255,255,255,0.06)"],
+[data-theme="light"] [style*="rgba(255,255,255,0.08)"],
+[data-theme="light"] [style*="rgba(255,255,255,0.04)"] {
+  border-color: rgba(0,0,0,0.08) !important;
+}
+/* Sidebar light */
+[data-theme="light"] aside[style] {
+  background: #ffffff !important;
+  border-right-color: rgba(0,0,0,0.08) !important;
+}
+/* Tables in light mode */
+[data-theme="light"] table tr:hover td {
+  background: rgba(0,229,176,0.05) !important;
+}
+/* Scrollbar light */
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.15);
+}
+/* Selection light */
+[data-theme="light"] ::selection {
+  background: rgba(0,229,176,0.2);
+  color: #0f172a;
+}
+/* Modal overlays stay dark */
+[data-theme="light"] [style*="rgba(0,0,0,0.7)"],
+[data-theme="light"] [style*="rgba(0,0,0,0.6)"] {
+  background: rgba(0,0,0,0.4) !important;
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: var(--font-sans); background: var(--bg-base); color: var(--text-primary); min-height: 100vh; -webkit-font-smoothing: antialiased; transition: background 0.3s, color 0.3s; }
 ::selection { background: var(--teal-glow); color: #fff; }
