@@ -7,9 +7,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!session.valid) redirect('/');
 
   return (
-    <div className="flex min-h-screen" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ display: 'flex', minHeight: '100vh', fontFamily: "'Inter', system-ui, sans-serif" }}>
       <Sidebar user={session.user || 'Admin'} />
-      <main className="flex-1 ml-[240px] min-h-screen flex flex-col" style={{ background: '#0a0d14' }}>
+      <main style={{ flex: 1, marginLeft: 64, minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#0a0d14', transition: 'margin-left 0.25s' }}>
         {children}
       </main>
     </div>
