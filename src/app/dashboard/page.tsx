@@ -14,9 +14,19 @@ export default function Dashboard() {
   const [meetings, setMeetings] = useState(0);
   const [leadsData, setLeadsData] = useState<Record<string, unknown>[]>([]);
   const [meetingsData, setMeetingsData] = useState<Record<string, unknown>[]>([]);
+  const [projects, setProjects] = useState<Record<string, unknown>[]>([]);
   const [modal, setModal] = useState<ModalData | null>(null);
   const [selectedLog, setSelectedLog] = useState<Record<string, unknown> | null>(null);
   const router = useRouter();
+
+  const getGreeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Buenos días';
+    if (h < 19) return 'Buenas tardes';
+    return 'Buenas noches';
+  };
+  const formattedDate = new Date().toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const capitalizedDate = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
 
   const api = (payload: Record<string, unknown>) =>
     fetch('/api/agents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json());
@@ -25,6 +35,7 @@ export default function Dashboard() {
     api({ action: 'list' }).then(d => { if (d.agents) setAgents(d.agents); });
     api({ action: 'query', table: 'leads', order: 'created_at.desc', limit: 100 }).then(d => { if (d.data) { setLeads(d.data.length); setLeadsData(d.data); } }).catch(() => {});
     api({ action: 'query', table: 'reuniones', order: 'created_at.desc', limit: 100 }).then(d => { if (d.data) { setMeetings(d.data.length); setMeetingsData(d.data); } }).catch(() => {});
+    api({ action: 'query', table: 'projects', limit: 4 }).then(d => { if (d.data) setProjects(d.data); }).catch(() => {});
     Promise.all(['claude','groq','grok','gemini','deployer'].map(id => api({ action: 'logs', agentId: id })))
       .then(results => {
         const all = results.flatMap(r => r.logs || []).sort((a: Record<string, unknown>, b: Record<string, unknown>) => new Date(b.created_at as string).getTime() - new Date(a.created_at as string).getTime());
@@ -123,6 +134,12 @@ export default function Dashboard() {
         <span>Intranet</span><span style={{ margin: '0 8px', color: '#475569' }}>/</span><span style={{ color: '#fff', fontWeight: 600 }}>Dashboard</span>
       </div>
       <div style={{ padding: '1.5rem 2rem', flex: 1 }}>
+        {/* Welcome Header */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#f1f5f9', margin: 0, lineHeight: 1.3 }}>{getGreeting()}, Guillermo 👋</h1>
+          <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '4px 0 0 0' }}>{capitalizedDate}</p>
+        </div>
+
         {/* KPIs */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
           {kpis.map((kpi, i) => (
@@ -133,6 +150,25 @@ export default function Dashboard() {
               <div style={{ fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1, color: '#f1f5f9', fontSize: kpi.small ? '0.95rem' : '1.75rem' }}>{kpi.value}</div>
               <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: 6, fontWeight: 500 }}>{kpi.label}</div>
               <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: kpi.color }}></div>
+            </div>
+          ))}
+        </div>
+
+        {/* Quick Actions */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1.5rem' }}>
+          {[
+            { icon: 'bi-play-circle-fill', label: 'Ejecutar Agente', color: '#00e5b0', href: '/dashboard/agents' },
+            { icon: 'bi-person-plus-fill', label: 'Nuevo Lead', color: '#3b82f6', href: '/dashboard/leads' },
+            { icon: 'bi-kanban-fill', label: 'Ver Proyectos', color: '#8b5cf6', href: '/dashboard/projects' },
+            { icon: 'bi-bar-chart-line-fill', label: 'Analytics', color: '#f59e0b', href: '/dashboard/analytics' },
+          ].map((btn, i) => (
+            <div key={i} onClick={() => router.push(btn.href)} style={{ background: 'rgba(17,24,39,0.7)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '1rem 1.25rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, transition: 'all 0.2s' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = btn.color + '50'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 24px ${btn.color}15`; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: btn.color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', color: btn.color }}>
+                <i className={`bi ${btn.icon}`}></i>
+              </div>
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#e2e8f0' }}>{btn.label}</span>
             </div>
           ))}
         </div>
@@ -148,6 +184,7 @@ export default function Dashboard() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead><tr>
                   <th style={{ textAlign: 'left', padding: '0.6rem 1rem', fontSize: '0.65rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Agente</th>
+                  <th style={{ textAlign: 'left', padding: '0.6rem 1rem', fontSize: '0.65rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Provider</th>
                   <th style={{ textAlign: 'left', padding: '0.6rem 1rem', fontSize: '0.65rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Modelo</th>
                   <th style={{ textAlign: 'left', padding: '0.6rem 1rem', fontSize: '0.65rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Estado</th>
                   <th style={{ textAlign: 'left', padding: '0.6rem 1rem', fontSize: '0.65rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Tareas</th>
@@ -162,6 +199,7 @@ export default function Dashboard() {
                         <td style={{ padding: '0.6rem 1rem', fontSize: '0.8rem', borderBottom: '1px solid rgba(255,255,255,0.04)', color: '#e2e8f0', fontWeight: 600 }}>
                           <i className={`bi ${m.icon}`} style={{ color: m.color, marginRight: 8 }}></i>{a.name as string}
                         </td>
+                        <td style={{ padding: '0.6rem 1rem', fontSize: '0.7rem', color: '#94a3b8', borderBottom: '1px solid rgba(255,255,255,0.04)', textTransform: 'capitalize' }}>{(a.provider as string) || '—'}</td>
                         <td style={{ padding: '0.6rem 1rem', fontSize: '0.7rem', fontFamily: "'JetBrains Mono', monospace", color: '#64748b', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>{(a.model as string) || '—'}</td>
                         <td style={{ padding: '0.6rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                           <span style={{ fontSize: '0.6rem', fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: a.active ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.12)', color: a.active ? '#22c55e' : '#f59e0b', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -201,6 +239,48 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* Proyectos Recientes */}
+        <div style={{ marginTop: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}><i className="bi bi-kanban" style={{ color: '#8b5cf6' }}></i> Proyectos Recientes</h3>
+            <a href="/dashboard/projects" style={{ fontSize: '0.7rem', color: '#94a3b8', textDecoration: 'none' }}>Ver todos →</a>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
+            {projects.length === 0 ? (
+              <div style={{ gridColumn: '1 / -1', background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '2rem', textAlign: 'center', color: '#475569', fontSize: '0.8rem' }}>Sin proyectos</div>
+            ) : projects.map((p, i) => {
+              const statusColors: Record<string, { bg: string; text: string }> = {
+                activo: { bg: 'rgba(34,197,94,0.12)', text: '#22c55e' },
+                active: { bg: 'rgba(34,197,94,0.12)', text: '#22c55e' },
+                completado: { bg: 'rgba(59,130,246,0.12)', text: '#3b82f6' },
+                completed: { bg: 'rgba(59,130,246,0.12)', text: '#3b82f6' },
+                pausado: { bg: 'rgba(245,158,11,0.12)', text: '#f59e0b' },
+                paused: { bg: 'rgba(245,158,11,0.12)', text: '#f59e0b' },
+              };
+              const st = statusColors[((p.status as string) || '').toLowerCase()] || { bg: 'rgba(148,163,184,0.12)', text: '#94a3b8' };
+              const progress = (p.progress as number) || 0;
+              return (
+                <div key={i} style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '1.25rem', transition: 'all 0.2s', cursor: 'pointer' }}
+                  onClick={() => setModal({ title: (p.name as string) || 'Proyecto', content: p })}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.3)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'; (e.currentTarget as HTMLElement).style.transform = 'none'; }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '65%' }}>{(p.name as string) || 'Sin nombre'}</span>
+                    <span style={{ fontSize: '0.55rem', fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: st.bg, color: st.text, textTransform: 'capitalize' }}>{(p.status as string) || '—'}</span>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 999, height: 6, overflow: 'hidden', marginBottom: 10 }}>
+                    <div style={{ height: '100%', width: `${Math.min(progress, 100)}%`, background: 'linear-gradient(90deg, #8b5cf6, #a78bfa)', borderRadius: 999, transition: 'width 0.4s ease' }}></div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.65rem', color: '#64748b' }}>{progress}%</span>
+                    <span style={{ fontSize: '0.65rem', color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }}>{(p.owner as string) || '—'}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

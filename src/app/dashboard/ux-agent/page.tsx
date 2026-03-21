@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 interface Insight {
   id: string;
@@ -17,29 +17,60 @@ const CATEGORIAS = ['Todas', 'Conversión', 'SEO', 'Contenido', 'Navegación', '
 const ESTADOS = ['Todas', 'Pendiente', 'En progreso', 'Implementado'];
 
 const agentColors: Record<string, string> = { claude: '#00e5b0', groq: '#f59e0b', grok: '#8b5cf6', gemini: '#22c55e', deployer: '#3b82f6' };
-const estadoColors: Record<string, { bg: string; text: string; dot: string }> = {
-  pendiente: { bg: 'rgba(245,158,11,0.1)', text: '#f59e0b', dot: '#f59e0b' },
-  en_progreso: { bg: 'rgba(59,130,246,0.1)', text: '#3b82f6', dot: '#3b82f6' },
-  implementado: { bg: 'rgba(34,197,94,0.1)', text: '#22c55e', dot: '#22c55e' },
+const estadoColors: Record<string, { bg: string; text: string }> = {
+  pendiente: { bg: 'rgba(245,158,11,0.12)', text: '#f59e0b' },
+  en_progreso: { bg: 'rgba(59,130,246,0.12)', text: '#3b82f6' },
+  implementado: { bg: 'rgba(34,197,94,0.12)', text: '#22c55e' },
 };
 const catColors: Record<string, string> = { 'Conversión': '#ef4444', 'Conversion': '#ef4444', SEO: '#8b5cf6', Contenido: '#f59e0b', Navegación: '#3b82f6', Navegacion: '#3b82f6', WhatsApp: '#22c55e', i18n: '#00e5b0', Checkout: '#f97316' };
 
+/* ── Popup overlay ─────────────────────────────────────────── */
+function Overlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}
+    >
+      <div onClick={e => e.stopPropagation()} style={{ background: '#0f1623', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, width: '100%', maxWidth: 620, maxHeight: '85vh', overflow: 'auto', boxShadow: '0 25px 60px rgba(0,0,0,0.6)' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ── Animated dots ─────────────────────────────────────────── */
+function AnimatedDots() {
+  const [dots, setDots] = useState('');
+  useEffect(() => {
+    const t = setInterval(() => setDots(d => d.length >= 3 ? '' : d + '.'), 400);
+    return () => clearInterval(t);
+  }, []);
+  return <span>{dots}</span>;
+}
+
+/* ── Main page ─────────────────────────────────────────────── */
 export default function UXAgent() {
   const [insights, setInsights] = useState<Insight[]>([]);
   const [filterCat, setFilterCat] = useState('Todas');
   const [filterEstado, setFilterEstado] = useState('Todas');
-  const [analyzing, setAnalyzing] = useState(false);
 
-  const api = (payload: Record<string, unknown>) =>
-    fetch('/api/agents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json());
+  // Popups
+  const [analysisPopup, setAnalysisPopup] = useState<'loading' | 'result' | null>(null);
+  const [analysisResult, setAnalysisResult] = useState('');
+  const [detailInsight, setDetailInsight] = useState<Insight | null>(null);
+  const [agentRunning, setAgentRunning] = useState(false);
+  const [agentResult, setAgentResult] = useState('');
 
-  const loadInsights = () => {
+  const api = useCallback((payload: Record<string, unknown>) =>
+    fetch('/api/agents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json()), []);
+
+  const loadInsights = useCallback(() => {
     api({ action: 'query', table: 'ux_insights', order: 'created_at.desc', limit: 100 })
       .then(d => { if (d.data) setInsights(d.data as Insight[]); })
       .catch(() => {});
-  };
+  }, [api]);
 
-  useEffect(() => { loadInsights(); }, []);
+  useEffect(() => { loadInsights(); }, [loadInsights]);
 
   const filtered = insights.filter(i => {
     if (filterCat !== 'Todas' && i.categoria !== filterCat) return false;
@@ -58,114 +89,306 @@ export default function UXAgent() {
 
   const currentCiclo = insights.length > 0 ? Math.max(...insights.map(i => i.ciclo || 1)) : 1;
 
+  /* ── Run new analysis ──────────────────────────────── */
   const runAnalysis = async () => {
-    setAnalyzing(true);
+    setAnalysisPopup('loading');
+    setAnalysisResult('');
     try {
-      await api({
+      const res = await api({
         action: 'execute',
-        agentId: 'claude',
-        prompt: 'Analiza el sitio smconnection.cl y genera 3 mejoras UX concretas para mejorar conversión, SEO y experiencia. Para cada mejora incluye: título, descripción detallada, categoría (Conversión/SEO/Contenido/Navegación/WhatsApp), e impacto estimado. Responde en formato JSON array.',
+        agentId: 'groq',
+        prompt: 'Analiza el sitio smconnection.cl y genera 3 mejoras UX concretas para mejorar conversión, SEO y experiencia de usuario. Para cada mejora incluye: título, descripción detallada, categoría (Conversión/SEO/Contenido/Navegación/WhatsApp), e impacto estimado. Responde de forma clara y estructurada.',
         taskType: 'seo',
       });
+      setAnalysisResult(res.result || res.response || res.data || JSON.stringify(res, null, 2));
+      setAnalysisPopup('result');
       loadInsights();
-    } catch { /* */ }
-    setAnalyzing(false);
+    } catch (err) {
+      setAnalysisResult('Error al ejecutar el análisis: ' + String(err));
+      setAnalysisPopup('result');
+    }
+  };
+
+  /* ── Run agent on specific insight ─────────────────── */
+  const runAgentOnInsight = async (insight: Insight) => {
+    setAgentRunning(true);
+    setAgentResult('');
+    try {
+      const res = await api({
+        action: 'execute',
+        agentId: 'groq',
+        prompt: `Analiza esta mejora UX para smconnection.cl y da recomendaciones detalladas de implementación:\n\nTítulo: ${insight.titulo}\nDescripción: ${insight.descripcion}\nCategoría: ${insight.categoria}\nImpacto: ${insight.impacto}\n\nDa pasos concretos, código si es necesario, y priorización.`,
+        taskType: 'seo',
+      });
+      setAgentResult(res.result || res.response || res.data || JSON.stringify(res, null, 2));
+    } catch (err) {
+      setAgentResult('Error: ' + String(err));
+    }
+    setAgentRunning(false);
   };
 
   const updateEstado = (id: string, newEstado: string) => {
     setInsights(prev => prev.map(i => i.id === id ? { ...i, estado: newEstado } : i));
-    // TODO: persist to Supabase
+    if (detailInsight?.id === id) setDetailInsight(prev => prev ? { ...prev, estado: newEstado } : null);
   };
 
-  const s = {
-    page: { padding: '2rem', flex: 1 },
-    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' },
-    title: { fontSize: '1.25rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8, color: '#f1f5f9' },
-    subtitle: { fontSize: '0.8rem', color: '#64748b', marginTop: 4 },
-    analyzeBtn: { background: analyzing ? '#1a2235' : '#00e5b0', color: analyzing ? '#94a3b8' : '#0a0d14', border: 'none', padding: '10px 20px', borderRadius: 10, fontWeight: 700, fontSize: '0.8rem', cursor: analyzing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontFamily: "'Inter', system-ui, sans-serif" },
-    kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1.5rem' },
-    kpiCard: (color: string) => ({ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '1.25rem', borderTop: `3px solid ${color}` }),
-    kpiValue: (color: string) => ({ fontSize: '1.75rem', fontWeight: 900, color, lineHeight: 1 }),
-    kpiLabel: { fontSize: '0.75rem', color: '#94a3b8', marginTop: 4 },
-    filters: { display: 'flex', gap: 6, marginBottom: '1.5rem', flexWrap: 'wrap' as const },
-    filterBtn: (active: boolean) => ({ background: active ? 'rgba(0,229,176,0.15)' : 'transparent', color: active ? '#00e5b0' : '#94a3b8', border: active ? '1px solid rgba(0,229,176,0.3)' : '1px solid rgba(255,255,255,0.08)', padding: '6px 14px', borderRadius: 8, fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif" }),
-    card: (estado: string) => ({ background: '#111827', border: estado === 'en_progreso' ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '1.5rem', marginBottom: '0.75rem', transition: 'all 0.2s' }),
-    cardHeader: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' as const },
-    catBadge: (cat: string) => ({ fontSize: '0.6rem', fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${catColors[cat] || '#475569'}20`, color: catColors[cat] || '#94a3b8' }),
-    cicloBadge: { fontSize: '0.6rem', fontWeight: 600, color: '#475569', marginLeft: 4 },
-    impacto: { fontSize: '0.7rem', fontWeight: 600, color: '#22c55e', marginLeft: 'auto' },
-    cardTitle: { fontSize: '0.95rem', fontWeight: 700, color: '#f1f5f9', marginBottom: 8 },
-    cardDesc: { fontSize: '0.8rem', color: '#94a3b8', lineHeight: 1.6, marginBottom: 12 },
-    estadoSelect: { background: '#1a2235', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '4px 10px', fontSize: '0.7rem', fontWeight: 600, color: '#94a3b8', cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", appearance: 'none' as const, paddingRight: 24, backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'%2394a3b8\' d=\'M6 8L1 3h10z\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' },
-    agentDot: (agente: string) => ({ width: 8, height: 8, borderRadius: '50%', background: agentColors[agente] || '#475569', display: 'inline-block', marginRight: 4 }),
-  };
+  const fmtDate = (d: string) => { try { return new Date(d).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch { return d; } };
+
+  /* ── Styles ─────────────────────────────────────────── */
+  const pill = (active: boolean, color?: string): React.CSSProperties => ({
+    background: active ? (color ? `${color}20` : 'rgba(0,229,176,0.15)') : 'transparent',
+    color: active ? (color || '#00e5b0') : '#64748b',
+    border: active ? `1px solid ${color || 'rgba(0,229,176,0.3)'}` : '1px solid rgba(255,255,255,0.06)',
+    padding: '6px 16px', borderRadius: 999, fontSize: '0.72rem', fontWeight: 600,
+    cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", transition: 'all 0.15s',
+  });
 
   return (
     <>
-      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(17,24,39,0.9)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)', height: 56, display: 'flex', alignItems: 'center', padding: '0 2rem', fontSize: '0.85rem', color: '#94a3b8' }}>
+      {/* ── Breadcrumb ──────────────────────────────────── */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(15,22,35,0.92)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)', height: 56, display: 'flex', alignItems: 'center', padding: '0 2rem', fontSize: '0.85rem', color: '#94a3b8' }}>
         <span>Intranet</span><span style={{ margin: '0 8px', color: '#475569' }}>/</span><span style={{ color: '#fff', fontWeight: 600 }}>Agente UX</span>
       </div>
-      <div style={s.page}>
-        <div style={s.header}>
+
+      <div style={{ padding: '2rem', flex: 1 }}>
+        {/* ── Header ──────────────────────────────────────── */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
           <div>
-            <div style={s.title}>⚡ Agente UX</div>
-            <div style={s.subtitle}>Análisis continuo de experiencia y conversión — Ciclo {currentCiclo}</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: '1.4rem' }}>⚡</span> Agente UX
+            </div>
+            <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: 6 }}>
+              Análisis continuo de experiencia y conversión — Ciclo {currentCiclo}
+            </div>
           </div>
-          <button onClick={runAnalysis} disabled={analyzing} style={s.analyzeBtn}>
-            {analyzing ? <><i className="bi bi-hourglass-split"></i> Analizando...</> : <><i className="bi bi-lightning-charge"></i> Nuevo análisis</>}
+          <button
+            onClick={runAnalysis}
+            style={{ background: 'linear-gradient(135deg, #00e5b0, #00c49a)', color: '#0a0d14', border: 'none', padding: '12px 24px', borderRadius: 12, fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 20px rgba(0,229,176,0.25)', transition: 'all 0.2s' }}
+          >
+            <span style={{ fontSize: '1rem' }}>⚡</span> Nuevo análisis
           </button>
         </div>
 
-        {/* KPIs */}
-        <div style={s.kpiGrid}>
-          <div style={s.kpiCard('#f59e0b')}><div style={s.kpiValue('#f59e0b')}>{counts.pendiente}</div><div style={s.kpiLabel}>Pendientes</div></div>
-          <div style={s.kpiCard('#3b82f6')}><div style={s.kpiValue('#3b82f6')}>{counts.en_progreso}</div><div style={s.kpiLabel}>En progreso</div></div>
-          <div style={s.kpiCard('#22c55e')}><div style={s.kpiValue('#22c55e')}>{counts.implementado}</div><div style={s.kpiLabel}>Implementadas</div></div>
-          <div style={s.kpiCard('#f1f5f9')}><div style={s.kpiValue('#f1f5f9')}>{counts.total}</div><div style={s.kpiLabel}>Total mejoras</div></div>
+        {/* ── KPI Cards ───────────────────────────────────── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1.75rem' }}>
+          {([
+            { label: 'Pendientes', value: counts.pendiente, color: '#f59e0b', icon: '⏳' },
+            { label: 'En progreso', value: counts.en_progreso, color: '#3b82f6', icon: '🔄' },
+            { label: 'Implementadas', value: counts.implementado, color: '#22c55e', icon: '✅' },
+            { label: 'Total mejoras', value: counts.total, color: '#f1f5f9', icon: '📊' },
+          ] as const).map(kpi => (
+            <div key={kpi.label} style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '1.25rem 1.5rem', borderTop: `3px solid ${kpi.color}`, transition: 'all 0.2s' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '2rem', fontWeight: 900, color: kpi.color, lineHeight: 1 }}>{kpi.value}</div>
+                  <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 6, fontWeight: 500 }}>{kpi.label}</div>
+                </div>
+                <span style={{ fontSize: '1.5rem', opacity: 0.5 }}>{kpi.icon}</span>
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* Filters - Estado */}
-        <div style={s.filters}>
-          {ESTADOS.map(e => (
-            <button key={e} onClick={() => setFilterEstado(e)} style={s.filterBtn(filterEstado === e)}>{e}</button>
-          ))}
-          <span style={{ width: 1, background: 'rgba(255,255,255,0.08)', margin: '0 4px' }}></span>
+        {/* ── Filter Bar ──────────────────────────────────── */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: '1.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          {ESTADOS.map(e => {
+            const eColors: Record<string, string> = { 'Pendiente': '#f59e0b', 'En progreso': '#3b82f6', 'Implementado': '#22c55e' };
+            return <button key={e} onClick={() => setFilterEstado(e)} style={pill(filterEstado === e, eColors[e])}>{e}</button>;
+          })}
+          <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.08)', margin: '0 6px' }}></span>
           {CATEGORIAS.map(c => (
-            <button key={c} onClick={() => setFilterCat(c)} style={s.filterBtn(filterCat === c)}>{c}</button>
+            <button key={c} onClick={() => setFilterCat(c)} style={pill(filterCat === c, catColors[c])}>{c}</button>
           ))}
         </div>
 
-        {/* Insights List */}
+        {/* ── Insight Cards ───────────────────────────────── */}
         {filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: '#475569' }}>
-            <i className="bi bi-lightbulb" style={{ fontSize: '2rem', display: 'block', marginBottom: 8, opacity: 0.3 }}></i>
-            <p style={{ fontSize: '0.8rem' }}>Sin insights para este filtro</p>
+          <div style={{ textAlign: 'center', padding: '4rem 2rem', color: '#475569' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: 12, opacity: 0.3 }}>💡</div>
+            <p style={{ fontSize: '0.85rem', fontWeight: 500 }}>Sin insights para este filtro</p>
           </div>
         ) : filtered.map(insight => {
           const ec = estadoColors[insight.estado] || estadoColors.pendiente;
           return (
-            <div key={insight.id} style={s.card(insight.estado)}>
-              <div style={s.cardHeader}>
-                <span style={s.agentDot(insight.agente)}></span>
-                <span style={s.catBadge(insight.categoria)}>{insight.categoria}</span>
-                <span style={s.cicloBadge}>Ciclo {insight.ciclo}</span>
-                <span style={{ ...s.impacto, color: '#22c55e' }}>{insight.impacto}</span>
-                <select
-                  value={insight.estado}
-                  onChange={e => updateEstado(insight.id, e.target.value)}
-                  style={{ ...s.estadoSelect, color: ec.text, background: ec.bg }}
-                >
-                  <option value="pendiente">⏳ Pendiente</option>
-                  <option value="en_progreso">🔄 En progreso</option>
-                  <option value="implementado">✅ Implementado</option>
-                </select>
+            <div
+              key={insight.id}
+              onClick={() => { setDetailInsight(insight); setAgentResult(''); setAgentRunning(false); }}
+              style={{
+                background: '#111827', border: insight.estado === 'en_progreso' ? '1px solid rgba(59,130,246,0.25)' : '1px solid rgba(255,255,255,0.06)',
+                borderRadius: 16, padding: '1.25rem 1.5rem', marginBottom: '0.65rem', cursor: 'pointer',
+                transition: 'all 0.2s', display: 'flex', gap: 14, alignItems: 'flex-start',
+              }}
+            >
+              {/* Left dot */}
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: agentColors[insight.agente] || '#475569', marginTop: 6, flexShrink: 0, boxShadow: `0 0 8px ${agentColors[insight.agente] || '#475569'}60` }}></div>
+
+              {/* Content */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Top badges row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: `${catColors[insight.categoria] || '#475569'}18`, color: catColors[insight.categoria] || '#94a3b8', letterSpacing: '0.02em' }}>{insight.categoria}</span>
+                  <span style={{ fontSize: '0.6rem', fontWeight: 600, color: '#475569' }}>Ciclo {insight.ciclo}</span>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#22c55e', marginLeft: 'auto' }}>{insight.impacto}</span>
+                  <select
+                    value={insight.estado}
+                    onChange={e => { e.stopPropagation(); updateEstado(insight.id, e.target.value); }}
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      background: ec.bg, border: `1px solid ${ec.text}30`, borderRadius: 8, padding: '4px 26px 4px 10px',
+                      fontSize: '0.68rem', fontWeight: 700, color: ec.text, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif",
+                      appearance: 'none' as const,
+                      backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'10\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'%2394a3b8\' d=\'M6 8L1 3h10z\'/%3E%3C/svg%3E")',
+                      backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center',
+                    }}
+                  >
+                    <option value="pendiente">⏳ Pendiente</option>
+                    <option value="en_progreso">🔄 En progreso</option>
+                    <option value="implementado">✅ Implementado</option>
+                  </select>
+                </div>
+                {/* Title + desc */}
+                <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#f1f5f9', marginBottom: 5 }}>{insight.titulo}</div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8', lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{insight.descripcion}</div>
               </div>
-              <div style={s.cardTitle}>{insight.titulo}</div>
-              <div style={s.cardDesc}>{insight.descripcion}</div>
             </div>
           );
         })}
       </div>
+
+      {/* ══════════════════════════════════════════════════════
+          POPUP: Nuevo Análisis (loading)
+         ══════════════════════════════════════════════════════ */}
+      {analysisPopup === 'loading' && (
+        <Overlay onClose={() => {}}>
+          <div style={{ padding: '3rem', textAlign: 'center' }}>
+            <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(0,229,176,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', animation: 'pulse 1.5s ease-in-out infinite' }}>
+              <span style={{ fontSize: '1.5rem' }}>⚡</span>
+            </div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f1f5f9', marginBottom: 8 }}>
+              Analizando sitio<AnimatedDots />
+            </div>
+            <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+              El agente Groq está evaluando UX, conversión y SEO
+            </div>
+            <style>{`@keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } }`}</style>
+          </div>
+        </Overlay>
+      )}
+
+      {/* ══════════════════════════════════════════════════════
+          POPUP: Resultado del análisis
+         ══════════════════════════════════════════════════════ */}
+      {analysisPopup === 'result' && (
+        <Overlay onClose={() => setAnalysisPopup(null)}>
+          <div style={{ padding: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: '1rem' }}>✨</span> Resultado del análisis
+              </div>
+              <button onClick={() => setAnalysisPopup(null)} style={{ background: 'rgba(255,255,255,0.06)', border: 'none', color: '#94a3b8', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+            </div>
+            <div style={{ background: '#0a0d14', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '1.25rem', fontSize: '0.8rem', color: '#cbd5e1', lineHeight: 1.7, whiteSpace: 'pre-wrap', maxHeight: '50vh', overflow: 'auto', fontFamily: "'Inter', system-ui, sans-serif" }}>
+              {typeof analysisResult === 'string' ? analysisResult : JSON.stringify(analysisResult, null, 2)}
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: '1.25rem', justifyContent: 'flex-end' }}>
+              <button onClick={() => setAnalysisPopup(null)} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#94a3b8', padding: '10px 20px', borderRadius: 10, fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif" }}>
+                Cerrar
+              </button>
+              <button onClick={() => { setAnalysisPopup(null); }} style={{ background: 'linear-gradient(135deg, #00e5b0, #00c49a)', color: '#0a0d14', border: 'none', padding: '10px 20px', borderRadius: 10, fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif" }}>
+                Guardar mejoras
+              </button>
+            </div>
+          </div>
+        </Overlay>
+      )}
+
+      {/* ══════════════════════════════════════════════════════
+          POPUP: Detalle de insight
+         ══════════════════════════════════════════════════════ */}
+      {detailInsight && (
+        <Overlay onClose={() => setDetailInsight(null)}>
+          <div style={{ padding: '2rem' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 12, height: 12, borderRadius: '50%', background: agentColors[detailInsight.agente] || '#475569', boxShadow: `0 0 10px ${agentColors[detailInsight.agente] || '#475569'}60` }}></div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Agente: {detailInsight.agente}
+                </span>
+              </div>
+              <button onClick={() => setDetailInsight(null)} style={{ background: 'rgba(255,255,255,0.06)', border: 'none', color: '#94a3b8', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+            </div>
+
+            {/* Title */}
+            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f1f5f9', marginBottom: '1rem', lineHeight: 1.4 }}>{detailInsight.titulo}</div>
+
+            {/* Badges */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+              <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '4px 12px', borderRadius: 999, background: `${catColors[detailInsight.categoria] || '#475569'}18`, color: catColors[detailInsight.categoria] || '#94a3b8' }}>{detailInsight.categoria}</span>
+              <span style={{ fontSize: '0.65rem', fontWeight: 600, padding: '4px 12px', borderRadius: 999, background: 'rgba(255,255,255,0.04)', color: '#64748b' }}>Ciclo {detailInsight.ciclo}</span>
+              <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '4px 12px', borderRadius: 999, background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>{detailInsight.impacto}</span>
+            </div>
+
+            {/* Description */}
+            <div style={{ fontSize: '0.82rem', color: '#cbd5e1', lineHeight: 1.7, marginBottom: '1.5rem', background: '#0a0d14', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: '1.25rem' }}>
+              {detailInsight.descripcion}
+            </div>
+
+            {/* Status changer */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1.25rem' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Estado:</span>
+              {(['pendiente', 'en_progreso', 'implementado'] as const).map(est => {
+                const active = detailInsight.estado === est;
+                const ec = estadoColors[est];
+                const labels: Record<string, string> = { pendiente: '⏳ Pendiente', en_progreso: '🔄 En progreso', implementado: '✅ Implementado' };
+                return (
+                  <button
+                    key={est}
+                    onClick={() => updateEstado(detailInsight.id, est)}
+                    style={{
+                      background: active ? ec.bg : 'transparent',
+                      border: active ? `1px solid ${ec.text}40` : '1px solid rgba(255,255,255,0.06)',
+                      color: active ? ec.text : '#64748b',
+                      padding: '6px 14px', borderRadius: 8, fontSize: '0.72rem', fontWeight: 600,
+                      cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", transition: 'all 0.15s',
+                    }}
+                  >
+                    {labels[est]}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Date */}
+            <div style={{ fontSize: '0.72rem', color: '#475569', marginBottom: '1.5rem' }}>
+              Creado: {fmtDate(detailInsight.created_at)}
+            </div>
+
+            {/* Agent execution button */}
+            <button
+              onClick={() => runAgentOnInsight(detailInsight)}
+              disabled={agentRunning}
+              style={{
+                width: '100%', background: agentRunning ? '#1a2235' : 'linear-gradient(135deg, #f59e0b, #f97316)',
+                color: agentRunning ? '#94a3b8' : '#0a0d14', border: 'none', padding: '12px', borderRadius: 12,
+                fontWeight: 700, fontSize: '0.82rem', cursor: agentRunning ? 'not-allowed' : 'pointer',
+                fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                transition: 'all 0.2s',
+              }}
+            >
+              {agentRunning ? (<>Ejecutando agente<AnimatedDots /></>) : (<><span>🤖</span> Ejecutar agente sobre este insight</>)}
+            </button>
+
+            {/* Agent result */}
+            {agentResult && (
+              <div style={{ marginTop: '1rem', background: '#0a0d14', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 12, padding: '1.25rem', fontSize: '0.78rem', color: '#cbd5e1', lineHeight: 1.7, whiteSpace: 'pre-wrap', maxHeight: '35vh', overflow: 'auto' }}>
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#f59e0b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>🤖 Respuesta del agente</div>
+                {typeof agentResult === 'string' ? agentResult : JSON.stringify(agentResult, null, 2)}
+              </div>
+            )}
+          </div>
+        </Overlay>
+      )}
     </>
   );
 }
