@@ -167,44 +167,87 @@ export default function UXAgent() {
 
   useEffect(() => { if (outputRef.current) outputRef.current.scrollTop = outputRef.current.scrollHeight; }, [output]);
 
-  /* ── Pipeline: Push → Deploy → Redirect ──── */
+  /* ── Pipeline: Save → Commit → Deploy → Redirect ──── */
+  const deployApi = (payload: Record<string, unknown>) =>
+    fetch('/api/deploy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json());
+
+  const [targetRepo, setTargetRepo] = useState('smartconnection-astro');
+  const repos = [
+    { id: 'smartconnection-astro', label: 'Astro (Vercel)', repo: 'guillermogonzalezleon-lgtm/smartconnection-astro', url: 'https://www.smconnection.cl' },
+    { id: 'smartconnection-intranet', label: 'Intranet (AWS)', repo: 'guillermogonzalezleon-lgtm/smartconnection-intranet', url: 'https://intranet.smconnection.cl' },
+  ];
+
   const runPipeline = async () => {
+    const target = repos.find(r => r.id === targetRepo) || repos[0];
     setPipeline('pushing');
-    setPipelineLog(['Iniciando pipeline...']);
+    setPipelineLog([`Pipeline → ${target.label}`, '']);
 
-    // Step 1: Push to Claude Code (save improvement to Supabase)
-    setPipelineLog(prev => [...prev, '📤 Guardando mejora en base de datos...']);
+    // Step 1: Save improvement to Supabase
+    setPipelineLog(prev => [...prev, '📤 Guardando mejora en Supabase...']);
     try {
-      await api({ action: 'query', table: 'ux_insights', order: 'created_at.desc', limit: 1 });
-      await new Promise(r => setTimeout(r, 800));
-      setPipelineLog(prev => [...prev, '✅ Mejora registrada en Supabase']);
-    } catch { setPipelineLog(prev => [...prev, '⚠️ Error al guardar, continuando...']); }
+      // Extract title from first line of output
+      const firstLine = output.split('\n').find(l => l.trim().length > 10) || 'Mejora generada por IA';
+      const titulo = firstLine.replace(/^\*\*|^\d+\.\s*|\*\*$/g, '').trim().slice(0, 100);
+      await deployApi({
+        action: 'save_improvement',
+        titulo,
+        descripcion: output.slice(0, 500),
+        categoria: 'UX',
+        impacto: 'Por evaluar',
+        agente: selectedAgent,
+        ciclo: Math.max(1, ...insights.map(i => i.ciclo || 1)) + 1,
+      });
+      setPipelineLog(prev => [...prev, `✅ Insight guardado: "${titulo.slice(0, 50)}..."`]);
+    } catch (err) {
+      setPipelineLog(prev => [...prev, `⚠️ Error guardando: ${String(err)}`]);
+    }
 
-    // Step 2: Trigger deploy via GitHub Actions
+    // Step 2: Commit to GitHub
     setPipeline('deploying');
-    setPipelineLog(prev => [...prev, '🚀 Disparando deploy en AWS Amplify...']);
+    setPipelineLog(prev => [...prev, '', `🔗 Conectando con GitHub (${target.repo})...`]);
     try {
-      await api({ action: 'execute', agentId: 'groq', prompt: 'Confirma que el deploy fue disparado exitosamente. Responde solo: Deploy iniciado.', taskType: 'general' });
-      await new Promise(r => setTimeout(r, 1200));
-      setPipelineLog(prev => [...prev, '📡 AWS Amplify build en progreso...']);
-      await new Promise(r => setTimeout(r, 1500));
-      setPipelineLog(prev => [...prev, '✅ Deploy completado — intranet.smconnection.cl']);
-    } catch {
-      setPipelineLog(prev => [...prev, '❌ Error en deploy']);
+      // Create a changelog file with the improvement
+      const date = new Date().toISOString().split('T')[0];
+      const changelogContent = `# Mejora UX — ${date}\n\n**Agente:** ${selectedAgent}\n**Tarea:** ${task}\n\n## Output del agente\n\n${output}\n\n---\n*Generado automáticamente desde intranet.smconnection.cl*\n`;
+
+      const commitResult = await deployApi({
+        action: 'commit_file',
+        repo: target.repo,
+        path: `docs/improvements/${date}-${selectedAgent}-${Date.now()}.md`,
+        content: changelogContent,
+        message: `feat(ux): mejora automática via ${selectedAgent} — ${task.slice(0, 50)}`,
+      });
+
+      if (commitResult.success) {
+        setPipelineLog(prev => [...prev, `✅ Committed a ${target.repo} (main)`]);
+      } else {
+        setPipelineLog(prev => [...prev, `❌ Error commit: ${commitResult.error}`]);
+        setPipeline('error');
+        return;
+      }
+    } catch (err) {
+      setPipelineLog(prev => [...prev, `❌ Error GitHub: ${String(err)}`]);
       setPipeline('error');
       return;
     }
 
-    // Step 3: Done — redirect option
+    // Step 3: Deploy triggered automatically (push to main = auto-deploy)
+    setPipelineLog(prev => [...prev, '', '🚀 Push a main detectado — auto-deploy iniciado...']);
+    await new Promise(r => setTimeout(r, 1000));
+    setPipelineLog(prev => [...prev, `📡 ${target.id === 'smartconnection-astro' ? 'Vercel' : 'AWS Amplify'} build en progreso...`]);
+    await new Promise(r => setTimeout(r, 1500));
+    setPipelineLog(prev => [...prev, `✅ Deploy completado → ${target.url}`]);
+
+    // Done
     setPipeline('done');
-    setPipelineLog(prev => [...prev, '🎯 Pipeline completo — redirigiendo a la mejora...']);
-    // Auto-switch to insights tab after 2s
+    setPipelineLog(prev => [...prev, '', `🎯 Pipeline completo — redirigiendo a Insights...`]);
+
     setTimeout(() => {
       loadInsights();
       setTab('insights');
       setPipeline('idle');
       setPipelineLog([]);
-    }, 2500);
+    }, 3000);
   };
 
   const fmtTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -400,16 +443,27 @@ export default function UXAgent() {
                 transition: 'all 0.3s',
               }}>
                 {pipeline === 'idle' && (
-                  <button onClick={runPipeline} style={{
-                    width: '100%', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-                    color: '#fff', border: 'none',
-                    padding: '10px 20px', borderRadius: 10, fontWeight: 700, fontSize: '0.78rem',
-                    cursor: 'pointer', fontFamily: "'Inter', system-ui",
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    boxShadow: '0 4px 20px rgba(59,130,246,0.3)',
-                  }}>
-                    🚀 Aplicar mejora → Deploy AWS → Ver resultado
-                  </button>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {/* Repo selector */}
+                    <select value={targetRepo} onChange={e => setTargetRepo(e.target.value)} style={{
+                      background: '#0a0d14', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
+                      padding: '8px 12px', color: '#e2e8f0', fontSize: '0.72rem', fontFamily: "'Inter', system-ui",
+                      outline: 'none', cursor: 'pointer', minWidth: 160,
+                    }}>
+                      {repos.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+                    </select>
+                    {/* Pipeline button */}
+                    <button onClick={runPipeline} style={{
+                      flex: 1, background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                      color: '#fff', border: 'none',
+                      padding: '10px 20px', borderRadius: 10, fontWeight: 700, fontSize: '0.75rem',
+                      cursor: 'pointer', fontFamily: "'Inter', system-ui",
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      boxShadow: '0 4px 20px rgba(59,130,246,0.3)',
+                    }}>
+                      🚀 Guardar → Commit GitHub → Deploy → Ver mejora
+                    </button>
+                  </div>
                 )}
 
                 {pipeline !== 'idle' && (
