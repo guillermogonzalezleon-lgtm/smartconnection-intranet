@@ -33,8 +33,9 @@ export async function POST(request: Request) {
     cookieStore.set('sc_session', token, { path: '/', httpOnly: true, secure: true, sameSite: 'lax', maxAge: 86400 });
 
     return NextResponse.json({ success: true, user: { name: record.nombre || userEmail.split('@')[0], email: userEmail, role: record.rol || 'user' } });
-  } catch {
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
+  } catch (err) {
+    console.error('Auth error:', err);
+    return NextResponse.json({ error: 'Error interno', detail: String(err) }, { status: 500 });
   }
 }
 
