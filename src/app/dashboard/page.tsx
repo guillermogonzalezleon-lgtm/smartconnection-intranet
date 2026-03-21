@@ -95,10 +95,10 @@ export default function Dashboard() {
               {Object.entries(item).filter(([k]) => !['id', 'created_at', 'updated_at'].includes(k)).map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: '0.75rem' }}>
                   <span style={{ color: '#64748b', textTransform: 'capitalize' }}>{k.replace(/_/g, ' ')}</span>
-                  <span style={{ color: '#e2e8f0', maxWidth: '60%', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(v ?? '—')}</span>
+                  <span style={{ color: '#e2e8f0', maxWidth: '60%', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(v ?? '—') as string}</span>
                 </div>
               ))}
-              {item.created_at && <div style={{ fontSize: '0.6rem', color: '#475569', marginTop: 4 }}>{new Date(item.created_at as string).toLocaleString('es-CL')}</div>}
+              {item.created_at ? <div style={{ fontSize: '0.6rem', color: '#475569', marginTop: 4 }}>{new Date(String(item.created_at)).toLocaleString('es-CL')}</div> : null}
             </div>
           ))}
         </div>
