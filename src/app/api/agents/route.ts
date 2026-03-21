@@ -63,6 +63,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ data });
     }
 
+    if (action === 'update_project' && body.projectId) {
+      await supabaseQuery('projects', 'PATCH', { filter: `id=eq.${body.projectId}`, body: { status: body.status, updated_at: new Date().toISOString() } });
+      return NextResponse.json({ success: true });
+    }
+
     return NextResponse.json({ error: 'Acción no válida' }, { status: 400 });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

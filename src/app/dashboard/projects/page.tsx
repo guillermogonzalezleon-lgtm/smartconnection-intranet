@@ -60,6 +60,8 @@ export default function ProjectsPage() {
   const [filterPriority, setFilterPriority] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [modalStatus, setModalStatus] = useState('');
 
   useEffect(() => {
@@ -95,6 +97,16 @@ export default function ProjectsPage() {
   const closeModal = () => {
     setSelectedProject(null);
     setModalStatus('');
+  };
+
+  const updateProjectStatus = (projectId: string, newStatus: string) => {
+    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, status: newStatus } : p));
+    // Persist to Supabase via PATCH
+    fetch('/api/agents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update_project', projectId, status: newStatus }),
+    }).catch(() => {});
   };
 
   const selectStyle = (active: boolean): React.CSSProperties => ({
@@ -158,7 +170,11 @@ export default function ProjectsPage() {
           /* Kanban Board */
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20, alignItems: 'flex-start' }}>
             {grouped.map(col => (
-              <div key={col.key} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 14, borderTop: `3px solid ${col.color}`, minHeight: 400 }}>
+              <div key={col.key}
+                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropTarget(col.key); }}
+                onDragLeave={() => setDropTarget(null)}
+                onDrop={(e) => { e.preventDefault(); if (draggedId) { updateProjectStatus(draggedId, col.key); setDraggedId(null); setDropTarget(null); } }}
+                style={{ background: dropTarget === col.key ? 'rgba(0,229,176,0.04)' : 'rgba(255,255,255,0.02)', border: dropTarget === col.key ? '2px dashed rgba(0,229,176,0.3)' : '2px dashed transparent', borderRadius: 14, borderTop: `3px solid ${col.color}`, minHeight: 400 }}>
                 {/* Column Header */}
                 <div style={{ padding: '14px 16px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -176,6 +192,9 @@ export default function ProjectsPage() {
                   {col.items.map(project => (
                     <div
                       key={project.id}
+                      draggable
+                      onDragStart={(e) => { setDraggedId(project.id); e.dataTransfer.effectAllowed = 'move'; }}
+                      onDragEnd={() => { setDraggedId(null); setDropTarget(null); }}
                       onClick={() => openModal(project)}
                       onMouseEnter={() => setHoveredCard(project.id)}
                       onMouseLeave={() => setHoveredCard(null)}
@@ -186,7 +205,7 @@ export default function ProjectsPage() {
                         cursor: 'pointer',
                         border: '1px solid rgba(255,255,255,0.06)',
                         transition: 'all 0.2s ease',
-                        opacity: hoveredCard === project.id ? 0.85 : 1,
+                        opacity: draggedId === project.id ? 0.4 : (hoveredCard === project.id ? 0.85 : 1),
                         transform: hoveredCard === project.id ? 'translateY(-1px)' : 'none',
                         boxShadow: hoveredCard === project.id ? '0 8px 24px rgba(0,0,0,0.3)' : '0 1px 3px rgba(0,0,0,0.1)',
                       }}
@@ -336,7 +355,7 @@ export default function ProjectsPage() {
                 <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Estado</div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   {COLUMNS.map(col => (
-                    <button key={col.key} onClick={() => setModalStatus(col.key)} style={{
+                    <button key={col.key} onClick={() => { setModalStatus(col.key); if (selectedProject) updateProjectStatus(selectedProject.id, col.key); }} style={{
                       padding: '6px 14px', borderRadius: 8, fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer',
                       border: modalStatus === col.key ? `1px solid ${col.color}` : '1px solid rgba(255,255,255,0.08)',
                       background: modalStatus === col.key ? `${col.color}18` : 'rgba(255,255,255,0.03)',
