@@ -382,77 +382,86 @@ export default function UXAgent() {
                     {wsRunning && <span style={{ display: 'inline-block', width: 7, height: 14, background: agent.color, marginLeft: 2, animation: 'blink 1s step-end infinite', verticalAlign: 'text-bottom' }}></span>}
                   </div>
                   {!wsRunning && output && (
-                    <>
-                      {/* Action buttons */}
-                      <div style={{ display: 'flex', gap: 6, marginTop: 14, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                        <button onClick={() => navigator.clipboard.writeText(output)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '4px 10px', color: '#64748b', fontSize: '0.65rem', cursor: 'pointer', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', gap: 4 }}>📋 Copiar</button>
-                        <button onClick={executeWorkspace} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '4px 10px', color: '#64748b', fontSize: '0.65rem', cursor: 'pointer', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', gap: 4 }}>🔄 Re-ejecutar</button>
-                        <div style={{ flex: 1 }}></div>
-                        <button onClick={runPipeline} disabled={pipeline !== 'idle'} style={{
-                          background: pipeline !== 'idle' ? '#1a2235' : 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-                          color: pipeline !== 'idle' ? '#64748b' : '#fff', border: 'none',
-                          padding: '6px 16px', borderRadius: 8, fontWeight: 700, fontSize: '0.68rem',
-                          cursor: pipeline !== 'idle' ? 'not-allowed' : 'pointer', fontFamily: "'Inter', system-ui",
-                          display: 'flex', alignItems: 'center', gap: 6,
-                        }}>
-                          🚀 Push → Deploy → Ver mejora
-                        </button>
-                      </div>
-
-                      {/* Pipeline progress */}
-                      {pipeline !== 'idle' && (
-                        <div style={{ marginTop: 12, background: '#0a0d14', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10, padding: '12px 14px' }}>
-                          {/* Pipeline steps visual */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 12 }}>
-                            {[
-                              { key: 'pushing', label: 'Push', icon: '📤' },
-                              { key: 'deploying', label: 'Deploy', icon: '🚀' },
-                              { key: 'done', label: 'Live', icon: '🎯' },
-                            ].map((step, i) => {
-                              const steps: PipelineStep[] = ['pushing', 'deploying', 'done'];
-                              const currentIdx = steps.indexOf(pipeline);
-                              const stepIdx = i;
-                              const isActive = stepIdx === currentIdx;
-                              const isDone = stepIdx < currentIdx || pipeline === 'done';
-                              const color = isDone ? '#22c55e' : isActive ? '#3b82f6' : '#334155';
-                              return (
-                                <div key={step.key} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flex: 0 }}>
-                                    <div style={{
-                                      width: 28, height: 28, borderRadius: '50%',
-                                      background: isDone ? 'rgba(34,197,94,0.15)' : isActive ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)',
-                                      border: `2px solid ${color}`,
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                      fontSize: '0.7rem',
-                                      transition: 'all 0.3s',
-                                    }}>
-                                      {isDone ? '✓' : isActive ? <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, animation: 'pulse 1s infinite' }}></span> : step.icon}
-                                    </div>
-                                    <span style={{ fontSize: '0.55rem', fontWeight: 600, color, whiteSpace: 'nowrap' }}>{step.label}</span>
-                                  </div>
-                                  {i < 2 && (
-                                    <div style={{ flex: 1, height: 2, background: isDone ? '#22c55e' : 'rgba(255,255,255,0.06)', margin: '0 6px', marginBottom: 14, transition: 'background 0.3s' }}></div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                          {/* Pipeline log */}
-                          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.62rem', color: '#94a3b8', lineHeight: 1.7 }}>
-                            {pipelineLog.map((line, i) => (
-                              <div key={i} style={{ color: line.startsWith('✅') ? '#22c55e' : line.startsWith('❌') ? '#ef4444' : line.startsWith('🎯') ? '#3b82f6' : '#94a3b8' }}>{line}</div>
-                            ))}
-                            {(pipeline === 'pushing' || pipeline === 'deploying') && (
-                              <span style={{ display: 'inline-block', width: 6, height: 12, background: '#3b82f6', animation: 'blink 1s step-end infinite', verticalAlign: 'text-bottom' }}></span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 14, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                      <button onClick={() => navigator.clipboard.writeText(output)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '4px 10px', color: '#64748b', fontSize: '0.65rem', cursor: 'pointer', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', gap: 4 }}>📋 Copiar</button>
+                      <button onClick={executeWorkspace} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '4px 10px', color: '#64748b', fontSize: '0.65rem', cursor: 'pointer', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', gap: 4 }}>🔄 Re-ejecutar</button>
+                    </div>
                   )}
                 </div>
               )}
             </div>
+
+            {/* ── Pipeline Bar (sticky bottom) ── */}
+            {!wsRunning && output && (
+              <div style={{
+                borderTop: '1px solid rgba(255,255,255,0.06)',
+                background: pipeline !== 'idle' ? '#0a0d14' : '#111827',
+                padding: pipeline !== 'idle' ? '12px 16px' : '8px 16px',
+                transition: 'all 0.3s',
+              }}>
+                {pipeline === 'idle' && (
+                  <button onClick={runPipeline} style={{
+                    width: '100%', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                    color: '#fff', border: 'none',
+                    padding: '10px 20px', borderRadius: 10, fontWeight: 700, fontSize: '0.78rem',
+                    cursor: 'pointer', fontFamily: "'Inter', system-ui",
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    boxShadow: '0 4px 20px rgba(59,130,246,0.3)',
+                  }}>
+                    🚀 Aplicar mejora → Deploy AWS → Ver resultado
+                  </button>
+                )}
+
+                {pipeline !== 'idle' && (
+                  <>
+                    {/* Steps visual */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 10 }}>
+                      {[
+                        { key: 'pushing', label: 'Guardar', icon: '📤' },
+                        { key: 'deploying', label: 'Deploy AWS', icon: '🚀' },
+                        { key: 'done', label: 'Live', icon: '🎯' },
+                      ].map((step, i) => {
+                        const steps: PipelineStep[] = ['pushing', 'deploying', 'done'];
+                        const currentIdx = steps.indexOf(pipeline);
+                        const isActive = i === currentIdx;
+                        const isDone = i < currentIdx || pipeline === 'done';
+                        const isError = pipeline === 'error' && i === currentIdx;
+                        const color = isError ? '#ef4444' : isDone ? '#22c55e' : isActive ? '#3b82f6' : '#334155';
+                        return (
+                          <div key={step.key} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                              <div style={{
+                                width: 32, height: 32, borderRadius: '50%',
+                                background: isDone ? 'rgba(34,197,94,0.15)' : isActive ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)',
+                                border: `2px solid ${color}`,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: isDone ? '0.8rem' : '0.75rem', color,
+                                transition: 'all 0.3s',
+                              }}>
+                                {isDone ? '✓' : isError ? '✗' : isActive ? <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, animation: 'pulse 1s infinite' }}></span> : step.icon}
+                              </div>
+                              <span style={{ fontSize: '0.58rem', fontWeight: 600, color, whiteSpace: 'nowrap' }}>{step.label}</span>
+                            </div>
+                            {i < 2 && (
+                              <div style={{ flex: 1, height: 2, background: isDone ? '#22c55e' : 'rgba(255,255,255,0.06)', margin: '0 8px', marginBottom: 16, borderRadius: 1, transition: 'background 0.5s' }}></div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {/* Log */}
+                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.62rem', lineHeight: 1.6, maxHeight: 80, overflow: 'auto' }}>
+                      {pipelineLog.map((line, i) => (
+                        <div key={i} style={{ color: line.startsWith('✅') ? '#22c55e' : line.startsWith('❌') ? '#ef4444' : line.startsWith('🎯') ? '#3b82f6' : '#94a3b8' }}>{line}</div>
+                      ))}
+                      {(pipeline === 'pushing' || pipeline === 'deploying') && (
+                        <span style={{ display: 'inline-block', width: 6, height: 12, background: '#3b82f6', animation: 'blink 1s step-end infinite' }}></span>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
