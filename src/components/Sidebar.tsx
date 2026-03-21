@@ -17,6 +17,7 @@ export default function Sidebar({ user }: { user: string }) {
     { href: '/dashboard/analytics', icon: 'bi-graph-up', label: 'Analytics' },
     { href: '/dashboard/projects', icon: 'bi-kanban', label: 'Proyectos' },
     { href: '/dashboard/ux-agent', icon: 'bi-lightning-charge', label: 'Agente UX' },
+    { href: '/dashboard/labs', icon: 'bi-rocket-takeoff', label: 'Labs' },
   ];
 
   const infraItems = [
