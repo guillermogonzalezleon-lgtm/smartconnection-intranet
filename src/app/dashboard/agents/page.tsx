@@ -73,29 +73,120 @@ export default function AgentsWorkspace() {
 
   const startPipeline = () => { setPipeline('confirm'); setPipelineLog([]); };
 
+  const [stepTimes, setStepTimes] = useState<Record<string, number>>({});
+  const amplifyApi = (p: Record<string, unknown>) => fetch('/api/amplify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }).then(r => r.json());
+
   const runPipeline = async () => {
     const target = repos.find(r => r.id === targetRepo) || repos[0];
+    const pipelineStart = Date.now();
+    setStepTimes({});
     setPipeline('pushing');
     setPipelineLog([`Pipeline → ${target.label}`, '']);
+
+    // Step 1: Save to Supabase (real)
+    const s1 = Date.now();
     setPipelineLog(prev => [...prev, '📤 Guardando mejora en Supabase...']);
     try {
       const firstLine = output.split('\n').find(l => l.trim().length > 10) || 'Mejora generada por IA';
       const titulo = firstLine.replace(/^\*\*|^\d+\.\s*|\*\*$/g, '').trim().slice(0, 100);
       await deployApi({ action: 'save_improvement', titulo, descripcion: output.slice(0, 500), categoria: 'UX', impacto: 'Por evaluar', agente: selectedAgent, ciclo: 1 });
-      setPipelineLog(prev => [...prev, `✅ Insight guardado`]);
+      const t1 = ((Date.now() - s1) / 1000).toFixed(1);
+      setStepTimes(prev => ({ ...prev, save: Date.now() - s1 }));
+      setPipelineLog(prev => [...prev, `✅ Insight guardado (${t1}s)`]);
     } catch (err) { setPipelineLog(prev => [...prev, `⚠️ ${String(err)}`]); }
+
+    // Step 2: Commit to GitHub (real)
     setPipeline('deploying');
+    const s2 = Date.now();
     setPipelineLog(prev => [...prev, '', `🔗 Commit a GitHub (${target.repo})...`]);
     try {
       const date = new Date().toISOString().split('T')[0];
-      const r = await deployApi({ action: 'commit_file', repo: target.repo, path: `docs/improvements/${date}-${selectedAgent}-${Date.now()}.md`, content: `# Mejora — ${date}\n\n**Agente:** ${selectedAgent}\n**Tarea:** ${task}\n\n${output}\n`, message: `feat(ux): mejora via ${selectedAgent}` });
-      if (r.success) { setPipelineLog(prev => [...prev, `✅ Committed`]); } else { setPipelineLog(prev => [...prev, `❌ ${r.error}`]); setPipeline('error'); return; }
+      const r = await deployApi({
+        action: 'commit_file', repo: target.repo,
+        path: `docs/improvements/${date}-${selectedAgent}-${Date.now()}.md`,
+        content: `# Mejora — ${date}\n\n**Agente:** ${selectedAgent}\n**Tarea:** ${task}\n\n${output}\n`,
+        message: `feat(ux): mejora via ${selectedAgent}`,
+      });
+      const t2 = ((Date.now() - s2) / 1000).toFixed(1);
+      setStepTimes(prev => ({ ...prev, commit: Date.now() - s2 }));
+      if (r.success) {
+        setPipelineLog(prev => [...prev, `✅ Committed a main (${t2}s)`]);
+      } else {
+        setPipelineLog(prev => [...prev, `❌ Error commit: ${r.error}`]);
+        setPipeline('error');
+        return;
+      }
     } catch (err) { setPipelineLog(prev => [...prev, `❌ ${String(err)}`]); setPipeline('error'); return; }
-    setPipelineLog(prev => [...prev, '', '🚀 Auto-deploy iniciado...']);
-    await new Promise(r => setTimeout(r, 1500));
-    setPipelineLog(prev => [...prev, `✅ Deploy → ${target.url}`]);
+
+    // Step 3: Wait for Amplify build (real polling)
+    const s3 = Date.now();
+    setPipelineLog(prev => [...prev, '', '🚀 AWS Amplify build disparado por push a main...']);
+    setPipelineLog(prev => [...prev, '⏳ Esperando build de Amplify (polling cada 10s)...']);
+
+    let buildDone = false;
+    let attempts = 0;
+    const maxAttempts = 18; // 3 minutes max
+
+    while (!buildDone && attempts < maxAttempts) {
+      await new Promise(r => setTimeout(r, 10000)); // Poll every 10s
+      attempts++;
+      try {
+        const status = await amplifyApi({ action: 'build_status' });
+        const elapsed = ((Date.now() - s3) / 1000).toFixed(0);
+        if (status.amplify) {
+          const amp = status.amplify;
+          if (amp.status === 'completed') {
+            buildDone = true;
+            const t3 = ((Date.now() - s3) / 1000).toFixed(1);
+            setStepTimes(prev => ({ ...prev, build: Date.now() - s3 }));
+            if (amp.conclusion === 'success') {
+              setPipelineLog(prev => [...prev, `✅ Amplify build completado (${t3}s)`]);
+            } else {
+              setPipelineLog(prev => [...prev, `❌ Amplify build falló: ${amp.conclusion}`]);
+              setPipeline('error');
+              return;
+            }
+          } else {
+            setPipelineLog(prev => [...prev, `⟳ Build ${amp.status}... (${elapsed}s)`]);
+          }
+        } else if (status.status === 'success') {
+          buildDone = true;
+          const t3 = ((Date.now() - s3) / 1000).toFixed(1);
+          setStepTimes(prev => ({ ...prev, build: Date.now() - s3 }));
+          setPipelineLog(prev => [...prev, `✅ Build verificado via GitHub status (${t3}s)`]);
+        } else {
+          setPipelineLog(prev => [...prev, `⟳ Status: ${status.status || 'pending'}... (${elapsed}s)`]);
+        }
+      } catch {
+        setPipelineLog(prev => [...prev, `⟳ Polling... (intento ${attempts}/${maxAttempts})`]);
+      }
+    }
+
+    if (!buildDone) {
+      setPipelineLog(prev => [...prev, `⚠️ Timeout esperando build (${maxAttempts * 10}s) — el deploy sigue en background`]);
+    }
+
+    // Step 4: Health check (real)
+    const s4 = Date.now();
+    setPipelineLog(prev => [...prev, '', `🏥 Health check → ${target.url}...`]);
+    try {
+      const hc = await amplifyApi({ action: 'health_check' });
+      const t4 = ((Date.now() - s4) / 1000).toFixed(1);
+      setStepTimes(prev => ({ ...prev, health: Date.now() - s4 }));
+      if (hc.results) {
+        for (const r of hc.results) {
+          setPipelineLog(prev => [...prev, `${r.ok ? '✅' : '❌'} ${r.url} → ${r.status} (${r.latency}ms)`]);
+        }
+      }
+    } catch {
+      setPipelineLog(prev => [...prev, '⚠️ Health check no disponible']);
+    }
+
+    // Done
+    const totalTime = ((Date.now() - pipelineStart) / 1000).toFixed(1);
+    setStepTimes(prev => ({ ...prev, total: Date.now() - pipelineStart }));
     setPipeline('done');
-    setPipelineLog(prev => [...prev, '', '🎯 Pipeline completo']);
+    setPipelineLog(prev => [...prev, '', `🎯 Pipeline completo — Total: ${totalTime}s`]);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -235,9 +326,16 @@ export default function AgentsWorkspace() {
               {pipeline !== 'confirm' && (
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 16 }}>
-                    {[{ key: 'pushing', label: 'Guardar' }, { key: 'deploying', label: 'Deploy' }, { key: 'done', label: 'Live' }].map((step, i) => {
-                      const steps: PipelineStep[] = ['pushing', 'deploying', 'done'];
-                      const ci = steps.indexOf(pipeline); const isDone = i < ci || pipeline === 'done'; const isActive = i === ci;
+                    {[
+                      { key: 'pushing', label: 'Guardar', timeKey: 'save' },
+                      { key: 'deploying', label: 'Commit', timeKey: 'commit' },
+                      { key: 'deploying', label: 'Build', timeKey: 'build' },
+                      { key: 'done', label: 'Live', timeKey: 'health' },
+                    ].map((step, i) => {
+                      const steps: PipelineStep[] = ['pushing', 'pushing', 'deploying', 'done'];
+                      const ci = pipeline === 'pushing' ? (stepTimes.save ? 1 : 0) : pipeline === 'deploying' ? (stepTimes.commit ? 2 : 1) : pipeline === 'done' ? 4 : 0;
+                      const isDone = i < ci || pipeline === 'done'; const isActive = i === ci;
+                      const timeMs = stepTimes[step.timeKey]; const timeFmt = timeMs ? `${(timeMs / 1000).toFixed(1)}s` : '';
                       const clr = pipeline === 'error' && isActive ? '#ef4444' : isDone ? '#22c55e' : isActive ? '#3b82f6' : '#334155';
                       return (
                         <div key={step.key} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
@@ -246,8 +344,9 @@ export default function AgentsWorkspace() {
                               {isDone ? '✓' : isActive ? <span style={{ width: 8, height: 8, borderRadius: '50%', background: clr, animation: 'pulse 1s infinite' }}></span> : '○'}
                             </div>
                             <span style={{ fontSize: '0.62rem', fontWeight: 600, color: clr }}>{step.label}</span>
+                            {timeFmt && <span style={{ fontSize: '0.5rem', color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>{timeFmt}</span>}
                           </div>
-                          {i < 2 && <div style={{ flex: 1, height: 2, background: isDone ? '#22c55e' : 'rgba(255,255,255,0.06)', margin: '0 10px', marginBottom: 20, transition: 'background 0.5s' }}></div>}
+                          {i < 3 && <div style={{ flex: 1, height: 2, background: isDone ? '#22c55e' : 'rgba(255,255,255,0.06)', margin: '0 6px', marginBottom: 24, transition: 'background 0.5s' }}></div>}
                         </div>
                       );
                     })}
