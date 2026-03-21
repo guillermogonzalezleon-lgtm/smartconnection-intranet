@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 
     // Generic query
     if (action === 'query' && table) {
-      const allowed = ['leads', 'reuniones', 'analytics', 'agent_logs', 'agent_config', 'ux_insights'];
+      const allowed = ['leads', 'reuniones', 'analytics', 'agent_logs', 'agent_config', 'ux_insights', 'projects', 'project_tasks'];
       if (!allowed.includes(table)) return NextResponse.json({ error: 'Tabla no permitida' }, { status: 400 });
       const data = await supabaseQuery(table, 'GET', { order: order || 'created_at.desc', limit: limit || 50, filter });
       return NextResponse.json({ data });

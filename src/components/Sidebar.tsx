@@ -15,6 +15,7 @@ export default function Sidebar({ user }: { user: string }) {
     { href: '/dashboard/agents', icon: 'bi-robot', label: 'Agentes IA' },
     { href: '/dashboard/leads', icon: 'bi-people', label: 'Leads & CRM' },
     { href: '/dashboard/analytics', icon: 'bi-graph-up', label: 'Analytics' },
+    { href: '/dashboard/projects', icon: 'bi-kanban', label: 'Proyectos' },
     { href: '/dashboard/ux-agent', icon: 'bi-lightning-charge', label: 'Agente UX' },
   ];
 
