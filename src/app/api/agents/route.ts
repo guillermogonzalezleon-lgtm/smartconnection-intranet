@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, active: !agents[0].active });
     }
     if (action === 'query' && table) {
-      const allowed = ['leads', 'reuniones', 'analytics', 'agent_logs', 'agent_config'];
+      const allowed = ['leads', 'reuniones', 'analytics', 'agent_logs', 'agent_config', 'ux_insights'];
       if (!allowed.includes(table)) return NextResponse.json({ error: 'Tabla no permitida' }, { status: 400 });
       const data = await supabaseQuery(table, 'GET', { order: order || 'created_at.desc', limit: limit || 50, filter });
       return NextResponse.json({ data });

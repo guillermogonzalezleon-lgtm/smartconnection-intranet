@@ -21,6 +21,7 @@ export default function Sidebar({ user }: { user: string }) {
           { href: '/dashboard/agents', icon: 'bi-robot', label: 'Agentes IA' },
           { href: '/dashboard/leads', icon: 'bi-people', label: 'Leads & CRM' },
           { href: '/dashboard/analytics', icon: 'bi-graph-up', label: 'Analytics' },
+          { href: '/dashboard/ux-agent', icon: 'bi-lightning-charge', label: 'Agente UX' },
         ].map(item => (
           <a key={item.href} href={item.href} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', borderRadius: 6, color: '#94a3b8', fontSize: '0.8rem', fontWeight: 500, textDecoration: 'none', marginBottom: 2 }}>
             <i className={`bi ${item.icon}`} style={{ fontSize: '1rem', width: 20, textAlign: 'center' }}></i>
