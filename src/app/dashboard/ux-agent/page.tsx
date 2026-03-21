@@ -281,10 +281,10 @@ export default function UXAgent() {
   });
 
   return (
-    <>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 34px)', overflow: 'hidden' }}>
       {/* ── Header + Tabs ──────────────────────────────── */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(15,22,35,0.92)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div style={{ height: 56, display: 'flex', alignItems: 'center', padding: '0 2rem', fontSize: '0.85rem', color: '#94a3b8' }}>
+      <div style={{ flexShrink: 0, background: 'rgba(15,22,35,0.92)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ height: 48, display: 'flex', alignItems: 'center', padding: '0 1.5rem', fontSize: '0.82rem', color: '#94a3b8' }}>
           <span>Intranet</span><span style={{ margin: '0 8px', color: '#475569' }}>/</span><span style={{ color: '#fff', fontWeight: 600 }}>Agente UX</span>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 0 }}>
             <button onClick={() => setTab('insights')} style={{ background: 'none', border: 'none', padding: '8px 16px', color: tab === 'insights' ? '#00e5b0' : '#64748b', fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', borderBottom: tab === 'insights' ? '2px solid #00e5b0' : '2px solid transparent', fontFamily: "'Inter', system-ui" }}>Insights UX</button>
@@ -295,7 +295,7 @@ export default function UXAgent() {
 
       {/* ═══ TAB: Insights UX ═══ */}
       {tab === 'insights' && (
-        <div style={{ padding: '1.5rem 2rem', flex: 1 }}>
+        <div style={{ padding: '1.25rem 1.5rem', flex: 1, overflow: 'auto' }}>
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
             <div>
@@ -359,47 +359,42 @@ export default function UXAgent() {
 
       {/* ═══ TAB: Workspace Agentes ═══ */}
       {tab === 'workspace' && (
-        <div style={{ display: 'flex', flex: 1, height: 'calc(100vh - 126px)', overflow: 'hidden' }}>
-          {/* Left: Agent selector */}
-          <div style={{ width: 240, minWidth: 200, background: '#0a0d14', borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
-            <div style={{ padding: '12px 12px 8px' }}>
-              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Agentes</div>
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+          {/* Left: Agent selector — compact */}
+          <div style={{ width: 180, minWidth: 140, background: '#0a0d14', borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '10px 10px 6px' }}>
+              <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Agentes</div>
             </div>
-            <div style={{ padding: '0 8px', flex: 1 }}>
+            <div style={{ padding: '0 6px', flex: 1, overflow: 'auto' }}>
               {AGENTS.map(a => {
                 const isHoku = a.id === 'hoku';
                 const selected = selectedAgent === a.id;
                 return (
                   <div key={a.id} onClick={() => setSelectedAgent(a.id)} style={{
-                    padding: '10px 12px', borderRadius: 10, marginBottom: isHoku ? 8 : 3, cursor: 'pointer',
+                    padding: '7px 8px', borderRadius: 8, marginBottom: isHoku ? 6 : 2, cursor: 'pointer',
                     background: isHoku
                       ? (selected ? 'linear-gradient(135deg, rgba(255,107,107,0.15), rgba(139,92,246,0.15))' : 'linear-gradient(135deg, rgba(255,107,107,0.06), rgba(139,92,246,0.06))')
                       : (selected ? `${a.color}10` : 'transparent'),
                     border: selected ? `1px solid ${a.color}40` : isHoku ? '1px solid rgba(255,107,107,0.15)' : '1px solid transparent',
                     transition: 'all 0.15s',
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {isHoku ? (
-                        <span style={{ fontSize: '0.85rem' }}>🔥</span>
+                        <span style={{ fontSize: '0.75rem' }}>🔥</span>
                       ) : (
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: a.color, boxShadow: selected ? `0 0 8px ${a.color}60` : 'none' }}></span>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: a.color, boxShadow: selected ? `0 0 6px ${a.color}60` : 'none', flexShrink: 0 }}></span>
                       )}
-                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: selected ? a.color : '#e2e8f0' }}>{a.name}</span>
-                      {isHoku && <span style={{ fontSize: '0.5rem', fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: 'linear-gradient(135deg, #ff6b6b, #8b5cf6)', color: '#fff', letterSpacing: '0.05em' }}>FUSION</span>}
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: selected ? a.color : '#e2e8f0' }}>{a.name}</span>
+                      {isHoku && <span style={{ fontSize: '0.45rem', fontWeight: 800, padding: '1px 4px', borderRadius: 3, background: 'linear-gradient(135deg, #ff6b6b, #8b5cf6)', color: '#fff' }}>4in1</span>}
                     </div>
-                    <div style={{ fontSize: '0.6rem', color: '#475569', marginTop: 3, fontFamily: "'JetBrains Mono', monospace" }}>{a.model}</div>
-                    <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: 2 }}>{a.role}</div>
+                    <div style={{ fontSize: '0.55rem', color: '#475569', marginTop: 2, fontFamily: "'JetBrains Mono', monospace", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.model}</div>
                   </div>
                 );
               })}
             </div>
-            {/* How to use */}
-            <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,0.04)', fontSize: '0.6rem', color: '#334155', lineHeight: 1.6 }}>
-              <div style={{ fontWeight: 700, color: '#475569', marginBottom: 4 }}>Como usar:</div>
-              1. Selecciona un agente<br/>
-              2. Escribe tu tarea<br/>
-              3. Enter para ejecutar<br/>
-              <div style={{ marginTop: 4, color: '#1e293b' }}>Shift+Enter = nueva línea</div>
+            {/* Quick tip */}
+            <div style={{ padding: '6px 10px', borderTop: '1px solid rgba(255,255,255,0.04)', fontSize: '0.55rem', color: '#334155' }}>
+              Enter = ejecutar
             </div>
           </div>
 
@@ -640,6 +635,6 @@ export default function UXAgent() {
         @keyframes blink { 0%,100% { opacity:1 } 50% { opacity:0 } }
         @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.4 } }
       `}</style>
-    </>
+    </div>
   );
 }
