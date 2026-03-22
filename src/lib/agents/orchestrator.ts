@@ -4,6 +4,7 @@ import * as grok from './grok';
 import * as gemini from './gemini';
 import * as hoku from './hoku';
 import * as deployBot from './deployBot';
+import { createRunner } from './openai-compat';
 import { supabaseInsert, supabaseQuery } from '@/lib/supabase';
 
 export interface AgentResult {
@@ -24,13 +25,18 @@ interface AgentConfig {
   enabled: boolean;
 }
 
-const AGENT_MODULES: Record<string, typeof claude> = {
+const AGENT_MODULES: Record<string, { run: (task: string, config: { model?: string; systemPrompt?: string; maxTokens?: number; temperature?: number }) => Promise<AgentResult> }> = {
   hoku,
   claude,
   groq,
   grok,
   gemini,
   deployer: deployBot,
+  deepseek: createRunner('deepseek'),
+  mistral: createRunner('mistral'),
+  openai: createRunner('openai'),
+  cohere: createRunner('cohere'),
+  openrouter: createRunner('openrouter'),
 };
 
 const AGENT_TIMEOUT = 30_000;

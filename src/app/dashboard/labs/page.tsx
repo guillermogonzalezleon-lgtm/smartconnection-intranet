@@ -321,14 +321,20 @@ export default function LabsPage() {
     active: CONNECTORS.filter(c => c.status === 'active').length,
     available: CONNECTORS.filter(c => c.status === 'available').length,
     errors: CONNECTORS.filter(c => c.status === 'error').length,
+    roadmap: CONNECTORS.filter(c => c.status === 'coming_soon').length,
   };
 
+  const statusOrder: Record<string, number> = { active: 0, available: 1, error: 2, coming_soon: 3 };
   const filtered = CONNECTORS.filter(c => {
     if (catFilter !== 'Todas' && c.category !== catFilter) return false;
     if (statusFilter !== 'all' && c.status !== statusFilter) return false;
     if (searchDebounced && !c.name.toLowerCase().includes(searchDebounced.toLowerCase()) && !c.description.toLowerCase().includes(searchDebounced.toLowerCase())) return false;
     return true;
-  }).sort((a, b) => (b.businessValue || 0) - (a.businessValue || 0));
+  }).sort((a, b) => {
+    const orderDiff = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9);
+    if (orderDiff !== 0) return orderDiff;
+    return (b.businessValue || 0) - (a.businessValue || 0);
+  });
 
   // ─── Actions ─────────────────────────────────────────────────────────────
   const executeAgent = async (agentId: string) => {
@@ -570,7 +576,7 @@ export default function LabsPage() {
     active: { label: '✓ Instalado', color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
     available: { label: 'Disponible', color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
     error: { label: '✕ Error', color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
-    coming_soon: { label: 'Próximamente', color: '#475569', bg: 'rgba(71,85,105,0.1)' },
+    coming_soon: { label: 'Roadmap', color: '#475569', bg: 'rgba(71,85,105,0.1)' },
   };
 
   const actionBtn = (bg: string, border: string, color: string, extra?: React.CSSProperties): React.CSSProperties => ({
@@ -618,13 +624,22 @@ export default function LabsPage() {
         </div>
 
         <div style={{ padding: '1.5rem 2rem', flex: 1 }}>
+          {/* Counter resumen */}
+          <div style={{ marginBottom: '1rem', fontSize: '0.75rem', color: '#6b7a90', fontWeight: 500, letterSpacing: '-0.01em' }}>
+            <span style={{ color: '#22c55e', fontWeight: 700 }}>{stats.active}</span> instalados
+            <span style={{ margin: '0 6px', color: '#2d3748' }}>·</span>
+            <span style={{ color: '#3b82f6', fontWeight: 700 }}>{stats.available}</span> disponibles
+            <span style={{ margin: '0 6px', color: '#2d3748' }}>·</span>
+            <span style={{ color: '#475569', fontWeight: 700 }}>{stats.roadmap}</span> roadmap
+          </div>
+
           {/* Stats KPIs — clickeable */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1.5rem' }}>
             {[
               { label: 'Total Conectores', value: stats.total, color: '#f1f5f9', accent: 'rgba(241,245,249,0.06)', icon: '🔌', filter: null as string | null },
-              { label: 'Activos', value: stats.active, color: '#22c55e', accent: 'rgba(34,197,94,0.06)', icon: '✅', filter: 'active' },
+              { label: 'Instalados', value: stats.active, color: '#22c55e', accent: 'rgba(34,197,94,0.06)', icon: '✅', filter: 'active' },
               { label: 'Disponibles', value: stats.available, color: '#3b82f6', accent: 'rgba(59,130,246,0.06)', icon: '🔓', filter: 'available' },
-              { label: 'Errores', value: stats.errors, color: '#ef4444', accent: 'rgba(239,68,68,0.06)', icon: '🔴', filter: 'error' },
+              { label: 'Roadmap', value: stats.roadmap, color: '#475569', accent: 'rgba(71,85,105,0.06)', icon: '🗺️', filter: 'coming_soon' },
             ].map(s => (
               <div
                 key={s.label}
@@ -669,7 +684,7 @@ export default function LabsPage() {
                 <span style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.05)' }} />
                 {['all', 'active', 'available', 'coming_soon'].map(s => (
                   <button key={s} onClick={() => setStatusFilter(s)} style={pill(statusFilter === s, statusCfg[s]?.color)}>
-                    {s === 'all' ? 'Todos' : statusCfg[s]?.label}
+                    {s === 'all' ? 'Todos' : s === 'active' ? 'Instalados' : s === 'available' ? 'Disponibles' : 'Roadmap'}
                   </button>
                 ))}
                 <span style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.05)' }} />
@@ -678,68 +693,93 @@ export default function LabsPage() {
                 ))}
               </div>
 
-              {/* Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem' }}>
-                {filtered.map((c, idx) => {
-                  const sc = statusCfg[c.status];
-                  const isHovered = hoveredCard.current === c.id;
-                  return (
-                    <div
-                      key={c.id}
-                      className="labs-card"
-                      onMouseEnter={() => { hoveredCard.current = c.id; forceRender(n => n + 1); }}
-                      onMouseLeave={() => { hoveredCard.current = null; forceRender(n => n + 1); }}
-                      onClick={() => c.status !== 'coming_soon' && (setDetail(c), setTestResult(null), setNextSteps(false), setConnecting(false), setFlowSteps({ test: false, proposal: false, deploy: false, result: false }), setFlowStepRunning(null))}
-                      style={{
-                        background: '#0f1729',
-                        border: `1px solid ${isHovered && c.status !== 'coming_soon' ? c.color + '30' : 'rgba(255,255,255,0.05)'}`,
-                        borderRadius: 14,
-                        padding: '1.25rem',
-                        cursor: c.status === 'coming_soon' ? 'default' : 'pointer',
-                        opacity: c.status === 'coming_soon' ? 0.4 : 1,
-                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        position: 'relative',
-                        overflow: 'hidden',
-                        animation: `fadeIn 0.3s ease ${idx * 0.03}s both`,
-                      }}
-                    >
-                      {/* Hover gradient overlay */}
-                      <div className="card-gradient" style={{
-                        position: 'absolute', inset: 0, borderRadius: 14, pointerEvents: 'none',
-                        background: `linear-gradient(135deg, ${c.color}08, transparent 60%)`,
-                        opacity: isHovered ? 1 : 0, transition: 'opacity 0.3s',
-                      }} />
+              {/* Grid con secciones por status */}
+              {(() => {
+                const sections: { key: string; title: string; subtitle?: string; items: typeof filtered }[] = [];
+                const activeItems = filtered.filter(c => c.status === 'active');
+                const availableItems = filtered.filter(c => c.status === 'available');
+                const comingSoonItems = filtered.filter(c => c.status === 'coming_soon');
+                if (activeItems.length > 0) sections.push({ key: 'active', title: `Instalados (${activeItems.length})`, items: activeItems });
+                if (availableItems.length > 0) sections.push({ key: 'available', title: `Disponibles (${availableItems.length})`, subtitle: 'PROXIMAMENTE — Requiere configuracion', items: availableItems });
+                if (comingSoonItems.length > 0) sections.push({ key: 'coming_soon', title: `Roadmap (${comingSoonItems.length})`, items: comingSoonItems });
+                // Error items mixed into active section or standalone
+                const errorItems = filtered.filter(c => c.status === 'error');
+                if (errorItems.length > 0) sections.splice(1, 0, { key: 'error', title: `Con errores (${errorItems.length})`, items: errorItems });
 
-                      {/* Active indicator bar */}
-                      {c.status === 'active' && (
-                        <div style={{ position: 'absolute', left: 0, top: 12, bottom: 12, width: 3, borderRadius: '0 2px 2px 0', background: c.color, opacity: 0.6 }} />
-                      )}
-
-                      {(c.businessValue || 0) >= 4 && (
-                        <span style={{ position: 'absolute', top: 10, right: 10, fontSize: '0.5rem', fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: 'rgba(245,158,11,0.12)', color: '#f59e0b', letterSpacing: '0.04em', backdropFilter: 'blur(4px)' }}>
-                          {'★'.repeat(c.businessValue || 0)}
-                        </span>
-                      )}
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, position: 'relative' }}>
-                        <div style={{ width: 40, height: 40, borderRadius: 12, background: `${c.color}10`, border: `1px solid ${c.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.15rem', flexShrink: 0 }}>{c.icon}</div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.01em' }}>{c.name}</div>
-                          <div style={{ fontSize: '0.6rem', color: '#3a4a60' }}>{c.category} · {c.authType}</div>
-                        </div>
-                        <span style={{ fontSize: '0.56rem', fontWeight: 600, padding: '3px 8px', borderRadius: 999, background: sc.bg, color: sc.color }}>{sc.label}</span>
-                      </div>
-                      <p style={{ fontSize: '0.7rem', color: '#5a6a80', lineHeight: 1.55, margin: '0 0 10px' }}>{c.description}</p>
-                      {c.status === 'active' && (
-                        <div style={{ display: 'flex', gap: 16, fontSize: '0.6rem', color: '#3a4a60' }}>
-                          {c.lastSync && <span>🔄 {c.lastSync}</span>}
-                          {c.dataVolume && <span>📊 {c.dataVolume}</span>}
-                        </div>
+                let globalIdx = 0;
+                return sections.map(section => (
+                  <div key={section.key} style={{ marginBottom: '1.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: '0.75rem' }}>
+                      <h3 style={{ fontSize: '0.78rem', fontWeight: 700, color: statusCfg[section.key]?.color || '#f1f5f9', margin: 0, letterSpacing: '-0.01em' }}>{section.title}</h3>
+                      {section.subtitle && (
+                        <span style={{ fontSize: '0.58rem', fontWeight: 600, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', padding: '2px 8px', borderRadius: 6, letterSpacing: '0.02em' }}>{section.subtitle}</span>
                       )}
                     </div>
-                  );
-                })}
-              </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem' }}>
+                      {section.items.map(c => {
+                        const idx = globalIdx++;
+                        const sc = statusCfg[c.status];
+                        const isHovered = hoveredCard.current === c.id;
+                        return (
+                          <div
+                            key={c.id}
+                            className="labs-card"
+                            onMouseEnter={() => { hoveredCard.current = c.id; forceRender(n => n + 1); }}
+                            onMouseLeave={() => { hoveredCard.current = null; forceRender(n => n + 1); }}
+                            onClick={() => c.status !== 'coming_soon' && (setDetail(c), setTestResult(null), setNextSteps(false), setConnecting(false), setFlowSteps({ test: false, proposal: false, deploy: false, result: false }), setFlowStepRunning(null))}
+                            style={{
+                              background: '#0f1729',
+                              border: `1px solid ${isHovered && c.status !== 'coming_soon' ? c.color + '30' : 'rgba(255,255,255,0.05)'}`,
+                              borderRadius: 14,
+                              padding: '1.25rem',
+                              cursor: c.status === 'coming_soon' ? 'default' : 'pointer',
+                              opacity: c.status === 'coming_soon' ? 0.4 : 1,
+                              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                              position: 'relative',
+                              overflow: 'hidden',
+                              animation: `fadeIn 0.3s ease ${idx * 0.03}s both`,
+                            }}
+                          >
+                            {/* Hover gradient overlay */}
+                            <div className="card-gradient" style={{
+                              position: 'absolute', inset: 0, borderRadius: 14, pointerEvents: 'none',
+                              background: `linear-gradient(135deg, ${c.color}08, transparent 60%)`,
+                              opacity: isHovered ? 1 : 0, transition: 'opacity 0.3s',
+                            }} />
+
+                            {/* Active indicator bar */}
+                            {c.status === 'active' && (
+                              <div style={{ position: 'absolute', left: 0, top: 12, bottom: 12, width: 3, borderRadius: '0 2px 2px 0', background: c.color, opacity: 0.6 }} />
+                            )}
+
+                            {(c.businessValue || 0) >= 4 && (
+                              <span style={{ position: 'absolute', top: 10, right: 10, fontSize: '0.5rem', fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: 'rgba(245,158,11,0.12)', color: '#f59e0b', letterSpacing: '0.04em', backdropFilter: 'blur(4px)' }}>
+                                {'★'.repeat(c.businessValue || 0)}
+                              </span>
+                            )}
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, position: 'relative' }}>
+                              <div style={{ width: 40, height: 40, borderRadius: 12, background: `${c.color}10`, border: `1px solid ${c.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.15rem', flexShrink: 0 }}>{c.icon}</div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.01em' }}>{c.name}</div>
+                                <div style={{ fontSize: '0.6rem', color: '#3a4a60' }}>{c.category} · {c.authType}</div>
+                              </div>
+                              <span style={{ fontSize: '0.56rem', fontWeight: 600, padding: '3px 8px', borderRadius: 999, background: sc.bg, color: sc.color }}>{sc.label}</span>
+                            </div>
+                            <p style={{ fontSize: '0.7rem', color: '#5a6a80', lineHeight: 1.55, margin: '0 0 10px' }}>{c.description}</p>
+                            {c.status === 'active' && (
+                              <div style={{ display: 'flex', gap: 16, fontSize: '0.6rem', color: '#3a4a60' }}>
+                                {c.lastSync && <span>🔄 {c.lastSync}</span>}
+                                {c.dataVolume && <span>📊 {c.dataVolume}</span>}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ));
+              })()}
             </>
           )}
 

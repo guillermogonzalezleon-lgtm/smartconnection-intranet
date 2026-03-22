@@ -59,7 +59,6 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
 
   const infraItems = [
     { href: '/dashboard/deploy', icon: 'bi-rocket-takeoff', label: 'Deploy', iconColor: '#3b82f6' },
-    { href: '/dashboard/aws', icon: 'bi-cloud', label: 'AWS Panel', iconColor: '#f97316' },
   ];
 
   const statusItems = [
