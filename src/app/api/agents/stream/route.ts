@@ -55,14 +55,13 @@ export async function POST(request: Request) {
       async start(controller) {
         const send = (content: string) => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
 
-        send('🧠 HOKU — Ejecutando 4 agentes en paralelo...\n\n');
+        send('🐾 HOKU — Ejecutando 3 agentes en paralelo...\n\n');
 
         // Run all agents in parallel (using Groq with different system prompts)
         const agentPrompts = [
           { name: 'Groq', sys: 'Eres un asistente técnico ultra rápido. Responde en español de forma concisa.' },
           { name: 'Claude', sys: 'Eres un experto en desarrollo de software y code review. Responde en español con detalle técnico.' },
           { name: 'Gemini', sys: 'Eres un experto en SEO, analytics y datos. Responde en español con métricas y datos.' },
-          { name: 'Grok', sys: 'Eres un analista de mercado e investigador. Responde en español con insights únicos.' },
         ];
 
         const results: { name: string; result: string }[] = [];

@@ -6,7 +6,6 @@ const AGENTS = [
   { id: 'groq', name: 'Groq', model: 'llama-3.3-70b', color: '#f59e0b', role: 'Inferencia ultra rápida' },
   { id: 'claude', name: 'Claude', model: 'claude-sonnet-4-5', color: '#00e5b0', role: 'Desarrollo & Code Review' },
   { id: 'gemini', name: 'Gemini', model: 'gemini-2.0-flash', color: '#22c55e', role: 'SEO & Analytics' },
-  { id: 'grok', name: 'Grok', model: 'grok-3', color: '#8b5cf6', role: 'Análisis & Research' },
 ];
 
 const PLACEHOLDERS: Record<string, string> = {
@@ -14,7 +13,6 @@ const PLACEHOLDERS: Record<string, string> = {
   groq: 'Escribe el copy para la sección hero...',
   claude: 'Revisa el código y sugiere mejoras...',
   gemini: 'Genera mejoras SEO para la landing...',
-  grok: 'Investiga tendencias de conversión SaaS...',
 };
 
 type PipelineStep = 'idle' | 'confirm' | 'pushing' | 'deploying' | 'done' | 'error';
@@ -95,22 +93,58 @@ export default function AgentsWorkspace() {
       setPipelineLog(prev => [...prev, `✅ Insight guardado (${t1}s)`]);
     } catch (err) { setPipelineLog(prev => [...prev, `⚠️ ${String(err)}`]); }
 
-    // Step 2: Commit to GitHub (real)
+    // Step 2: Extract code blocks + commit to GitHub (real)
     setPipeline('deploying');
     const s2 = Date.now();
-    setPipelineLog(prev => [...prev, '', `🔗 Commit a GitHub (${target.repo})...`]);
+    setPipelineLog(prev => [...prev, '', `🔗 Analizando output para código...`]);
+
+    // Extract code blocks with file paths from output
+    // Format: ```tsx filename="src/components/X.tsx" or ```css or just ```
+    const codeBlockRegex = /```(\w+)?(?:\s+(?:filename=)?["']?([^"'\n]+)["']?)?\n([\s\S]*?)```/g;
+    const codeFiles: { path: string; content: string; lang: string }[] = [];
+    let match;
+    while ((match = codeBlockRegex.exec(output)) !== null) {
+      const lang = match[1] || 'txt';
+      const explicitPath = match[2];
+      const content = match[3].trim();
+      if (content.length > 50) { // Only meaningful code blocks
+        const path = explicitPath || `src/improvements/${Date.now()}-${lang}.${lang === 'tsx' || lang === 'typescript' ? 'tsx' : lang === 'css' ? 'css' : lang === 'json' ? 'json' : 'txt'}`;
+        codeFiles.push({ path, content, lang });
+      }
+    }
+
+    const date = new Date().toISOString().split('T')[0];
     try {
-      const date = new Date().toISOString().split('T')[0];
+      if (codeFiles.length > 0) {
+        // Commit real code files
+        setPipelineLog(prev => [...prev, `📁 ${codeFiles.length} archivo(s) de código detectados`]);
+        for (const file of codeFiles) {
+          setPipelineLog(prev => [...prev, `  📄 ${file.path} (${file.lang})`]);
+          const r = await deployApi({
+            action: 'commit_file', repo: target.repo,
+            path: file.path, content: file.content,
+            message: `feat(agent): ${file.path} via ${selectedAgent}`,
+          });
+          if (!r.success) {
+            setPipelineLog(prev => [...prev, `  ⚠️ Error: ${r.error}`]);
+          } else {
+            setPipelineLog(prev => [...prev, `  ✅ Committed`]);
+          }
+        }
+      }
+
+      // Always commit the improvement doc too
       const r = await deployApi({
         action: 'commit_file', repo: target.repo,
         path: `docs/improvements/${date}-${selectedAgent}-${Date.now()}.md`,
         content: `# Mejora — ${date}\n\n**Agente:** ${selectedAgent}\n**Tarea:** ${task}\n\n${output}\n`,
-        message: `feat(ux): mejora via ${selectedAgent}`,
+        message: `feat(ux): mejora via ${selectedAgent} — ${task.slice(0, 50)}`,
       });
+
       const t2 = ((Date.now() - s2) / 1000).toFixed(1);
       setStepTimes(prev => ({ ...prev, commit: Date.now() - s2 }));
       if (r.success) {
-        setPipelineLog(prev => [...prev, `✅ Committed a main (${t2}s)`]);
+        setPipelineLog(prev => [...prev, `✅ ${codeFiles.length + 1} archivos committed (${t2}s)`]);
       } else {
         setPipelineLog(prev => [...prev, `❌ Error commit: ${r.error}`]);
         setPipeline('error');
