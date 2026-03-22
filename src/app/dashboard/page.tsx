@@ -22,6 +22,7 @@ export default function Dashboard() {
   const [lastDeploy, setLastDeploy] = useState('—');
   const [deployRate, setDeployRate] = useState(0);
   const [deployRateData, setDeployRateData] = useState<{ total: number; success: number; logs: Record<string, unknown>[] }>({ total: 0, success: 0, logs: [] });
+  const [agentHealth, setAgentHealth] = useState(100);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -62,6 +63,16 @@ export default function Dashboard() {
           setDeployRateData({ total, success, logs: last30 });
         }
       }).catch(() => {});
+    api({ action: 'query', table: 'agent_logs', order: 'created_at.desc', limit: 50 })
+      .then(d => {
+        if (d.data && d.data.length > 0) {
+          const total = d.data.length;
+          const success = d.data.filter((l: Record<string, unknown>) => l.status === 'success').length;
+          setAgentHealth(Math.round((success / total) * 100));
+        } else {
+          setAgentHealth(100);
+        }
+      }).catch(() => {});
     Promise.all(['hoku','groq','claude','grok','deepseek','mistral','openai','cohere','openrouter','bedrock','gemini','deployer'].map(id => api({ action: 'logs', agentId: id })))
       .then(results => {
         const all = results.flatMap(r => r.logs || []).sort((a: Record<string, unknown>, b: Record<string, unknown>) => new Date(b.created_at as string).getTime() - new Date(a.created_at as string).getTime());
@@ -92,6 +103,7 @@ export default function Dashboard() {
     { icon: 'bi-rocket-takeoff', value: lastDeploy, label: 'Último Deploy', color: '#22c55e', small: true, onClick: () => setModal({ title: 'Deploy Info', content: 'Deploy automático cada push a main.\n\nAWS Amplify: intranet.smconnection.cl\nAWS S3+CloudFront: www.smconnection.cl' }) },
     { icon: 'bi-coin', value: tokensToday.toLocaleString(), label: 'Tokens IA', color: '#f97316', onClick: () => setModal({ title: 'Tokens IA', content: `Uso total: ${tokensToday.toLocaleString()} tokens\n\n10 agentes configurados:\nHoku (fusión 9 agentes)\nGroq: llama-3.3-70b (gratis)\nClaude: claude-haiku-4.5\nGrok: grok-3-mini\nDeepSeek: deepseek-chat\nMistral: mistral-small\nOpenAI: gpt-4o-mini\nCohere: command-a\nOpenRouter: llama-3.3-70b\nBedrock: claude-3.5-haiku` }) },
     { icon: 'bi-cloud-check', value: 'Live', label: 'AWS Status', color: '#f97316', onClick: () => router.push('/dashboard/aws') },
+    { icon: 'bi-heart-pulse', value: `${agentHealth}%`, label: 'Agent Health', color: agentHealth > 90 ? '#22c55e' : agentHealth > 70 ? '#f59e0b' : '#ef4444', onClick: () => setModal({ title: 'Agent Health', content: `Tasa de éxito de agentes: ${agentHealth}%\n\nBasado en últimos 50 logs de ejecución.` }) },
     { icon: 'bi-check2-circle', value: `${deployRate}%`, label: 'Deploy Success Rate', color: deployRate > 90 ? '#22c55e' : deployRate > 70 ? '#f59e0b' : '#ef4444', onClick: () => setModal({ title: 'Deploy Success Rate', content: `Tasa de éxito: ${deployRate}%\n\nÚltimos ${deployRateData.total} deploys:\n  Exitosos: ${deployRateData.success}\n  Fallidos: ${deployRateData.total - deployRateData.success}\n\nDesglose reciente:\n${deployRateData.logs.slice(0, 10).map((l: Record<string, unknown>) => `  ${new Date(l.created_at as string).toLocaleString('es-CL')} — ${l.status === 'error' ? '✗ Error' : '✓ OK'}${l.detail ? ': ' + String(l.detail).substring(0, 50) : ''}`).join('\n')}` }) },
   ];
 

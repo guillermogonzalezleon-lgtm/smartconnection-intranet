@@ -91,6 +91,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { action } = body;
 
+    // Track API usage
+    supabaseInsert('analytics', { page: '/api/deploy', event: action || 'unknown', source: 'api', created_at: new Date().toISOString() }).catch(() => {});
+
     // ── Save improvement to Supabase ──
     if (action === 'save_improvement') {
       const { titulo, descripcion, categoria, impacto, agente, codigo } = body;

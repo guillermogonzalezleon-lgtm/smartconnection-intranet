@@ -11,6 +11,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { action, agentId, task, agents: agentIds, prompt, taskType, context, table, order, limit, filter, offset } = body;
 
+    // Track API usage
+    supabaseInsert('analytics', { page: '/api/agents', event: action || 'unknown', source: 'api', created_at: new Date().toISOString() }).catch(() => {});
+
     // Parallel execution of multiple agents
     if (action === 'parallel' && agentIds && task) {
       const { results, totalMs } = await runAgentsParallel(task, agentIds, context);
