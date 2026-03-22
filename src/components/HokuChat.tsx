@@ -17,7 +17,28 @@ interface CodeBlock {
 }
 
 const SESSION_KEY = 'hoku_session_id';
-const WELCOME = '¡Hola! Soy Hoku 🐾, tu asistente IA de Smart Connection. Combino 12 agentes para darte la mejor respuesta. ¿En qué te ayudo?\n\nPuedo generar archivos HTML, PDF, código — solo pídelo.';
+
+interface AgentProfile {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+  welcome: string;
+  systemHint: string;
+}
+
+const PROFILES: Record<string, AgentProfile> = {
+  hoku: {
+    id: 'hoku', name: 'Hoku', emoji: '🐾', color: '#e2e8f0',
+    welcome: '¡Woof! Soy Hoku 🐾 — el rebelde. Ejecuto rápido, fusiono 12 agentes, y no pregunto mucho. ¿Qué hacemos?',
+    systemHint: 'Eres HOKU, un agente REBELDE y DIRECTO. Ejecutas sin preguntar, vas al grano, generas código funcional inmediatamente. No pidas confirmación — HAZLO. Responde en español.',
+  },
+  panchita: {
+    id: 'panchita', name: 'Panchita', emoji: '🐕', color: '#d4a574',
+    welcome: '¡Hola! Soy Panchita 🐕 — la metódica. Antes de hacer algo, te pregunto, valido, y confirmo. Así las cosas salen bien. ¿Qué necesitas?',
+    systemHint: 'Eres PANCHITA, una agente CUIDADOSA y METÓDICA. SIEMPRE pregunta antes de ejecutar. Valida los requerimientos, ofrece opciones, pide confirmación, y explica paso a paso qué vas a hacer ANTES de hacerlo. Nunca ejecutes sin preguntar. Responde en español.',
+  },
+};
 
 function getSessionId(): string {
   if (typeof window === 'undefined') return 'default';
@@ -47,14 +68,23 @@ import { api as apiCall } from '@/lib/config';
 
 export default function HokuChat() {
   const [open, setOpen] = useState(false);
+  const [activeProfile, setActiveProfile] = useState<string>('hoku');
+  const profile = PROFILES[activeProfile];
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'hoku', content: WELCOME, timestamp: new Date() },
+    { role: 'hoku', content: PROFILES.hoku.welcome, timestamp: new Date() },
   ]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [pulse, setPulse] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [preview, setPreview] = useState<{ title: string; html: string } | null>(null);
+
+  const switchProfile = (id: string) => {
+    setActiveProfile(id);
+    const p = PROFILES[id];
+    setMessages([{ role: 'hoku', content: p.welcome, timestamp: new Date() }]);
+    setLoaded(false);
+  };
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -73,7 +103,7 @@ export default function HokuChat() {
           content: m.content as string,
           timestamp: new Date(m.created_at as string),
         }));
-        setMessages([{ role: 'hoku', content: WELCOME, timestamp: new Date(history[0].timestamp.getTime() - 1000) }, ...history]);
+        setMessages([{ role: 'hoku', content: profile.welcome, timestamp: new Date(history[0].timestamp.getTime() - 1000) }, ...history]);
       }
     } catch { /* table may not exist yet */ }
     setLoaded(true);
@@ -194,7 +224,7 @@ export default function HokuChat() {
   };
 
   const buildContext = (msgs: Message[]): string => {
-    const recent = msgs.filter(m => m.content !== WELCOME).slice(-10);
+    const recent = msgs.filter(m => m.content !== profile.welcome).slice(-10);
     if (recent.length === 0) return '';
     return '\n\nHISTORIAL RECIENTE:\n' +
       recent.map(m => `${m.role === 'user' ? 'Usuario' : 'Hoku'}: ${m.content.slice(0, 300)}`).join('\n') +
@@ -256,7 +286,7 @@ export default function HokuChat() {
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: text + context,
+          prompt: `${profile.systemHint}\n\n${text}` + context,
           taskType: useCodeMode ? 'general' : 'general',
           agentId: 'hoku',
           chatMode: !useCodeMode,
@@ -420,37 +450,55 @@ export default function HokuChat() {
       {open && (
         <div style={{
           position: 'fixed', bottom: 90, right: 24, width: 420, maxHeight: 560,
-          background: '#111827', border: '1px solid rgba(255,107,107,0.25)',
-          borderRadius: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(255,107,107,0.08)',
+          background: '#111827', border: `1px solid ${profile.color}40`,
+          borderRadius: 20, boxShadow: `0 20px 60px rgba(0,0,0,0.5), 0 0 40px ${profile.color}15`,
           display: 'flex', flexDirection: 'column', zIndex: 999,
           animation: 'hokuSlideUp 0.25s ease-out', overflow: 'hidden',
         }}>
           {/* Header */}
           <div style={{
-            padding: '14px 18px', background: 'linear-gradient(135deg, #ff6b6b15, #ff6b6b08)',
-            borderBottom: '1px solid rgba(255,107,107,0.15)',
-            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '10px 14px', background: `linear-gradient(135deg, ${profile.color}15, ${profile.color}08)`,
+            borderBottom: `1px solid ${profile.color}25`,
+            display: 'flex', flexDirection: 'column', gap: 8,
           }}>
-            <div style={{
-              width: 38, height: 38, borderRadius: 12,
-              background: 'linear-gradient(135deg, #ff6b6b, #ff8e8e)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '1.1rem', boxShadow: '0 4px 12px rgba(255,107,107,0.3)',
-            }}>🐾</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f1f5f9' }}>Hoku</div>
-              <div style={{ fontSize: '0.65rem', color: '#ff6b6b', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 6px #22c55e' }}></span>
-                Fusión 12 agentes · Online
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 10,
+                background: `linear-gradient(135deg, ${profile.color}, ${profile.color}cc)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '1rem', boxShadow: `0 4px 12px ${profile.color}40`,
+              }}>{profile.emoji}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f1f5f9' }}>{profile.name}</div>
+                <div style={{ fontSize: '0.6rem', color: profile.color, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 6px #22c55e' }}></span>
+                  {activeProfile === 'hoku' ? 'Rebelde · Ejecuta directo' : 'Metódica · Valida antes'}
+                </div>
               </div>
-            </div>
-            <button onClick={() => setOpen(false)} style={{
-              background: 'none', border: 'none', color: '#64748b', cursor: 'pointer',
-              fontSize: '1.1rem', padding: 4, borderRadius: 8, transition: 'color 0.15s',
-            }}
+              <button onClick={() => setOpen(false)} style={{
+                background: 'none', border: 'none', color: '#64748b', cursor: 'pointer',
+                fontSize: '1rem', padding: 4, borderRadius: 8, transition: 'color 0.15s',
+              }}
               onMouseEnter={e => (e.currentTarget.style.color = '#f1f5f9')}
               onMouseLeave={e => (e.currentTarget.style.color = '#64748b')}
             >✕</button>
+            </div>
+            {/* Profile Switch */}
+            <div style={{ display: 'flex', gap: 4 }}>
+              {Object.values(PROFILES).map(p => (
+                <button key={p.id} onClick={() => switchProfile(p.id)}
+                  style={{
+                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                    padding: '4px 8px', borderRadius: 6, fontSize: '0.6rem', fontWeight: 700,
+                    background: activeProfile === p.id ? `${p.color}20` : 'rgba(255,255,255,0.03)',
+                    color: activeProfile === p.id ? p.color : '#475569',
+                    border: `1px solid ${activeProfile === p.id ? `${p.color}30` : 'rgba(255,255,255,0.04)'}`,
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }}>
+                  {p.emoji} {p.name}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Messages */}
@@ -490,7 +538,7 @@ export default function HokuChat() {
                     }}>
                       {msg.role === 'hoku' && '🐾 '}{formatTime(msg.timestamp)}
                     </span>
-                    {msg.role === 'hoku' && !isLastStreaming && msg.content.length > 20 && msg.content !== WELCOME && (
+                    {msg.role === 'hoku' && !isLastStreaming && msg.content.length > 20 && msg.content !== profile.welcome && (
                       <div style={{ display: 'flex', gap: 2 }}>
                         <button onClick={() => submitFeedback(i, 'positive')}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.7rem', opacity: msg.feedback === 'positive' ? 1 : 0.4, transition: 'opacity 0.15s', padding: '0 2px' }}
@@ -552,16 +600,16 @@ export default function HokuChat() {
         style={{
           position: 'fixed', bottom: 24, right: 24, width: 56, height: 56,
           borderRadius: 16, border: 'none', cursor: 'pointer',
-          background: 'linear-gradient(135deg, #ff6b6b, #ff8e8e)',
-          boxShadow: '0 8px 32px rgba(255,107,107,0.35), 0 0 20px rgba(255,107,107,0.15)',
+          background: `linear-gradient(135deg, ${profile.color}, ${profile.color}cc)`,
+          boxShadow: `0 8px 32px ${profile.color}50, 0 0 20px ${profile.color}20`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '1.5rem', zIndex: 1000, transition: 'all 0.2s',
+          fontSize: '1.5rem', zIndex: 1000, transition: 'all 0.3s',
           animation: pulse ? 'hokuPulse 2s infinite' : 'none',
         }}
-        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(255,107,107,0.45)'; }}
-        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 8px 32px rgba(255,107,107,0.35)'; }}
+        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)'; }}
+        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
       >
-        {open ? '✕' : '🐾'}
+        {open ? '✕' : profile.emoji}
       </button>
 
       <style>{`

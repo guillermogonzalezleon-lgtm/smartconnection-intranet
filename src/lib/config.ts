@@ -23,6 +23,7 @@ export const CONFIG = {
   },
   agents: {
     hoku: { id: 'hoku', name: 'Hoku', model: 'fusión 9 agentes', color: '#ff6b6b' },
+    panchita: { id: 'panchita', name: 'Panchita', model: 'fusión cuidadosa', color: '#f472b6' },
     groq: { id: 'groq', name: 'Groq', model: 'llama-3.3-70b', color: '#f59e0b' },
     claude: { id: 'claude', name: 'Claude', model: 'claude-haiku-4.5', color: '#00e5b0' },
     grok: { id: 'grok', name: 'Grok', model: 'grok-3-mini', color: '#8b5cf6' },
@@ -54,7 +55,7 @@ AGENT_COLORS.deployer = '#3b82f6';
 
 // ── Agent icons ──
 export const AGENT_ICONS: Record<string, string> = {
-  hoku: 'bi-stars', groq: 'bi-cpu', claude: 'bi-robot', grok: 'bi-lightning-charge',
+  hoku: 'bi-stars', panchita: 'bi-heart', groq: 'bi-cpu', claude: 'bi-robot', grok: 'bi-lightning-charge',
   deepseek: 'bi-code-slash', mistral: 'bi-translate', openai: 'bi-braces',
   cohere: 'bi-file-text', openrouter: 'bi-shuffle', bedrock: 'bi-cloud',
   gemini: 'bi-gem', deployer: 'bi-gear-wide-connected',
