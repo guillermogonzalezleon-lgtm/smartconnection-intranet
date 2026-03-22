@@ -485,7 +485,7 @@ export default function DeployCenter() {
             </p>
           </div>
           <button
-            onClick={triggerFullDeploy}
+            onClick={() => triggerFullDeploy('manual')}
             disabled={deploying}
             style={{
               background: deploying
