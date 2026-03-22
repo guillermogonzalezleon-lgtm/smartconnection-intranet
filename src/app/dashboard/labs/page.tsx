@@ -83,6 +83,43 @@ const CONNECTORS: Connector[] = [
   { id: 'make', name: 'Make (Integromat)', category: 'Automation', icon: '⚙️', color: '#a855f7', status: 'available', description: 'Workflows visuales de automatización', authType: 'API Key', businessValue: 2 },
   { id: 'zapier', name: 'Zapier', category: 'Automation', icon: '🔗', color: '#f97316', status: 'available', description: 'Conectar 5000+ apps', authType: 'OAuth 2.0', businessValue: 2 },
 
+  // Marketplace & E-commerce
+  { id: 'mercadolibre', name: 'Mercado Libre', category: 'Marketplace', icon: '🛒', color: '#ffe600', status: 'available', description: 'API MeLi — productos, ventas, preguntas, envíos, métricas', authType: 'OAuth 2.0', endpoints: ['/items', '/orders', '/questions', '/shipments'], businessValue: 5 },
+  { id: 'amazon-sp', name: 'Amazon SP-API', category: 'Marketplace', icon: '📦', color: '#ff9900', status: 'available', description: 'Selling Partner API — catálogo, ventas, FBA, advertising', authType: 'OAuth 2.0', endpoints: ['/catalog/v2', '/orders/v0', '/reports'], businessValue: 5 },
+  { id: 'shopify', name: 'Shopify', category: 'E-commerce', icon: '🏪', color: '#96bf48', status: 'available', description: 'Tienda online — productos, órdenes, clientes, analytics', authType: 'OAuth 2.0', endpoints: ['/admin/api/2024-01/'], businessValue: 4 },
+  { id: 'woocommerce', name: 'WooCommerce', category: 'E-commerce', icon: '🛍️', color: '#96588a', status: 'available', description: 'WordPress commerce — productos, órdenes, cupones', authType: 'API Key', endpoints: ['/wp-json/wc/v3/'], businessValue: 3 },
+  { id: 'jumpseller', name: 'Jumpseller', category: 'E-commerce', icon: '🚀', color: '#00b4d8', status: 'active', description: 'E-commerce Chile — productos, órdenes, clientes', authType: 'API Key', endpoints: ['/v1/products', '/v1/orders'], businessValue: 3, lastSync: 'Via InfoPet', dataVolume: '~200 productos' },
+  { id: 'bsale', name: 'Bsale', category: 'ERP Chile', icon: '🧾', color: '#00b050', status: 'active', description: 'Facturación electrónica + POS + inventario Chile', authType: 'API Key', endpoints: ['/v1/documents', '/v1/products', '/v1/stocks'], businessValue: 4, lastSync: 'Via InfoPet', dataVolume: '~500 docs' },
+
+  // Importaciones & Logística
+  { id: 'alibaba', name: 'Alibaba/1688', category: 'Importaciones', icon: '🏭', color: '#ff6a00', status: 'available', description: 'Proveedores China — productos, cotizaciones, seguimiento', authType: 'API Key', endpoints: ['/openapi/param2/1/'], businessValue: 5 },
+  { id: 'customs-cl', name: 'Aduana Chile', category: 'Importaciones', icon: '🇨🇱', color: '#d52b1e', status: 'available', description: 'SICEX — DUS, declaraciones, aranceles, tracking', authType: 'Certificado Digital', endpoints: ['/api/v1/declarations'], businessValue: 4 },
+  { id: 'shipping-track', name: 'Track & Trace', category: 'Logística', icon: '🚢', color: '#0077b6', status: 'available', description: 'Seguimiento envíos marítimos — contenedores, ETA, puertos', authType: 'API Key', endpoints: ['/tracking/v1/'], businessValue: 3 },
+
+  // Pagos & Finanzas
+  { id: 'stripe', name: 'Stripe', category: 'Pagos', icon: '💳', color: '#635bff', status: 'available', description: 'Pagos internacionales — suscripciones, checkout, invoices', authType: 'API Key', endpoints: ['/v1/charges', '/v1/subscriptions'], businessValue: 4 },
+  { id: 'mercadopago', name: 'Mercado Pago', category: 'Pagos', icon: '💰', color: '#00b1ea', status: 'available', description: 'Pagos LatAm — checkout pro, QR, point, suscripciones', authType: 'OAuth 2.0', endpoints: ['/v1/payments', '/checkout/preferences'], businessValue: 4 },
+  { id: 'flow-cl', name: 'Flow.cl', category: 'Pagos', icon: '🏦', color: '#00c853', status: 'available', description: 'Pagos Chile — WebPay, transferencias, cobros recurrentes', authType: 'API Key', endpoints: ['/api/payment/create'], businessValue: 3 },
+
+  // Comunicación
+  { id: 'slack', name: 'Slack', category: 'Messaging', icon: '💬', color: '#e01e5a', status: 'available', description: 'Mensajería equipo — bots, webhooks, canales', authType: 'OAuth 2.0', endpoints: ['/api/chat.postMessage'], businessValue: 3 },
+  { id: 'twilio', name: 'Twilio', category: 'Comunicación', icon: '📱', color: '#f22f46', status: 'available', description: 'SMS, voz, video — comunicación programable', authType: 'API Key', endpoints: ['/2010-04-01/Accounts/'], businessValue: 3 },
+  { id: 'sendgrid', name: 'SendGrid', category: 'Email', icon: '✉️', color: '#1a82e2', status: 'available', description: 'Email masivo — campañas, templates, analytics', authType: 'API Key', endpoints: ['/v3/mail/send'], businessValue: 3 },
+
+  // IA & ML
+  { id: 'openai', name: 'OpenAI', category: 'IA Generativa', icon: '🧠', color: '#412991', status: 'available', description: 'GPT-4o, DALL-E, Whisper — IA multimodal', authType: 'API Key', endpoints: ['/v1/chat/completions'], businessValue: 4 },
+  { id: 'huggingface', name: 'Hugging Face', category: 'IA/ML', icon: '🤗', color: '#ff9d00', status: 'available', description: 'Modelos open-source — NLP, visión, audio', authType: 'API Key', endpoints: ['/models/', '/api/inference'], businessValue: 3 },
+  { id: 'replicate', name: 'Replicate', category: 'IA/ML', icon: '🔄', color: '#0a0a0a', status: 'available', description: 'Ejecutar modelos ML — Stable Diffusion, LLaMA, Whisper', authType: 'API Key', endpoints: ['/v1/predictions'], businessValue: 3 },
+
+  // Analytics & Monitoring
+  { id: 'google-analytics', name: 'Google Analytics 4', category: 'Analytics', icon: '📊', color: '#e37400', status: 'available', description: 'Web analytics — tráfico, conversiones, audiencias', authType: 'OAuth 2.0', endpoints: ['/analyticsdata/v1beta/'], businessValue: 4 },
+  { id: 'hotjar', name: 'Hotjar', category: 'Analytics', icon: '🔥', color: '#fd3a5c', status: 'available', description: 'Heatmaps, recordings, surveys — UX analytics', authType: 'API Key', endpoints: ['/v1/surveys'], businessValue: 3 },
+  { id: 'sentry', name: 'Sentry', category: 'Monitoring', icon: '🐛', color: '#362d59', status: 'available', description: 'Error tracking — bugs, performance, releases', authType: 'API Key', endpoints: ['/api/0/projects/'], businessValue: 3 },
+
+  // CRM & Ventas
+  { id: 'hubspot', name: 'HubSpot', category: 'CRM', icon: '🔶', color: '#ff7a59', status: 'available', description: 'CRM + Marketing + Sales — contactos, deals, campañas', authType: 'OAuth 2.0', endpoints: ['/crm/v3/objects/'], businessValue: 4 },
+  { id: 'pipedrive', name: 'Pipedrive', category: 'CRM', icon: '🔷', color: '#017737', status: 'available', description: 'Sales CRM — deals, pipelines, actividades', authType: 'API Key', endpoints: ['/v1/deals', '/v1/persons'], businessValue: 3 },
+
   // Coming soon
   { id: 'midjourney', name: 'Midjourney', category: 'IA Visual', icon: '🎨', color: '#8b5cf6', status: 'coming_soon', description: 'Generación de imágenes', authType: 'Discord Bot', businessValue: 1 },
   { id: 'sora', name: 'Sora (OpenAI)', category: 'IA Video', icon: '🌀', color: '#f1f5f9', status: 'coming_soon', description: 'Text to video', authType: 'API Key', businessValue: 1 },
