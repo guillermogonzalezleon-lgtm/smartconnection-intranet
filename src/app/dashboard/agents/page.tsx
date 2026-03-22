@@ -38,6 +38,14 @@ export default function AgentsWorkspace() {
 
   const deployApi = (p: Record<string, unknown>) => fetch('/api/deploy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }).then(r => r.json());
 
+  // Load prompt from Labs/flows
+  useEffect(() => {
+    try {
+      const p = sessionStorage.getItem('agent-prompt');
+      if (p) { setTask(p); sessionStorage.removeItem('agent-prompt'); }
+    } catch {}
+  }, []);
+
   const execute = useCallback(async () => {
     if (!task.trim() || running) return;
     setRunning(true); setOutput(''); setElapsed(0); setTokens(0);
