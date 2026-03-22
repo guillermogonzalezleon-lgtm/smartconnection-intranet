@@ -100,17 +100,18 @@ export default function DeployCenter() {
   const [pipelineElapsed, setPipelineElapsed] = useState(0);
   const [activeStepLog, setActiveStepLog] = useState<string | null>(null);
   const [copiedLog, setCopiedLog] = useState(false);
+  const REPO_ID = 'smartconnection-intranet';
+  const REPO_FULL = 'guillermogonzalezleon-lgtm/smartconnection-intranet';
+  const REPO_LABEL = 'Intranet (AWS Amplify)';
+  const PROD_URL = 'https://intranet.smconnection.cl';
+
   const [showLivePreview, setShowLivePreview] = useState(false);
+  const [livePreviewUrl, setLivePreviewUrl] = useState(PROD_URL + '/dashboard');
   const termRef = useRef<HTMLDivElement>(null);
   const stepTimers = useRef<Record<string, number>>({});
   const stepLogs = useRef<Record<string, string[]>>({});
   const pipelineStartRef = useRef<number>(0);
   const pipelineTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const REPO_ID = 'smartconnection-intranet';
-  const REPO_FULL = 'guillermogonzalezleon-lgtm/smartconnection-intranet';
-  const REPO_LABEL = 'Intranet (AWS Amplify)';
-  const PROD_URL = 'https://intranet.smconnection.cl';
 
   /* ── Derived state ── */
   const lastDeploy = history.find(h => h.status === 'success');
@@ -626,10 +627,19 @@ export default function DeployCenter() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 8px #22c55e' }}></div>
                 <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#f1f5f9' }}>Live Preview</span>
-                <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontFamily: "'JetBrains Mono', monospace" }}>{PROD_URL}</span>
+                <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontFamily: "'JetBrains Mono', monospace" }}>{livePreviewUrl}</span>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <a href={PROD_URL} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.65rem', padding: '4px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: 'none', cursor: 'pointer', textDecoration: 'none', fontWeight: 600 }}>
+                <button onClick={() => { setLivePreviewUrl(PROD_URL + '/dashboard/improvements'); }} style={{ fontSize: '0.6rem', padding: '4px 10px', borderRadius: 8, background: 'rgba(139,92,246,0.12)', color: '#a78bfa', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                  Improvements
+                </button>
+                <button onClick={() => { setLivePreviewUrl(PROD_URL + '/dashboard/agents'); }} style={{ fontSize: '0.6rem', padding: '4px 10px', borderRadius: 8, background: 'rgba(0,229,176,0.12)', color: '#00e5b0', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                  Agentes
+                </button>
+                <button onClick={() => { setLivePreviewUrl(PROD_URL + '/dashboard'); }} style={{ fontSize: '0.6rem', padding: '4px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                  Dashboard
+                </button>
+                <a href={livePreviewUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.6rem', padding: '4px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: 'none', cursor: 'pointer', textDecoration: 'none', fontWeight: 600 }}>
                   Abrir en tab
                 </a>
                 <button onClick={() => setShowLivePreview(false)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.2rem', padding: '0 4px' }}>✕</button>
@@ -643,12 +653,12 @@ export default function DeployCenter() {
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e' }}></div>
               </div>
               <div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '4px 12px', fontSize: '0.7rem', color: '#94a3b8', fontFamily: "'JetBrains Mono', monospace" }}>
-                {PROD_URL}/dashboard
+                {livePreviewUrl}
               </div>
             </div>
             {/* Iframe */}
             <iframe
-              src={PROD_URL + '/dashboard'}
+              src={livePreviewUrl}
               style={{ flex: 1, border: 'none', background: '#0a0d14' }}
               title="Live Preview — SmartConnection Intranet"
             />
@@ -1405,7 +1415,24 @@ export default function DeployCenter() {
                         Copiar log
                       </button>
                       <button
-                        onClick={() => setShowLivePreview(true)}
+                        onClick={() => {
+                          // Extract deployed file path from detail to show specific preview
+                          const detail = h.detail || '';
+                          const fileMatch = detail.match(/Committed\s+([\w/.:-]+)\s+to/);
+                          const pathMatch = detail.match(/path['":\s]+(src\/[^\s'"]+)/);
+                          const filePath = fileMatch?.[1] || pathMatch?.[1] || '';
+                          if (filePath && filePath.endsWith('.html')) {
+                            // Show the specific HTML file
+                            setLivePreviewUrl(`https://raw.githubusercontent.com/${REPO_FULL}/main/${filePath}`);
+                          } else if (detail.includes('/dashboard/improvements') || detail.includes('ux_insights')) {
+                            setLivePreviewUrl(PROD_URL + '/dashboard/improvements');
+                          } else if (detail.includes('/dashboard/agents')) {
+                            setLivePreviewUrl(PROD_URL + '/dashboard/agents');
+                          } else {
+                            setLivePreviewUrl(PROD_URL + '/dashboard');
+                          }
+                          setShowLivePreview(true);
+                        }}
                         style={{
                           background: 'rgba(0,229,176,0.04)', border: '1px solid rgba(0,229,176,0.1)',
                           color: '#00e5b0', fontSize: '0.6rem', cursor: 'pointer',
@@ -1675,7 +1702,7 @@ export default function DeployCenter() {
                   <i className="bi bi-clipboard" /> Copiar
                 </button>
                 <button
-                  onClick={() => { setShowReport(false); setShowLivePreview(true); }}
+                  onClick={() => { setShowReport(false); setLivePreviewUrl(PROD_URL + '/dashboard/improvements'); setShowLivePreview(true); }}
                   style={{
                     background: 'rgba(0,229,176,0.06)', border: '1px solid rgba(0,229,176,0.15)',
                     borderRadius: 10, padding: '10px', color: '#00e5b0', width: '100%',
