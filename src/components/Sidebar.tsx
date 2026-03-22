@@ -59,6 +59,7 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
 
   const infraItems = [
     { href: '/dashboard/deploy', icon: 'bi-rocket-takeoff', label: 'Deploy', iconColor: '#3b82f6' },
+    { href: '/dashboard/scan', icon: 'bi-shield-check', label: 'Scan', iconColor: '#1fd975' },
   ];
 
   const statusItems = [
