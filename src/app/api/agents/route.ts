@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 
     // Generic query
     if (action === 'query' && table) {
-      const allowed = ['leads', 'reuniones', 'analytics', 'agent_logs', 'agent_config', 'ux_insights', 'projects', 'project_tasks', 'hoku_chat'];
+      const allowed = ['leads', 'reuniones', 'analytics', 'agent_logs', 'agent_config', 'ux_insights', 'projects', 'project_tasks', 'hoku_chat', 'hoku_knowledge'];
       if (!allowed.includes(table)) return NextResponse.json({ error: 'Tabla no permitida' }, { status: 400 });
       const data = await supabaseQuery(table, 'GET', { order: order || 'created_at.desc', limit: limit || 50, filter, offset });
       return NextResponse.json({ data });
@@ -83,6 +83,71 @@ export async function POST(request: Request) {
         content: String(body.content).slice(0, 5000),
         created_at: new Date().toISOString(),
       });
+      return NextResponse.json({ success: true });
+    }
+
+    // ── Hoku ML: Search knowledge base (full-text search) ──
+    if (action === 'hoku_search' && body.query) {
+      const words = String(body.query).split(/\s+/).filter(w => w.length > 2).slice(0, 5);
+      if (words.length === 0) return NextResponse.json({ results: [] });
+      const tsQuery = words.join(' | ');
+      const data = await supabaseQuery('hoku_knowledge', 'GET', {
+        filter: `search_vector=fts.${encodeURIComponent(tsQuery)}`,
+        order: 'quality_score.desc',
+        limit: 5,
+      }).catch(() => []);
+      return NextResponse.json({ results: data });
+    }
+
+    // ── Hoku ML: Save knowledge ──
+    if (action === 'hoku_learn' && body.topic && body.content) {
+      await supabaseInsert('hoku_knowledge', {
+        topic: String(body.topic).slice(0, 200),
+        content: String(body.content).slice(0, 3000),
+        source: body.source || 'conversation',
+        quality_score: body.quality_score || 0.5,
+      });
+      return NextResponse.json({ success: true });
+    }
+
+    // ── Hoku ML: Feedback on message ──
+    if (action === 'hoku_feedback' && body.messageId && body.feedback) {
+      await supabaseQuery('hoku_chat', 'PATCH', {
+        filter: `id=eq.${body.messageId}`,
+        body: { feedback: body.feedback },
+      });
+      // If positive feedback, boost related knowledge
+      if (body.feedback === 'positive' && body.knowledgeIds?.length) {
+        for (const kid of body.knowledgeIds) {
+          const existing = await supabaseQuery('hoku_knowledge', 'GET', { filter: `id=eq.${kid}`, limit: 1 });
+          if (existing[0]) {
+            const current = existing[0] as Record<string, unknown>;
+            await supabaseQuery('hoku_knowledge', 'PATCH', {
+              filter: `id=eq.${kid}`,
+              body: {
+                feedback_positive: ((current.feedback_positive as number) || 0) + 1,
+                quality_score: Math.min(1, ((current.quality_score as number) || 0.5) + 0.05),
+                use_count: ((current.use_count as number) || 0) + 1,
+              },
+            });
+          }
+        }
+      }
+      if (body.feedback === 'negative' && body.knowledgeIds?.length) {
+        for (const kid of body.knowledgeIds) {
+          const existing = await supabaseQuery('hoku_knowledge', 'GET', { filter: `id=eq.${kid}`, limit: 1 });
+          if (existing[0]) {
+            const current = existing[0] as Record<string, unknown>;
+            await supabaseQuery('hoku_knowledge', 'PATCH', {
+              filter: `id=eq.${kid}`,
+              body: {
+                feedback_negative: ((current.feedback_negative as number) || 0) + 1,
+                quality_score: Math.max(0, ((current.quality_score as number) || 0.5) - 0.1),
+              },
+            });
+          }
+        }
+      }
       return NextResponse.json({ success: true });
     }
 

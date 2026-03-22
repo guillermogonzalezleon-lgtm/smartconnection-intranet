@@ -2,9 +2,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 
 interface Message {
+  id?: string;
   role: 'user' | 'hoku';
   content: string;
   timestamp: Date;
+  feedback?: 'positive' | 'negative' | null;
+  knowledgeIds?: string[];
 }
 
 interface CodeBlock {
@@ -125,6 +128,51 @@ export default function HokuChat() {
     } catch { return ''; }
   };
 
+  // ML: Search knowledge base for relevant context
+  const searchKnowledge = async (query: string): Promise<{ context: string; ids: string[] }> => {
+    try {
+      const res = await apiCall({ action: 'hoku_search', query });
+      if (!res.results?.length) return { context: '', ids: [] };
+      const ids = res.results.map((r: Record<string, unknown>) => r.id as string);
+      const context = '\n\nCONOCIMIENTO APRENDIDO (usa esto como referencia prioritaria):\n' +
+        res.results.map((r: Record<string, unknown>) =>
+          `[${r.topic}] (score:${(r.quality_score as number)?.toFixed(2)}): ${(r.content as string).slice(0, 400)}`
+        ).join('\n') + '\n';
+      return { context, ids };
+    } catch { return { context: '', ids: [] }; }
+  };
+
+  // ML: Extract learnings from a conversation exchange
+  const extractAndLearn = async (userMsg: string, hokuResponse: string) => {
+    if (hokuResponse.length < 50) return; // skip short/error responses
+    // Extract topic from user message
+    const topic = userMsg.slice(0, 150).replace(/[^\w\sáéíóúñ]/gi, '').trim();
+    // Save condensed knowledge
+    const content = hokuResponse
+      .replace(/```[\s\S]*?```/g, '[código]') // remove code blocks for storage
+      .slice(0, 2000);
+    apiCall({
+      action: 'hoku_learn',
+      topic,
+      content,
+      source: 'conversation',
+      quality_score: 0.5,
+    }).catch(() => {});
+  };
+
+  // ML: Submit feedback
+  const submitFeedback = (msgIndex: number, feedback: 'positive' | 'negative') => {
+    setMessages(prev => {
+      const updated = [...prev];
+      updated[msgIndex] = { ...updated[msgIndex], feedback };
+      return updated;
+    });
+    const msg = messages[msgIndex];
+    if (msg.id) {
+      apiCall({ action: 'hoku_feedback', messageId: msg.id, feedback, knowledgeIds: msg.knowledgeIds || [] }).catch(() => {});
+    }
+  };
+
   const buildContext = (msgs: Message[]): string => {
     const recent = msgs.filter(m => m.content !== WELCOME).slice(-10);
     if (recent.length === 0) return '';
@@ -173,11 +221,12 @@ export default function HokuChat() {
     const hokuMsg: Message = { role: 'hoku', content: '', timestamp: new Date() };
     setMessages(prev => [...prev, hokuMsg]);
 
-    const [chatContext, intranetData] = await Promise.all([
+    const [chatContext, intranetData, knowledge] = await Promise.all([
       Promise.resolve(buildContext([...messages, userMsg])),
       fetchIntranetContext(),
+      searchKnowledge(text),
     ]);
-    const context = chatContext + intranetData;
+    const context = chatContext + intranetData + knowledge.context;
     const useCodeMode = wantsCode(text);
     let fullResponse = '';
 
@@ -242,7 +291,17 @@ export default function HokuChat() {
       });
     }
 
-    if (fullResponse) saveMessage('hoku', fullResponse);
+    if (fullResponse) {
+      saveMessage('hoku', fullResponse);
+      // ML: learn from this exchange
+      extractAndLearn(text, fullResponse);
+      // Store knowledge IDs on the last message
+      setMessages(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1] = { ...updated[updated.length - 1], knowledgeIds: knowledge.ids };
+        return updated;
+      });
+    }
     setStreaming(false);
   };
 
@@ -403,13 +462,25 @@ export default function HokuChat() {
                       <span style={{ animation: 'hokuBlink 1s infinite', color: '#ff6b6b' }}>▊</span>
                     )}
                   </div>
-                  <span style={{
-                    fontSize: '0.55rem', color: '#475569', marginTop: 3,
-                    paddingLeft: msg.role === 'hoku' ? 4 : 0,
-                    paddingRight: msg.role === 'user' ? 4 : 0,
-                  }}>
-                    {msg.role === 'hoku' && '🐾 '}{formatTime(msg.timestamp)}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                    <span style={{
+                      fontSize: '0.55rem', color: '#475569',
+                      paddingLeft: msg.role === 'hoku' ? 4 : 0,
+                      paddingRight: msg.role === 'user' ? 4 : 0,
+                    }}>
+                      {msg.role === 'hoku' && '🐾 '}{formatTime(msg.timestamp)}
+                    </span>
+                    {msg.role === 'hoku' && !isLastStreaming && msg.content.length > 20 && msg.content !== WELCOME && (
+                      <div style={{ display: 'flex', gap: 2 }}>
+                        <button onClick={() => submitFeedback(i, 'positive')}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.7rem', opacity: msg.feedback === 'positive' ? 1 : 0.4, transition: 'opacity 0.15s', padding: '0 2px' }}
+                          title="Buena respuesta">👍</button>
+                        <button onClick={() => submitFeedback(i, 'negative')}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.7rem', opacity: msg.feedback === 'negative' ? 1 : 0.4, transition: 'opacity 0.15s', padding: '0 2px' }}
+                          title="Mala respuesta">👎</button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
