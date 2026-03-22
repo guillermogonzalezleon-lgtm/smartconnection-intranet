@@ -96,6 +96,7 @@ export default function UXAgent() {
   const updateEstado = (id: string, newEstado: string) => {
     setInsights(prev => prev.map(i => i.id === id ? { ...i, estado: newEstado } : i));
     if (detailInsight?.id === id) setDetailInsight(prev => prev ? { ...prev, estado: newEstado } : null);
+    api({ action: 'update_insight', insightId: id, estado: newEstado }).catch(() => {});
   };
 
   const fmtDate = (d: string) => { try { return new Date(d).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' }); } catch { return d; } };

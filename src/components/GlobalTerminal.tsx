@@ -36,6 +36,7 @@ export default function GlobalTerminal() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<{ startY: number; startH: number } | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const [customH, setCustomH] = useState(0);
 
   const heights: Record<string, number | string> = { minimized: 34, normal: 240, expanded: 400, fullscreen: '100vh' };
@@ -59,10 +60,14 @@ export default function GlobalTerminal() {
       setMode(m => m === 'minimized' ? 'normal' : m);
 
       // Start streaming
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
       fetch('/api/agents/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, taskType, agentId: agent }),
+        signal: controller.signal,
       }).then(async res => {
         if (!res.ok || !res.body) {
           setSessions(prev => prev.map(s => s.id === sessionId ? {
@@ -126,6 +131,7 @@ export default function GlobalTerminal() {
     return () => {
       window.removeEventListener('toggle-terminal', toggleHandler);
       window.removeEventListener('exec-agent', execHandler);
+      abortRef.current?.abort();
     };
   }, [activeTab]);
 

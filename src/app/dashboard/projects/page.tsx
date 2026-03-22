@@ -166,14 +166,23 @@ export default function ProjectsPage() {
   const inputStyle: React.CSSProperties = { width: '100%', background: '#0a0d14', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', color: '#e2e8f0', fontSize: '0.8rem', fontFamily: "'Inter', system-ui, sans-serif", outline: 'none' };
   const labelStyle: React.CSSProperties = { fontSize: '0.65rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 6, display: 'block' };
 
-  const updateProjectStatus = (projectId: string, newStatus: string) => {
+  const updateProjectStatus = async (projectId: string, newStatus: string) => {
+    const previousProjects = [...projects];
     setProjects(prev => prev.map(p => p.id === projectId ? { ...p, status: newStatus } : p));
     // Persist to Supabase via PATCH
-    fetch('/api/agents', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'update_project', projectId, status: newStatus }),
-    }).catch(() => {});
+    try {
+      const res = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_project', projectId, status: newStatus }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Error al actualizar');
+    } catch (err) {
+      setProjects(previousProjects);
+      alert(`Error al mover proyecto: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
 
   const selectStyle = (active: boolean): React.CSSProperties => ({

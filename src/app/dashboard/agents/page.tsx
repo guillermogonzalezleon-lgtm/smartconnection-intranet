@@ -82,6 +82,7 @@ export default function AgentsWorkspace() {
   const amplifyApi = (p: Record<string, unknown>) => fetch('/api/amplify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }).then(r => r.json());
 
   const runPipeline = async () => {
+    if (output.length < 100) { setPipelineLog(['⚠️ Output muy corto para commitear']); setPipeline('error'); return; }
     const target = repos.find(r => r.id === targetRepo) || repos[0];
     const pipelineStart = Date.now();
     setStepTimes({});
@@ -166,7 +167,7 @@ export default function AgentsWorkspace() {
 
     let buildDone = false;
     let attempts = 0;
-    const maxAttempts = 18; // 3 minutes max
+    const maxAttempts = 6; // 60 seconds max
 
     while (!buildDone && attempts < maxAttempts) {
       await new Promise(r => setTimeout(r, 10000)); // Poll every 10s
@@ -204,7 +205,7 @@ export default function AgentsWorkspace() {
     }
 
     if (!buildDone) {
-      setPipelineLog(prev => [...prev, `⚠️ Timeout esperando build (${maxAttempts * 10}s) — el deploy sigue en background`]);
+      setPipelineLog(prev => [...prev, `⚠️ Timeout esperando build (${maxAttempts * 10}s)`, '🔄 Build continúa en background — verificar en AWS Amplify Console']);
     }
 
     // Step 4: Health check (real)

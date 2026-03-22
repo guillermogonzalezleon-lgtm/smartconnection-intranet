@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface Command {
@@ -19,7 +19,7 @@ export default function CommandBar() {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
-  const commands: Command[] = [
+  const commands: Command[] = useMemo(() => [
     // Quick actions
     { id: 'run-agent', icon: '⚡', label: 'Ejecutar agente...', group: 'Acciones', action: () => { setOpen(false); router.push('/dashboard/agents'); }, shortcut: '⌘E' },
     { id: 'deploy', icon: '🚀', label: 'Deploy a producción', group: 'Acciones', action: () => { setOpen(false); router.push('/dashboard/deploy'); }, color: '#3b82f6' },
@@ -39,7 +39,7 @@ export default function CommandBar() {
     { id: 'agent-claude', icon: '●', label: 'Claude — Code Review & Dev', group: 'Agentes', action: () => { setOpen(false); router.push('/dashboard/ux-agent?tab=workspace'); }, color: '#00e5b0' },
     { id: 'agent-groq', icon: '●', label: 'Groq — Inferencia rápida', group: 'Agentes', action: () => { setOpen(false); router.push('/dashboard/ux-agent?tab=workspace'); }, color: '#f59e0b' },
     { id: 'agent-gemini', icon: '●', label: 'Gemini — SEO & Analytics', group: 'Agentes', action: () => { setOpen(false); router.push('/dashboard/ux-agent?tab=workspace'); }, color: '#22c55e' },
-  ];
+  ], [router]);
 
   const filtered = query.trim()
     ? commands.filter(c => c.label.toLowerCase().includes(query.toLowerCase()) || c.group.toLowerCase().includes(query.toLowerCase()))

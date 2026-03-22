@@ -3,8 +3,27 @@ import { cookies } from 'next/headers';
 import { supabaseQuery } from '@/lib/supabase';
 import { createSession } from '@/lib/auth';
 
+const loginAttempts = new Map<string, { count: number; lastAttempt: number }>();
+
 export async function POST(request: Request) {
   try {
+    const ip = request.headers.get('x-forwarded-for') || 'unknown';
+    const now = Date.now();
+    const attempt = loginAttempts.get(ip);
+    if (attempt) {
+      if (now - attempt.lastAttempt < 60000) {
+        if (attempt.count >= 5) {
+          return NextResponse.json({ error: 'Demasiados intentos. Intenta en 60 segundos.' }, { status: 429 });
+        }
+        attempt.count++;
+        attempt.lastAttempt = now;
+      } else {
+        loginAttempts.set(ip, { count: 1, lastAttempt: now });
+      }
+    } else {
+      loginAttempts.set(ip, { count: 1, lastAttempt: now });
+    }
+
     const body = await request.json();
     const { pin, email, password } = body;
 

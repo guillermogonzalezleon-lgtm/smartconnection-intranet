@@ -63,6 +63,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ data });
     }
 
+    // Update insight estado
+    if (action === 'update_insight' && body.insightId) {
+      await supabaseQuery('ux_insights', 'PATCH', { filter: `id=eq.${body.insightId}`, body: { estado: body.estado, updated_at: new Date().toISOString() } });
+      return NextResponse.json({ success: true });
+    }
+
     if (action === 'update_project' && body.projectId) {
       await supabaseQuery('projects', 'PATCH', { filter: `id=eq.${body.projectId}`, body: { status: body.status, updated_at: new Date().toISOString() } });
       return NextResponse.json({ success: true });
@@ -103,7 +109,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
-    return NextResponse.json({ error: 'Acción no válida' }, { status: 400 });
+    return NextResponse.json({ error: 'Acción no válida: ' + (action || 'undefined') }, { status: 400 });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
