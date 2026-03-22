@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [projects, setProjects] = useState<Record<string, unknown>[]>([]);
   const [modal, setModal] = useState<ModalData | null>(null);
   const [selectedLog, setSelectedLog] = useState<Record<string, unknown> | null>(null);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   const getGreeting = () => {
@@ -32,7 +33,8 @@ export default function Dashboard() {
     fetch('/api/agents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json());
 
   const refresh = () => {
-    api({ action: 'list' }).then(d => { if (d.agents) setAgents(d.agents); });
+    const done = () => setLoading(false);
+    api({ action: 'list' }).then(d => { if (d.agents) setAgents(d.agents); done(); }).catch(done);
     api({ action: 'query', table: 'leads', order: 'created_at.desc', limit: 100 }).then(d => { if (d.data) { setLeads(d.data.length); setLeadsData(d.data); } }).catch(() => {});
     api({ action: 'query', table: 'reuniones', order: 'created_at.desc', limit: 100 }).then(d => { if (d.data) { setMeetings(d.data.length); setMeetingsData(d.data); } }).catch(() => {});
     api({ action: 'query', table: 'projects', limit: 4 }).then(d => { if (d.data) setProjects(d.data); }).catch(() => {});
@@ -142,7 +144,14 @@ export default function Dashboard() {
 
         {/* KPIs */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
-          {kpis.map((kpi, i) => (
+          {loading ? Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '1.25rem', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ width: 24, height: 24, borderRadius: 6, background: '#1e293b', marginBottom: 10, animation: 'shimmer 1.5s infinite' }}></div>
+              <div style={{ width: '50%', height: 28, borderRadius: 6, background: '#1e293b', animation: 'shimmer 1.5s infinite' }}></div>
+              <div style={{ width: '70%', height: 12, borderRadius: 4, background: '#1e293b', marginTop: 8, animation: 'shimmer 1.5s infinite' }}></div>
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: '#1e293b' }}></div>
+            </div>
+          )) : kpis.map((kpi, i) => (
             <div key={i} onClick={kpi.onClick} style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '1.25rem', position: 'relative', overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s' }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = kpi.color + '40'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'; (e.currentTarget as HTMLElement).style.transform = 'none'; }}>
@@ -190,7 +199,15 @@ export default function Dashboard() {
                   <th style={{ textAlign: 'left', padding: '0.6rem 1rem', fontSize: '0.65rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Tareas</th>
                 </tr></thead>
                 <tbody>
-                  {agents.map((a, i) => {
+                  {loading ? Array.from({ length: 3 }).map((_, i) => (
+                    <tr key={i} style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                      {Array.from({ length: 5 }).map((_, j) => (
+                        <td key={j} style={{ padding: '0.6rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                          <div style={{ width: j === 0 ? '80%' : j === 3 ? 60 : '60%', height: 14, borderRadius: 4, background: '#1e293b', animation: 'shimmer 1.5s infinite' }}></div>
+                        </td>
+                      ))}
+                    </tr>
+                  )) : agents.map((a, i) => {
                     const m = agentMeta[a.agent_id as string] || { color: '#94a3b8', icon: 'bi-cpu' };
                     return (
                       <tr key={i} onClick={() => showAgentDetail(a)} style={{ borderTop: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', transition: 'background 0.15s' }}
@@ -249,7 +266,21 @@ export default function Dashboard() {
             <a href="/dashboard/projects" style={{ fontSize: '0.7rem', color: '#94a3b8', textDecoration: 'none' }}>Ver todos →</a>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
-            {projects.length === 0 ? (
+            {loading ? Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <div style={{ width: '60%', height: 14, borderRadius: 4, background: '#1e293b', animation: 'shimmer 1.5s infinite' }}></div>
+                  <div style={{ width: 50, height: 16, borderRadius: 999, background: '#1e293b', animation: 'shimmer 1.5s infinite' }}></div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 999, height: 6, overflow: 'hidden', marginBottom: 10 }}>
+                  <div style={{ height: '100%', width: '30%', background: '#1e293b', borderRadius: 999, animation: 'shimmer 1.5s infinite' }}></div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ width: 30, height: 10, borderRadius: 4, background: '#1e293b', animation: 'shimmer 1.5s infinite' }}></div>
+                  <div style={{ width: '40%', height: 10, borderRadius: 4, background: '#1e293b', animation: 'shimmer 1.5s infinite' }}></div>
+                </div>
+              </div>
+            )) : projects.length === 0 ? (
               <div style={{ gridColumn: '1 / -1', background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '2rem', textAlign: 'center', color: '#475569', fontSize: '0.8rem' }}>Sin proyectos</div>
             ) : projects.map((p, i) => {
               const statusColors: Record<string, { bg: string; text: string }> = {
@@ -284,6 +315,9 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Shimmer animation */}
+      <style>{`@keyframes shimmer { 0% { opacity: 0.3; } 50% { opacity: 0.6; } 100% { opacity: 0.3; } }`}</style>
 
       {/* Modal */}
       {modal && (

@@ -34,13 +34,20 @@ export default function AWSPage() {
 
   const checkHealth = useCallback(async () => {
     const results = await Promise.all(ENDPOINTS.map(async (url) => {
-      const start = performance.now();
-      try {
-        await fetch(url, { mode: 'no-cors', cache: 'no-store' });
-        return { url, status: 'ok' as const, latency: Math.round(performance.now() - start) };
-      } catch {
-        return { url, status: 'error' as const, latency: Math.round(performance.now() - start) };
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const start = performance.now();
+        try {
+          await fetch(url, { mode: 'no-cors', cache: 'no-store' });
+          return { url, status: 'ok' as const, latency: Math.round(performance.now() - start) };
+        } catch {
+          if (attempt < 2) {
+            await new Promise(r => setTimeout(r, 500));
+            continue;
+          }
+          return { url, status: 'error' as const, latency: Math.round(performance.now() - start) };
+        }
       }
+      return { url, status: 'error' as const, latency: 0 };
     }));
     setHealthChecks(results);
   }, []);

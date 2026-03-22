@@ -63,6 +63,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ data });
     }
 
+    // Update lead
+    if (action === 'update_lead' && body.leadId && body.updates) {
+      await supabaseQuery('leads', 'PATCH', { filter: `id=eq.${body.leadId}`, body: { ...body.updates, updated_at: new Date().toISOString() } });
+      return NextResponse.json({ success: true });
+    }
+
+    // Delete lead
+    if (action === 'delete_lead' && body.leadId) {
+      await supabaseQuery('leads', 'DELETE', { filter: `id=eq.${body.leadId}` });
+      return NextResponse.json({ success: true });
+    }
+
     // Update insight estado
     if (action === 'update_insight' && body.insightId) {
       await supabaseQuery('ux_insights', 'PATCH', { filter: `id=eq.${body.insightId}`, body: { estado: body.estado, updated_at: new Date().toISOString() } });

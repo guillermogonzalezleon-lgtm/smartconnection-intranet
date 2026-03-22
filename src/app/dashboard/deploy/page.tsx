@@ -85,9 +85,15 @@ export default function DeployCenter() {
     setLogs(prev => [...prev, { text, color: getTagColor(text), ts }]);
   }, []);
 
-  // Auto-scroll terminal
+  // Load saved logs from localStorage on mount
+  useEffect(() => { try { const saved = localStorage.getItem('deploy-logs'); if (saved) setLogs(JSON.parse(saved)); } catch {} }, []);
+
+  // Auto-scroll terminal + persist logs
   useEffect(() => {
     if (termRef.current) termRef.current.scrollTop = termRef.current.scrollHeight;
+    if (logs.length > 0) {
+      try { localStorage.setItem('deploy-logs', JSON.stringify(logs.slice(-50))); } catch {}
+    }
   }, [logs]);
 
   // Load deploy history
