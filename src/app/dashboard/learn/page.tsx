@@ -182,6 +182,7 @@ export default function LearnPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [completedSteps, setCompletedSteps] = useState<Record<string, boolean[]>>({});
   const [stats, setStats] = useState({ agents: 0, leads: 0, projects: 0 });
+  const [preview, setPreview] = useState<{ url: string; title: string; missionId: string; stepIdx: number } | null>(null);
 
   // Load real stats from Supabase
   useEffect(() => {
@@ -388,12 +389,41 @@ export default function LearnPage() {
                             <div style={{ fontSize: '0.75rem', fontWeight: 600, color: isDone ? '#64748b' : '#e2e8f0', textDecoration: isDone ? 'line-through' : 'none', marginBottom: 2 }}>{step.title}</div>
                             <div style={{ fontSize: '0.68rem', color: '#94a3b8', lineHeight: 1.5 }}>{step.description}</div>
                             {step.action && !isDone && (
-                              <a href={step.action.href} style={{
-                                display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6,
-                                fontSize: '0.62rem', fontWeight: 700, color: '#00e5b0', textDecoration: 'none',
-                                padding: '3px 10px', borderRadius: 6, background: 'rgba(0,229,176,0.08)',
-                                border: '1px solid rgba(0,229,176,0.15)',
-                              }}>{step.action.label} →</a>
+                              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                                <button onClick={(e) => { e.stopPropagation(); setPreview({ url: step.action!.href, title: step.title, missionId: mission.id, stepIdx: i }); }} style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                                  fontSize: '0.62rem', fontWeight: 700, color: '#00e5b0',
+                                  padding: '3px 10px', borderRadius: 6, background: 'rgba(0,229,176,0.08)',
+                                  border: '1px solid rgba(0,229,176,0.15)', cursor: 'pointer',
+                                }}>▶ {step.action!.label}</button>
+                                <a href={step.action!.href} style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                                  fontSize: '0.62rem', fontWeight: 600, color: '#64748b',
+                                  padding: '3px 10px', borderRadius: 6, textDecoration: 'none',
+                                  border: '1px solid rgba(255,255,255,0.06)',
+                                }}>Abrir ↗</a>
+                              </div>
+                            )}
+                            {/* Inline Preview */}
+                            {preview && preview.missionId === mission.id && preview.stepIdx === i && (
+                              <div style={{ marginTop: 10, borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(0,229,176,0.2)', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(0,229,176,0.04)', borderBottom: '1px solid rgba(0,229,176,0.1)' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e' }} />
+                                    <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#f1f5f9' }}>{preview.title}</span>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.58rem', color: '#64748b', fontFamily: "'JetBrains Mono', monospace" }}>{preview.url}</span>
+                                    <button onClick={() => { toggleStep(mission.id, i); setPreview(null); }} style={{
+                                      fontSize: '0.58rem', padding: '2px 8px', borderRadius: 5,
+                                      background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.2)',
+                                      cursor: 'pointer', fontWeight: 700,
+                                    }}>✓ Completar</button>
+                                    <button onClick={() => setPreview(null)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.8rem' }}>✕</button>
+                                  </div>
+                                </div>
+                                <iframe src={preview.url} style={{ width: '100%', height: 400, border: 'none', background: '#0a0d14' }} title={preview.title} />
+                              </div>
                             )}
                           </div>
                           <span style={{ fontSize: '0.6rem', color: '#475569', flexShrink: 0, marginTop: 2 }}>{step.duration}</span>
