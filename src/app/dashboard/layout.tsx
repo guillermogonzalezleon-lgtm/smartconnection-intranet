@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import CommandBar from '@/components/CommandBar';
 import GlobalTerminal from '@/components/GlobalTerminal';
+import HokuChat from '@/components/HokuChat';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -42,6 +43,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </main>
       <CommandBar />
       <GlobalTerminal />
+      <HokuChat />
     </div>
   );
 }
