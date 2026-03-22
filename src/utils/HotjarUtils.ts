@@ -1,0 +1,1 @@
+// No hay utilidades necesarias para este componente
