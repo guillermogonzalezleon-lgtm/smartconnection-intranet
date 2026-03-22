@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 
     // Generic query
     if (action === 'query' && table) {
-      const allowed = ['leads', 'reuniones', 'analytics', 'agent_logs', 'agent_config', 'ux_insights', 'projects', 'project_tasks'];
+      const allowed = ['leads', 'reuniones', 'analytics', 'agent_logs', 'agent_config', 'ux_insights', 'projects', 'project_tasks', 'hoku_chat'];
       if (!allowed.includes(table)) return NextResponse.json({ error: 'Tabla no permitida' }, { status: 400 });
       const data = await supabaseQuery(table, 'GET', { order: order || 'created_at.desc', limit: limit || 50, filter, offset });
       return NextResponse.json({ data });
@@ -72,6 +72,17 @@ export async function POST(request: Request) {
     // Delete lead
     if (action === 'delete_lead' && body.leadId) {
       await supabaseQuery('leads', 'DELETE', { filter: `id=eq.${body.leadId}` });
+      return NextResponse.json({ success: true });
+    }
+
+    // Insert chat message
+    if (action === 'insert_chat' && body.session_id && body.role && body.content) {
+      await supabaseInsert('hoku_chat', {
+        session_id: body.session_id,
+        role: body.role,
+        content: String(body.content).slice(0, 5000),
+        created_at: new Date().toISOString(),
+      });
       return NextResponse.json({ success: true });
     }
 

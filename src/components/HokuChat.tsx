@@ -7,14 +7,28 @@ interface Message {
   timestamp: Date;
 }
 
+const SESSION_KEY = 'hoku_session_id';
+const WELCOME = '¡Hola! Soy Hoku 🐾, tu asistente IA de Smart Connection. Combino 12 agentes para darte la mejor respuesta. ¿En qué te ayudo?';
+
+function getSessionId(): string {
+  if (typeof window === 'undefined') return 'default';
+  let id = localStorage.getItem(SESSION_KEY);
+  if (!id) { id = crypto.randomUUID(); localStorage.setItem(SESSION_KEY, id); }
+  return id;
+}
+
+const api = (payload: Record<string, unknown>) =>
+  fetch('/api/agents', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json());
+
 export default function HokuChat() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'hoku', content: '¡Hola! Soy Hoku 🐾, tu asistente IA de Smart Connection. Combino 12 agentes para darte la mejor respuesta. ¿En qué te ayudo?', timestamp: new Date() },
+    { role: 'hoku', content: WELCOME, timestamp: new Date() },
   ]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [pulse, setPulse] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -22,9 +36,47 @@ export default function HokuChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
+  // Load chat history from Supabase
+  const loadHistory = useCallback(async () => {
+    if (loaded) return;
+    try {
+      const sessionId = getSessionId();
+      const d = await api({ action: 'query', table: 'hoku_chat', filter: `session_id=eq.${sessionId}`, order: 'created_at.asc', limit: 100 });
+      if (d.data && d.data.length > 0) {
+        const history: Message[] = d.data.map((m: Record<string, unknown>) => ({
+          role: m.role as 'user' | 'hoku',
+          content: m.content as string,
+          timestamp: new Date(m.created_at as string),
+        }));
+        setMessages([{ role: 'hoku', content: WELCOME, timestamp: new Date(history[0].timestamp.getTime() - 1000) }, ...history]);
+      }
+    } catch { /* table may not exist yet */ }
+    setLoaded(true);
+  }, [loaded]);
+
+  // Save message to Supabase (fire-and-forget)
+  const saveMessage = (role: 'user' | 'hoku', content: string) => {
+    const sessionId = getSessionId();
+    api({ action: 'query', table: 'hoku_chat', __insert: true }).catch(() => {});
+    // Use direct insert via supabase
+    fetch('/api/agents', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'insert_chat', session_id: sessionId, role, content }),
+    }).catch(() => {});
+  };
+
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
-  useEffect(() => { if (open && inputRef.current) inputRef.current.focus(); }, [open]);
-  useEffect(() => { if (open) setPulse(false); }, [open]);
+  useEffect(() => { if (open) { setPulse(false); loadHistory(); if (inputRef.current) inputRef.current.focus(); } }, [open, loadHistory]);
+
+  // Build context from recent messages for Hoku
+  const buildContext = (msgs: Message[]): string => {
+    const recent = msgs.filter(m => m.content !== WELCOME).slice(-10);
+    if (recent.length === 0) return '';
+    return '\n\nHISTORIAL RECIENTE DE CONVERSACIÓN:\n' +
+      recent.map(m => `${m.role === 'user' ? 'Usuario' : 'Hoku'}: ${m.content.slice(0, 300)}`).join('\n') +
+      '\n\nUsa este contexto para dar continuidad a la conversación.\n';
+  };
 
   const sendMessage = async () => {
     const text = input.trim();
@@ -34,24 +86,28 @@ export default function HokuChat() {
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setStreaming(true);
+    saveMessage('user', text);
 
-    // Add empty hoku message for streaming
     const hokuMsg: Message = { role: 'hoku', content: '', timestamp: new Date() };
     setMessages(prev => [...prev, hokuMsg]);
+
+    const context = buildContext([...messages, userMsg]);
+    let fullResponse = '';
 
     try {
       const res = await fetch('/api/agents/stream', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: text, taskType: 'general', agentId: 'hoku', chatMode: true }),
+        body: JSON.stringify({ prompt: text + context, taskType: 'general', agentId: 'hoku', chatMode: true }),
       });
 
       if (!res.ok || !res.body) {
         const errText = await res.text().catch(() => '');
+        const errContent = `Error (${res.status}): ${errText || 'No se pudo conectar con Hoku.'}`;
         setMessages(prev => {
           const updated = [...prev];
-          updated[updated.length - 1] = { ...updated[updated.length - 1], content: `Error (${res.status}): ${errText || 'No se pudo conectar con Hoku.'}` };
+          updated[updated.length - 1] = { ...updated[updated.length - 1], content: errContent };
           return updated;
         });
         setStreaming(false);
@@ -76,6 +132,7 @@ export default function HokuChat() {
           try {
             const p = JSON.parse(d);
             if (p.content) {
+              fullResponse += p.content;
               setMessages(prev => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1];
@@ -94,6 +151,8 @@ export default function HokuChat() {
       });
     }
 
+    // Save Hoku response
+    if (fullResponse) saveMessage('hoku', fullResponse);
     setStreaming(false);
   };
 
@@ -101,15 +160,13 @@ export default function HokuChat() {
 
   return (
     <>
-      {/* Chat Window */}
       {open && (
         <div style={{
           position: 'fixed', bottom: 90, right: 24, width: 380, maxHeight: 520,
           background: '#111827', border: '1px solid rgba(255,107,107,0.25)',
           borderRadius: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(255,107,107,0.08)',
           display: 'flex', flexDirection: 'column', zIndex: 999,
-          animation: 'hokuSlideUp 0.25s ease-out',
-          overflow: 'hidden',
+          animation: 'hokuSlideUp 0.25s ease-out', overflow: 'hidden',
         }}>
           {/* Header */}
           <div style={{
