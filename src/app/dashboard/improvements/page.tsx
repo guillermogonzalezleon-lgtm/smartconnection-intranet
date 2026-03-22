@@ -49,6 +49,11 @@ export default function ImprovementsPage() {
   const [selectedItem, setSelectedItem] = useState<Improvement | null>(null);
   const [deploying, setDeploying] = useState<string | null>(null);
   const [deployLog, setDeployLog] = useState<string[]>([]);
+  const [rollingBack, setRollingBack] = useState<string | null>(null);
+  const [rollbackLog, setRollbackLog] = useState<string[]>([]);
+  const [rollbackConfirm, setRollbackConfirm] = useState<string | null>(null);
+  const [showRecentOnly, setShowRecentOnly] = useState(false);
+  const [compareItem, setCompareItem] = useState<string | null>(null);
 
   const api = useCallback((p: Record<string, unknown>) =>
     fetch('/api/agents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }).then(r => r.json()), []);
@@ -66,7 +71,10 @@ export default function ImprovementsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const filtered = filter === 'all' ? improvements : improvements.filter(i => mapEstado(i.estado) === filter);
+  const recentCount = improvements.filter(i => (Date.now() - new Date(i.created_at).getTime()) < 24 * 60 * 60 * 1000).length;
+
+  const baseFiltered = filter === 'all' ? improvements : improvements.filter(i => mapEstado(i.estado) === filter);
+  const filtered = showRecentOnly ? baseFiltered.filter(i => (Date.now() - new Date(i.created_at).getTime()) < 24 * 60 * 60 * 1000) : baseFiltered;
 
   const extractHtml = (text: string): string | null => {
     const htmlMatch = text.match(/```html\s*([\s\S]*?)```/);
@@ -118,6 +126,31 @@ export default function ImprovementsPage() {
     setTimeout(() => { load(); setDeploying(null); setDeployLog([]); }, 2000);
   };
 
+  const rollbackImprovement = async (item: Improvement) => {
+    setRollbackConfirm(null);
+    setRollingBack(item.id);
+    setRollbackLog(['Iniciando rollback...']);
+    setRollbackLog(prev => [...prev, '↩ Revirtiendo estado...']);
+    await deployApi({ action: 'rollback', id: item.id, titulo: item.titulo, agente: item.agente });
+    setRollbackLog(prev => [...prev, '📤 Actualizando en Supabase...']);
+    await api({ action: 'update_insight', insightId: item.id, estado: 'draft' });
+    setRollbackLog(prev => [...prev, '✅ Estado revertido a borrador']);
+    setRollbackLog(prev => [...prev, '🎯 Rollback completado']);
+    setTimeout(() => { load(); setRollingBack(null); setRollbackLog([]); }, 2000);
+  };
+
+  const buildTimeline = (item: Improvement): { icon: string; label: string; time: string }[] => {
+    const steps: { icon: string; label: string; time: string }[] = [];
+    steps.push({ icon: '📝', label: 'Creado', time: `hace ${timeAgo(item.created_at)}` });
+    if (item.estado === 'en_progreso' || item.estado === 'implementado') {
+      steps.push({ icon: '🔄', label: 'En progreso', time: `hace ${timeAgo(item.created_at)}` });
+    }
+    if (item.estado === 'implementado') {
+      steps.push({ icon: '🚀', label: 'Deployado', time: `hace ${timeAgo(item.created_at)}` });
+    }
+    return steps;
+  };
+
   const counts = { all: improvements.length, draft: improvements.filter(i => mapEstado(i.estado) === 'draft').length, preview: 0, approved: improvements.filter(i => mapEstado(i.estado) === 'approved').length, deployed: improvements.filter(i => mapEstado(i.estado) === 'deployed').length };
 
   return (
@@ -152,6 +185,13 @@ export default function ImprovementsPage() {
         <div style={{ display: 'flex', gap: 6, marginBottom: '1rem' }}>
           <button onClick={() => setFilter('all')} style={{ padding: '5px 12px', borderRadius: 6, fontSize: '0.65rem', fontWeight: 600, cursor: 'pointer', background: filter === 'all' ? 'rgba(0,229,176,0.1)' : 'transparent', color: filter === 'all' ? '#00e5b0' : '#475569', border: filter === 'all' ? '1px solid rgba(0,229,176,0.2)' : '1px solid rgba(255,255,255,0.04)', fontFamily: "'Inter', system-ui" }}>Todos ({counts.all})</button>
         </div>
+
+        {recentCount > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '1rem', padding: '10px 16px', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10 }}>
+            <span style={{ fontSize: '0.75rem', color: '#93c5fd' }}>🆕 {recentCount} mejora{recentCount > 1 ? 's' : ''} nueva{recentCount > 1 ? 's' : ''} en las últimas 24h</span>
+            <button onClick={() => setShowRecentOnly(!showRecentOnly)} style={{ marginLeft: 'auto', background: showRecentOnly ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 6, padding: '3px 10px', color: '#3b82f6', fontSize: '0.62rem', cursor: 'pointer', fontWeight: 600, fontFamily: "'Inter', system-ui" }}>{showRecentOnly ? '✕ Mostrar todas' : 'Ver últimas'}</button>
+          </div>
+        )}
 
         {loading && <div style={{ textAlign: 'center', padding: '3rem', color: '#475569', fontSize: '0.78rem' }}><div style={{ width: 20, height: 20, border: '2px solid #1e293b', borderTopColor: '#00e5b0', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 10px' }} />Cargando...</div>}
 
@@ -194,6 +234,8 @@ export default function ImprovementsPage() {
                 {hasHtml && <button onClick={() => { setPreviewHtml(extractHtml(item.descripcion)); setPreviewTitle(item.titulo); }} style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 6, padding: '4px 8px', color: '#3b82f6', fontSize: '0.62rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>👁 Preview</button>}
                 {lifecycle !== 'deployed' && <button onClick={() => deployImprovement(item)} disabled={!!deploying} style={{ background: 'rgba(0,229,176,0.08)', border: '1px solid rgba(0,229,176,0.15)', borderRadius: 6, padding: '4px 8px', color: '#00e5b0', fontSize: '0.62rem', cursor: deploying ? 'not-allowed' : 'pointer', fontFamily: "'Inter', system-ui" }}>🚀 Deploy</button>}
                 {lifecycle === 'deployed' && <a href="https://intranet.smconnection.cl" target="_blank" rel="noopener" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 6, padding: '4px 8px', color: '#22c55e', fontSize: '0.62rem', textDecoration: 'none', fontFamily: "'Inter', system-ui" }}>🔗 Live</a>}
+                {lifecycle === 'deployed' && <button onClick={() => setRollbackConfirm(item.id)} disabled={!!rollingBack} style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 6, padding: '4px 8px', color: '#ef4444', fontSize: '0.62rem', cursor: rollingBack ? 'not-allowed' : 'pointer', fontFamily: "'Inter', system-ui" }}>↩ Rollback</button>}
+                {lifecycle === 'deployed' && <button onClick={() => setCompareItem(compareItem === item.id ? null : item.id)} style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: 6, padding: '4px 8px', color: '#8b5cf6', fontSize: '0.62rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>📊 Antes/Después</button>}
                 <button onClick={() => navigator.clipboard.writeText(item.descripcion)} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 6, padding: '4px 8px', color: '#475569', fontSize: '0.62rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>📋</button>
               </div>
 
@@ -209,6 +251,47 @@ export default function ImprovementsPage() {
                     {deployLog.map((l, i) => <div key={i} style={{ color: l.startsWith('✅') ? '#22c55e' : l.startsWith('❌') ? '#ef4444' : l.startsWith('🎯') ? '#3b82f6' : '#94a3b8' }}>{l}</div>)}
                     {!deployLog.includes('🎯 Completado') && <span style={{ display: 'inline-block', width: 6, height: 12, background: '#00e5b0', animation: 'blink 1s step-end infinite' }} />}
                   </div>
+                </div>
+              )}
+
+              {/* Rollback confirmation */}
+              {rollbackConfirm === item.id && (
+                <div style={{ marginTop: 10, padding: '12px', background: 'rgba(239,68,68,0.06)', borderRadius: 8, border: '1px solid rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: '0.72rem', color: '#fca5a5' }}>¿Revertir esta mejora?</span>
+                  <button onClick={() => rollbackImprovement(item)} style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: '4px 12px', color: '#ef4444', fontSize: '0.62rem', fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>Sí, revertir</button>
+                  <button onClick={() => setRollbackConfirm(null)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '4px 12px', color: '#64748b', fontSize: '0.62rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>Cancelar</button>
+                </div>
+              )}
+
+              {/* Rollback log */}
+              {rollingBack === item.id && (
+                <div style={{ marginTop: 10, padding: '10px', background: '#0a0d14', borderRadius: 8, border: '1px solid rgba(239,68,68,0.1)' }}>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.62rem', lineHeight: 1.7 }}>
+                    {rollbackLog.map((l, i) => <div key={i} style={{ color: l.startsWith('✅') ? '#22c55e' : l.startsWith('🎯') ? '#3b82f6' : '#94a3b8' }}>{l}</div>)}
+                    {!rollbackLog.includes('🎯 Rollback completado') && <span style={{ display: 'inline-block', width: 6, height: 12, background: '#ef4444', animation: 'blink 1s step-end infinite' }} />}
+                  </div>
+                </div>
+              )}
+
+              {/* Comparar antes/después */}
+              {compareItem === item.id && lifecycle === 'deployed' && (
+                <div style={{ marginTop: 10, padding: '12px', background: '#0a0d14', borderRadius: 8, border: '1px solid rgba(139,92,246,0.12)' }}>
+                  <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#8b5cf6', marginBottom: 6 }}>📊 ANTES / DESPUÉS</div>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#e2e8f0', marginBottom: 4 }}>Mejora aplicada:</div>
+                  <div style={{ fontSize: '0.65rem', color: '#94a3b8', lineHeight: 1.6, marginBottom: 10, padding: '8px', background: 'rgba(139,92,246,0.05)', borderRadius: 6, border: '1px solid rgba(139,92,246,0.08)' }}>{item.descripcion.slice(0, 300)}{item.descripcion.length > 300 ? '...' : ''}</div>
+                  <a href="https://intranet.smconnection.cl" target="_blank" rel="noopener" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 6, padding: '5px 12px', color: '#22c55e', fontSize: '0.62rem', textDecoration: 'none', fontWeight: 600, fontFamily: "'Inter', system-ui" }}>🔗 Ver resultado en producción</a>
+                </div>
+              )}
+
+              {/* Timeline */}
+              {selectedItem?.id === item.id && (
+                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap' }}>
+                  {buildTimeline(item).map((step, i, arr) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.58rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>{step.icon} {step.label} {step.time}</span>
+                      {i < arr.length - 1 && <span style={{ margin: '0 6px', color: '#334155', fontSize: '0.55rem' }}>→</span>}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

@@ -214,6 +214,57 @@ export async function POST(request: Request) {
       return NextResponse.json({ repos: repos?.map((r: Record<string, unknown>) => ({ name: r.full_name, url: r.html_url, updated: r.updated_at })) || [] });
     }
 
+    // ── Rollback: revert repo to a previous commit's tree ──
+    if (action === 'rollback' && body.commitSha) {
+      const repo = body.repo || 'guillermogonzalezleon-lgtm/smartconnection-intranet';
+
+      // 1. Get target commit's tree
+      const targetCommit = await githubApi(`/repos/${repo}/git/commits/${body.commitSha}`);
+      if (!targetCommit?.tree?.sha) {
+        return NextResponse.json({ error: 'No se pudo obtener el tree del commit objetivo' }, { status: 400 });
+      }
+
+      // 2. Get current HEAD
+      const head = await githubApi(`/repos/${repo}/git/refs/heads/main`);
+      const currentSha = head?.object?.sha;
+      if (!currentSha) {
+        return NextResponse.json({ error: 'No se pudo obtener el HEAD actual' }, { status: 400 });
+      }
+
+      // 3. Create new commit with old tree
+      const newCommit = await githubApi(`/repos/${repo}/git/commits`, {
+        method: 'POST',
+        body: JSON.stringify({
+          message: `revert: rollback to ${body.commitSha.slice(0, 7)} — ${body.message || 'manual rollback'}`,
+          tree: targetCommit.tree.sha,
+          parents: [currentSha],
+        }),
+      });
+      if (!newCommit?.sha) {
+        return NextResponse.json({ error: 'No se pudo crear el commit de rollback' }, { status: 500 });
+      }
+
+      // 4. Update main branch
+      const refUpdate = await githubApi(`/repos/${repo}/git/refs/heads/main`, {
+        method: 'PATCH',
+        body: JSON.stringify({ sha: newCommit.sha, force: false }),
+      });
+      if (!refUpdate?.object?.sha) {
+        return NextResponse.json({ error: 'No se pudo actualizar la ref de main' }, { status: 500 });
+      }
+
+      // 5. Log to Supabase
+      await supabaseInsert('agent_logs', {
+        agent_id: 'deployer',
+        agent_name: 'Deploy Bot',
+        action: 'rollback',
+        detail: `Rollback to ${body.commitSha.slice(0, 7)} on ${repo} — new commit: ${newCommit.sha.slice(0, 7)}`,
+        status: 'success',
+      }).catch(() => {});
+
+      return NextResponse.json({ success: true, sha: newCommit.sha });
+    }
+
     return NextResponse.json({ error: 'Acción no válida' }, { status: 400 });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

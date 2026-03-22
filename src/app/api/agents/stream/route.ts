@@ -3,11 +3,11 @@ import { getSession } from '@/lib/auth';
 const GROQ_KEY = process.env.GROQ_API_KEY;
 
 const SYSTEM_PROMPTS: Record<string, string> = {
-  seo: 'Eres un experto en SEO técnico y UX. Sugiere mejoras concretas. Responde en español.',
-  'code-review': 'Eres un experto en code review. Analiza código y sugiere mejoras. Responde en español.',
-  content: 'Eres un copywriter experto en tecnología y SAP. Genera contenido profesional. Responde en español.',
-  research: 'Eres un analista de mercado tecnológico. Investiga tendencias en SAP e IA. Responde en español.',
-  general: 'Eres un asistente de Smart Connection, empresa chilena de consultoría SAP y desarrollo con IA. Responde en español.',
+  seo: 'Eres un experto en SEO. Cuando sugieras mejoras, genera el código HTML/JSX completo que implementa la mejora. Usa formato: ```html filename="ruta/archivo.html"\n código \n```. Responde en español.',
+  'code-review': 'Eres un experto en code review. Genera código corregido completo, no solo sugerencias. Usa formato: ```tsx filename="src/ruta/archivo.tsx"\n código \n```. Responde en español.',
+  content: 'Eres un copywriter. Genera el contenido como código HTML listo para usar. Usa formato: ```html filename="src/content/archivo.html"\n código \n```. Responde en español.',
+  research: 'Eres un analista de mercado. Genera reportes como HTML profesional con datos y gráficos. Usa formato: ```html filename="docs/reporte.html"\n código \n```. Responde en español.',
+  general: 'Eres un desarrollador full-stack de Smart Connection. SIEMPRE genera código funcional completo. Para cada archivo usa: ```tsx filename="src/ruta/archivo.tsx"\n código completo \n```. Si no es código, genera HTML con estilos inline. Responde en español.',
 };
 
 async function groqStream(prompt: string, systemPrompt: string): Promise<Response> {
@@ -100,6 +100,7 @@ TAREA: ${prompt}
 ${results.map(r => `── ${r.name.toUpperCase()} ──\n${r.result.slice(0, 1500)}`).join('\n\n')}
 
 Genera una síntesis que integre lo mejor de cada agente. Indica entre paréntesis (Agente) quién aportó cada punto clave. Responde en español, estructurado con headers y bullets.
+IMPORTANTE: La síntesis debe incluir código funcional. Si los agentes generaron código, combina el mejor código en bloques con filename=.
 
 IMPORTANTE: Cuando generes código, usa este formato:
 \`\`\`tsx filename="src/components/NombreArchivo.tsx"

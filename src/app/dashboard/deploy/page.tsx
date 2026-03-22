@@ -274,20 +274,20 @@ export default function DeployCenter() {
     // Step 1: Build
     const buildOk = await runStep('build', async () => {
       if (source === 'rollback') {
-        addLog('[build] Creando revert commit...', undefined, 'build');
-        // Create a revert commit via GitHub API
+        addLog('[build] Ejecutando rollback real via GitHub API...', undefined, 'build');
+        addLog(`[build] Revirtiendo al tree del commit ${rollbackTarget}`, undefined, 'build');
+        // Real rollback: create a new commit that points to the old commit's tree
         const res = await deployApi({
-          action: 'commit_file',
+          action: 'rollback',
           repo: REPO_FULL,
-          path: '.rollback-trigger',
-          content: JSON.stringify({ rollbackTo: rollbackTarget, timestamp: new Date().toISOString() }),
-          message: `revert: rollback to ${rollbackTarget}`,
+          commitSha: rollbackTarget,
+          message: 'rollback desde Deploy Center',
         });
         if (res.success) {
-          addLog('[build] Revert commit creado exitosamente', 'success', 'build');
-          addLog(`[build] Message: revert: rollback to ${rollbackTarget}`, undefined, 'build');
+          addLog('[build] Rollback commit creado exitosamente', 'success', 'build');
+          addLog(`[build] Nuevo commit: ${res.sha?.slice(0, 7) || 'ok'}`, undefined, 'build');
         } else {
-          addLog(`[error] Fallo al crear revert commit: ${res.error || 'Unknown'}`, 'error', 'build');
+          addLog(`[error] Fallo en rollback: ${res.error || 'Unknown'}`, 'error', 'build');
           return false;
         }
       } else {
