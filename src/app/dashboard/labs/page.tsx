@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface Connector {
@@ -81,6 +81,7 @@ export default function LabsPage() {
   const router = useRouter();
   const [tab, setTab] = useState('Conectores');
   const [search, setSearch] = useState('');
+  const [searchDebounced, setSearchDebounced] = useState('');
   const [catFilter, setCatFilter] = useState('Todas');
   const [statusFilter, setStatusFilter] = useState('all');
   const [detail, setDetail] = useState<Connector | null>(null);
@@ -90,6 +91,11 @@ export default function LabsPage() {
   const [testResult, setTestResult] = useState<string | null>(null);
   const [nextSteps, setNextSteps] = useState(false);
   const [connecting, setConnecting] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchDebounced(search), 200);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const categories = ['Todas', ...Array.from(new Set(CONNECTORS.map(c => c.category)))];
 
@@ -103,7 +109,7 @@ export default function LabsPage() {
   const filtered = CONNECTORS.filter(c => {
     if (catFilter !== 'Todas' && c.category !== catFilter) return false;
     if (statusFilter !== 'all' && c.status !== statusFilter) return false;
-    if (search && !c.name.toLowerCase().includes(search.toLowerCase()) && !c.description.toLowerCase().includes(search.toLowerCase())) return false;
+    if (searchDebounced && !c.name.toLowerCase().includes(searchDebounced.toLowerCase()) && !c.description.toLowerCase().includes(searchDebounced.toLowerCase())) return false;
     return true;
   }).sort((a, b) => (b.businessValue || 0) - (a.businessValue || 0));
 

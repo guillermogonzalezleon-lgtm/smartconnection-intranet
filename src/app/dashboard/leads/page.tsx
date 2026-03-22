@@ -113,6 +113,17 @@ export default function LeadsPage() {
     return sortDir === 'asc' ? ' ▲' : ' ▼';
   };
 
+  const exportCSV = () => {
+    const headers = ['Nombre', 'Empresa', 'Email', 'Teléfono', 'Servicio', 'Estado', 'Fecha'];
+    const rows = leads.map(l => [l.nombre, l.empresa, l.email, l.telefono, l.servicio, l.estado, l.created_at].map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `leads-${new Date().toISOString().split('T')[0]}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const inputStyle: React.CSSProperties = {
     background: 'rgba(255,255,255,0.06)',
     border: '1px solid rgba(255,255,255,0.1)',
@@ -131,7 +142,12 @@ export default function LeadsPage() {
         Intranet <span style={{ margin: '0 8px', color: '#475569' }}>/</span> <span style={{ color: '#fff', fontWeight: 600 }}>Leads & CRM</span>
       </div>
       <div style={{ padding: '1.5rem 2rem' }}>
-        <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Buscar por nombre o email..." style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '8px 14px', color: '#fff', fontSize: '0.8rem', width: 300, marginBottom: 16, outline: 'none', fontFamily: "'Inter', system-ui" }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Buscar por nombre o email..." style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '8px 14px', color: '#fff', fontSize: '0.8rem', width: 300, outline: 'none', fontFamily: "'Inter', system-ui" }} />
+          <button onClick={exportCSV} style={{ background: 'rgba(0,229,176,0.1)', color: '#00e5b0', border: '1px solid rgba(0,229,176,0.2)', borderRadius: 8, padding: '8px 16px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', system-ui", whiteSpace: 'nowrap', transition: 'all 0.15s' }}>
+            Exportar CSV
+          </button>
+        </div>
         <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr style={{ textAlign: 'left' }}>

@@ -10,8 +10,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <Sidebar user={session.user || 'Admin'} />
-      <main style={{
+      <Sidebar user={session.user || 'Admin'} role="navigation" aria-label="Sidebar" />
+      <main role="main" aria-label="Dashboard content" style={{
         flex: 1,
         marginLeft: 64,
         minHeight: '100vh',
@@ -34,6 +34,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
           @keyframes fadeInUp {
             from { opacity: 0; transform: translateY(4px); }
             to { opacity: 1; transform: translateY(0); }
+          }
+          @media (max-width: 768px) {
+            main { margin-left: 0 !important; }
           }
         `}</style>
       </main>

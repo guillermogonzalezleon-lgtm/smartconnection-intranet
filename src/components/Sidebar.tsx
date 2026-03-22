@@ -2,11 +2,20 @@
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 
-export default function Sidebar({ user }: { user: string }) {
+export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user: string; role?: string; 'aria-label'?: string }) {
   const [expanded, setExpanded] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem('sc-theme') as 'dark' | 'light' | null;
@@ -29,7 +38,8 @@ export default function Sidebar({ user }: { user: string }) {
     fetch('/api/auth', { method: 'DELETE' }).then(() => { window.location.href = '/'; });
   };
 
-  const w = expanded ? 240 : 64;
+  const w = isMobile ? (mobileOpen ? 240 : 0) : (expanded ? 240 : 64);
+  const showExpanded = isMobile ? mobileOpen : expanded;
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard';
@@ -64,14 +74,14 @@ export default function Sidebar({ user }: { user: string }) {
       display: 'flex',
       alignItems: 'center',
       gap: 10,
-      padding: expanded ? '8px 10px' : '10px 0',
+      padding: showExpanded ? '8px 10px' : '10px 0',
       borderRadius: 8,
       color: active ? '#00e5b0' : hovered ? '#cbd5e1' : '#94a3b8',
       fontSize: '0.78rem',
       fontWeight: active ? 600 : 500,
       textDecoration: 'none',
       marginBottom: 2,
-      justifyContent: expanded ? 'flex-start' : 'center',
+      justifyContent: showExpanded ? 'flex-start' : 'center',
       whiteSpace: 'nowrap',
       overflow: 'hidden',
       position: 'relative',
@@ -86,9 +96,55 @@ export default function Sidebar({ user }: { user: string }) {
   };
 
   return (
+    <>
+    {/* Hamburger button - mobile only */}
+    {isMobile && !mobileOpen && (
+      <button
+        onClick={() => setMobileOpen(true)}
+        style={{
+          position: 'fixed',
+          top: 10,
+          left: 10,
+          zIndex: 110,
+          background: '#111827',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 8,
+          color: '#94a3b8',
+          fontSize: '1.3rem',
+          width: 40,
+          height: 40,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        aria-label="Abrir menu"
+      >
+        &#9776;
+      </button>
+    )}
+
+    {/* Backdrop - mobile only */}
+    {isMobile && mobileOpen && (
+      <div
+        onClick={() => setMobileOpen(false)}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.6)',
+          zIndex: 99,
+        }}
+      />
+    )}
+
     <aside
-      onMouseEnter={() => setExpanded(true)}
-      onMouseLeave={() => { setExpanded(false); setHoveredItem(null); }}
+      role={role}
+      aria-label={ariaLabel}
+      onMouseEnter={() => !isMobile && setExpanded(true)}
+      onMouseLeave={() => { if (!isMobile) { setExpanded(false); setHoveredItem(null); } }}
       style={{
         width: w,
         minWidth: w,
@@ -104,17 +160,17 @@ export default function Sidebar({ user }: { user: string }) {
         fontFamily: "'Inter', system-ui, sans-serif",
         transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease',
         overflow: 'hidden',
-        boxShadow: expanded ? '8px 0 40px rgba(0,0,0,0.6)' : 'none',
+        boxShadow: (showExpanded || mobileOpen) ? '8px 0 40px rgba(0,0,0,0.6)' : 'none',
       }}
     >
       {/* Logo */}
-      <div style={{ padding: expanded ? '1.25rem 1rem' : '1.25rem 0.5rem', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.06)', justifyContent: expanded ? 'flex-start' : 'center', transition: 'padding 0.25s' }}>
+      <div style={{ padding: showExpanded ? '1.25rem 1rem' : '1.25rem 0.5rem', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.06)', justifyContent: showExpanded ? 'flex-start' : 'center', transition: 'padding 0.25s' }}>
         <img src="/img/logo_smart.svg" alt="SC" style={{ height: 24, flexShrink: 0 }} />
-        {expanded && <span style={{ background: '#00e5b0', color: '#0a0d14', fontSize: '0.5rem', fontWeight: 800, padding: '2px 6px', borderRadius: 999, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>INTRANET</span>}
+        {showExpanded && <span style={{ background: '#00e5b0', color: '#0a0d14', fontSize: '0.5rem', fontWeight: 800, padding: '2px 6px', borderRadius: 999, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>INTRANET</span>}
       </div>
 
       {/* Command Search Trigger */}
-      {expanded ? (
+      {showExpanded ? (
         <div style={{ padding: '0.75rem 0.75rem 0' }}>
           <button
             style={{
@@ -167,18 +223,19 @@ export default function Sidebar({ user }: { user: string }) {
 
       {/* Nav */}
       <div style={{ padding: '0.75rem 0.5rem', flex: 1 }}>
-        {expanded && <div style={{ fontSize: '0.55rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '0 8px', marginBottom: 6 }}>Principal</div>}
+        {showExpanded && <div style={{ fontSize: '0.55rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '0 8px', marginBottom: 6 }}>Principal</div>}
         {navItems.map(item => (
           <a
             key={item.href}
             href={item.href}
             style={navLinkStyle(item.href)}
-            title={!expanded ? item.label : undefined}
+            title={!showExpanded ? item.label : undefined}
             onMouseEnter={() => setHoveredItem(item.href)}
             onMouseLeave={() => setHoveredItem(null)}
+            onClick={() => isMobile && setMobileOpen(false)}
           >
             <i className={`bi ${item.icon}`} style={{ fontSize: '1.1rem', width: 22, textAlign: 'center', flexShrink: 0 }}></i>
-            {expanded && (
+            {showExpanded && (
               <>
                 <span style={{ flex: 1 }}>{item.label}</span>
                 <kbd style={{
@@ -198,24 +255,25 @@ export default function Sidebar({ user }: { user: string }) {
         ))}
 
         <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }}></div>
-        {expanded && <div style={{ fontSize: '0.55rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '0 8px', marginBottom: 6 }}>Infra</div>}
+        {showExpanded && <div style={{ fontSize: '0.55rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '0 8px', marginBottom: 6 }}>Infra</div>}
         {infraItems.map(item => (
           <a
             key={item.href}
             href={item.href}
             style={navLinkStyle(item.href)}
-            title={!expanded ? item.label : undefined}
+            title={!showExpanded ? item.label : undefined}
             onMouseEnter={() => setHoveredItem(item.href)}
             onMouseLeave={() => setHoveredItem(null)}
+            onClick={() => isMobile && setMobileOpen(false)}
           >
             <i className={`bi ${item.icon}`} style={{ fontSize: '1.1rem', width: 22, textAlign: 'center', flexShrink: 0, color: isActive(item.href) ? '#00e5b0' : item.iconColor }}></i>
-            {expanded && <span>{item.label}</span>}
+            {showExpanded && <span>{item.label}</span>}
           </a>
         ))}
       </div>
 
       {/* Status */}
-      {expanded && (
+      {showExpanded && (
         <div style={{ padding: '0.5rem 0.75rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           {statusItems.map(s => (
             <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 6px', fontSize: '0.65rem', color: '#64748b' }}>
@@ -227,8 +285,8 @@ export default function Sidebar({ user }: { user: string }) {
       )}
 
       {/* Theme Toggle */}
-      <div style={{ padding: expanded ? '6px 12px' : '6px 0', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: expanded ? 'flex-start' : 'center', gap: 8 }}>
-        {expanded ? (
+      <div style={{ padding: showExpanded ? '6px 12px' : '6px 0', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: showExpanded ? 'flex-start' : 'center', gap: 8 }}>
+        {showExpanded ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 2, width: '100%' }}>
             <button onClick={() => setTheme('dark')} style={{
               flex: 1, padding: '5px 0', borderRadius: 6, border: 'none', cursor: 'pointer',
@@ -263,11 +321,11 @@ export default function Sidebar({ user }: { user: string }) {
       </div>
 
       {/* User */}
-      <div style={{ padding: expanded ? '0.75rem' : '0.75rem 0', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10, justifyContent: expanded ? 'flex-start' : 'center' }}>
+      <div style={{ padding: showExpanded ? '0.75rem' : '0.75rem 0', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10, justifyContent: showExpanded ? 'flex-start' : 'center' }}>
         <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(0,229,176,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', color: '#00e5b0', fontWeight: 700, flexShrink: 0 }}>
           {user.charAt(0).toUpperCase()}
         </div>
-        {expanded && (
+        {showExpanded && (
           <>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.split('@')[0]}</div>
@@ -279,5 +337,6 @@ export default function Sidebar({ user }: { user: string }) {
         )}
       </div>
     </aside>
+    </>
   );
 }

@@ -3,6 +3,9 @@ import { useEffect, useState, useCallback } from 'react';
 
 type Period = 'today' | '7d' | '30d' | 'all';
 
+const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
+  Promise.race([promise, new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))]);
+
 export default function AnalyticsPage() {
   const [analytics, setAnalytics] = useState<Record<string, unknown>[]>([]);
   const [leadsCount, setLeadsCount] = useState(0);
@@ -10,6 +13,7 @@ export default function AnalyticsPage() {
   const [period, setPeriod] = useState<Period>('30d');
   const [hoveredKpi, setHoveredKpi] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const api = useCallback(
     (p: Record<string, unknown>) =>
@@ -23,18 +27,22 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      api({ action: 'query', table: 'analytics', order: 'created_at.desc', limit: 2000 }).then((d) => {
-        if (d.data) setAnalytics(d.data);
-      }),
-      api({ action: 'query', table: 'leads', limit: 1000 }).then((d) => {
-        if (d.data) setLeadsCount(d.data.length);
-      }),
-      api({ action: 'query', table: 'reuniones', limit: 1000 }).then((d) => {
-        if (d.data) setMeetingsCount(d.data.length);
-      }),
-    ])
-      .catch(() => {})
+    setError(false);
+    withTimeout(
+      Promise.all([
+        api({ action: 'query', table: 'analytics', order: 'created_at.desc', limit: 2000 }).then((d) => {
+          if (d.data) setAnalytics(d.data);
+        }),
+        api({ action: 'query', table: 'leads', limit: 1000 }).then((d) => {
+          if (d.data) setLeadsCount(d.data.length);
+        }),
+        api({ action: 'query', table: 'reuniones', limit: 1000 }).then((d) => {
+          if (d.data) setMeetingsCount(d.data.length);
+        }),
+      ]),
+      10000
+    )
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [api]);
 
@@ -209,6 +217,24 @@ export default function AnalyticsPage() {
           >
             <i className="bi bi-arrow-repeat" style={{ animation: 'spin 1s linear infinite' }} />
             Cargando datos...
+          </div>
+        )}
+
+        {/* Error state */}
+        {error && !loading && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 10,
+              padding: '2rem',
+              color: '#ef4444',
+              fontSize: '0.85rem',
+            }}
+          >
+            <i className="bi bi-exclamation-triangle" />
+            Error cargando datos
           </div>
         )}
 

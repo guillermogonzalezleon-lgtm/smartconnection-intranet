@@ -200,7 +200,7 @@ export default function GlobalTerminal() {
   };
 
   return (
-    <div style={{
+    <div className="global-terminal-wrap" style={{
       position: 'fixed', bottom: 0, left: 64, right: 0, zIndex: 90,
       height: typeof height === 'string' ? height : height,
       background: '#0d1117', borderTop: '1px solid rgba(255,255,255,0.08)',
@@ -307,6 +307,9 @@ export default function GlobalTerminal() {
       <style>{`
         @keyframes blink { 0%,100% { opacity:1 } 50% { opacity:0 } }
         @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.4 } }
+        @media (max-width: 768px) {
+          .global-terminal-wrap { left: 0 !important; }
+        }
       `}</style>
     </div>
   );
