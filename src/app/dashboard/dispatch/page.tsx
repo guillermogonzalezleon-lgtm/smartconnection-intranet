@@ -139,29 +139,45 @@ export default function DispatchPage() {
     addLog('VOICE', '#f59e0b', 'Escuchando...');
   }, [voiceState]);
 
-  // Preload voices (Chrome loads async)
-  useEffect(() => {
-    if (window.speechSynthesis) {
-      window.speechSynthesis.getVoices();
-      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
-    }
-  }, []);
+  // Voice - speak response via OpenAI TTS (natural voice)
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Voice - speak response
-  const speak = useCallback((text: string) => {
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const clean = text.replace(/```[\s\S]*?```/g, 'código generado').replace(/[#*_`→✓●◌⟳🐾🔍🚀👥💼⚡📊]/g, '').replace(/https?:\/\/\S+/g, '').replace(/\n{2,}/g, '. ').slice(0, 800);
-    if (clean.trim().length < 10) return;
-    const u = new SpeechSynthesisUtterance(clean);
-    u.lang = 'es-CL'; u.rate = 1.05; u.pitch = 1;
-    const voices = window.speechSynthesis.getVoices();
-    const esVoice = voices.find((v: any) => v.lang === 'es-CL') || voices.find((v: any) => v.lang.startsWith('es')) || voices[0];
-    if (esVoice) u.voice = esVoice;
-    u.onstart = () => setVoiceState('speaking');
-    u.onend = () => setVoiceState('idle');
-    u.onerror = () => setVoiceState('idle');
-    window.speechSynthesis.speak(u);
+  const speak = useCallback(async (text: string) => {
+    if (text.trim().length < 10) return;
+    setVoiceState('speaking');
+    addLog('VOICE', '#22c55e', '🔊 Generando audio...');
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, voice: 'nova' }),
+      });
+      if (!res.ok) {
+        // Fallback to browser TTS
+        addLog('VOICE', '#f59e0b', 'OpenAI TTS no disponible, usando browser');
+        if (window.speechSynthesis) {
+          const clean = text.replace(/```[\s\S]*?```/g, '').replace(/[#*_`]/g, '').slice(0, 600);
+          const u = new SpeechSynthesisUtterance(clean);
+          u.lang = 'es-CL'; u.rate = 1.05;
+          u.onend = () => setVoiceState('idle');
+          window.speechSynthesis.speak(u);
+        } else {
+          setVoiceState('idle');
+        }
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      if (audioRef.current) { audioRef.current.pause(); URL.revokeObjectURL(audioRef.current.src); }
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => { setVoiceState('idle'); URL.revokeObjectURL(url); };
+      audio.onerror = () => { setVoiceState('idle'); URL.revokeObjectURL(url); };
+      audio.play();
+      addLog('VOICE', '#22c55e', '🔊 Hoku hablando (OpenAI TTS)');
+    } catch {
+      setVoiceState('idle');
+    }
   }, []);
 
   // Send message
@@ -292,6 +308,7 @@ export default function DispatchPage() {
       recognitionRef.current?.stop();
       setVoiceState('idle');
     } else if (voiceState === 'speaking') {
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
       window.speechSynthesis?.cancel();
       setVoiceState('idle');
     } else if (voiceState === 'idle') {
