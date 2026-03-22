@@ -139,17 +139,28 @@ export default function DispatchPage() {
     addLog('VOICE', '#f59e0b', 'Escuchando...');
   }, [voiceState]);
 
+  // Preload voices (Chrome loads async)
+  useEffect(() => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+    }
+  }, []);
+
   // Voice - speak response
   const speak = useCallback((text: string) => {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
-    const clean = text.replace(/```[\s\S]*?```/g, '').replace(/[#*_`]/g, '').replace(/https?:\/\/\S+/g, '').slice(0, 600);
+    const clean = text.replace(/```[\s\S]*?```/g, 'código generado').replace(/[#*_`→✓●◌⟳🐾🔍🚀👥💼⚡📊]/g, '').replace(/https?:\/\/\S+/g, '').replace(/\n{2,}/g, '. ').slice(0, 800);
+    if (clean.trim().length < 10) return;
     const u = new SpeechSynthesisUtterance(clean);
-    u.lang = 'es-CL'; u.rate = 1.1;
-    const v = window.speechSynthesis.getVoices().find((v: any) => v.lang.startsWith('es'));
-    if (v) u.voice = v;
+    u.lang = 'es-CL'; u.rate = 1.05; u.pitch = 1;
+    const voices = window.speechSynthesis.getVoices();
+    const esVoice = voices.find((v: any) => v.lang === 'es-CL') || voices.find((v: any) => v.lang.startsWith('es')) || voices[0];
+    if (esVoice) u.voice = esVoice;
     u.onstart = () => setVoiceState('speaking');
     u.onend = () => setVoiceState('idle');
+    u.onerror = () => setVoiceState('idle');
     window.speechSynthesis.speak(u);
   }, []);
 
@@ -270,7 +281,7 @@ export default function DispatchPage() {
     }
 
     // Voice speak
-    if (chatMode === 'voice' && fullText) speak(fullText);
+    if (fullText) speak(fullText);
     setStreaming(false);
     if (voiceState === 'processing') setVoiceState('idle');
   };
