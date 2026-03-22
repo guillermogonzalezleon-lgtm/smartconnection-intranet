@@ -23,6 +23,8 @@ export default function AWSPage() {
   const [deploys, setDeploys] = useState<DeployLog[]>([]);
   const [invalidating, setInvalidating] = useState(false);
   const [invalidateMsg, setInvalidateMsg] = useState('');
+  const [deploySortBy, setDeploySortBy] = useState<'action' | 'status' | 'date'>('date');
+  const [deploySortDir, setDeploySortDir] = useState<'asc' | 'desc'>('desc');
   const metricsRef = useRef<HTMLDivElement>(null);
   const logsRef = useRef<HTMLDivElement>(null);
 
@@ -77,6 +79,19 @@ export default function AWSPage() {
   };
 
   const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  const toggleDeploySort = (col: 'action' | 'status' | 'date') => {
+    if (deploySortBy === col) setDeploySortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setDeploySortBy(col); setDeploySortDir(col === 'date' ? 'desc' : 'asc'); }
+  };
+  const sortArrow = (active: boolean, dir: 'asc' | 'desc') => active ? (dir === 'asc' ? ' ▲' : ' ▼') : '';
+
+  const sortedDeploys = [...deploys].sort((a, b) => {
+    const dir = deploySortDir === 'asc' ? 1 : -1;
+    if (deploySortBy === 'action') return dir * (a.action || '').localeCompare(b.action || '');
+    if (deploySortBy === 'status') return dir * (a.status || '').localeCompare(b.status || '');
+    return dir * ((a.created_at || '').localeCompare(b.created_at || ''));
+  });
 
   const timeAgo = (date: string) => {
     const diff = Date.now() - new Date(date).getTime();
@@ -227,14 +242,14 @@ export default function AWSPage() {
           ) : (
             <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
               {/* Table Header */}
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1fr', padding: '10px 16px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: '0.68rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                <div>Acción</div>
-                <div>Detalle</div>
-                <div style={{ textAlign: 'center' }}>Status</div>
-                <div style={{ textAlign: 'right' }}>Fecha</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1fr', padding: '10px 16px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div onClick={() => toggleDeploySort('action')} style={{ color: deploySortBy === 'action' ? '#00e5b0' : '#64748b', cursor: 'pointer', userSelect: 'none' }}>Acción{sortArrow(deploySortBy === 'action', deploySortDir)}</div>
+                <div style={{ color: '#64748b' }}>Detalle</div>
+                <div onClick={() => toggleDeploySort('status')} style={{ textAlign: 'center', color: deploySortBy === 'status' ? '#00e5b0' : '#64748b', cursor: 'pointer', userSelect: 'none' }}>Status{sortArrow(deploySortBy === 'status', deploySortDir)}</div>
+                <div onClick={() => toggleDeploySort('date')} style={{ textAlign: 'right', color: deploySortBy === 'date' ? '#00e5b0' : '#64748b', cursor: 'pointer', userSelect: 'none' }}>Fecha{sortArrow(deploySortBy === 'date', deploySortDir)}</div>
               </div>
-              {deploys.map((d, i) => (
-                <div key={d.id || i} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1fr', padding: '12px 16px', borderBottom: i < deploys.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', alignItems: 'center' }}>
+              {sortedDeploys.map((d, i) => (
+                <div key={d.id || i} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1fr', padding: '12px 16px', borderBottom: i < sortedDeploys.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', alignItems: 'center' }}>
                   <div style={{ fontSize: '0.78rem', color: '#e2e8f0', fontWeight: 500 }}>{d.action || 'deploy'}</div>
                   <div style={{ fontSize: '0.75rem', color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.detail || '—'}</div>
                   <div style={{ textAlign: 'center' }}>

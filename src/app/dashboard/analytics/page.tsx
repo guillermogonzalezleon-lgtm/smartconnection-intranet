@@ -14,6 +14,10 @@ export default function AnalyticsPage() {
   const [hoveredKpi, setHoveredKpi] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [pagesSortBy, setPagesSortBy] = useState<'page' | 'count'>('count');
+  const [pagesSortDir, setPagesSortDir] = useState<'asc' | 'desc'>('desc');
+  const [sourcesSortBy, setSourcesSortBy] = useState<'name' | 'count'>('count');
+  const [sourcesSortDir, setSourcesSortDir] = useState<'asc' | 'desc'>('desc');
 
   const api = useCallback(
     (p: Record<string, unknown>) =>
@@ -75,6 +79,10 @@ export default function AnalyticsPage() {
     sources[s] = (sources[s] || 0) + 1;
   });
   const sortedSources = Object.entries(sources).sort((a, b) => b[1] - a[1]);
+  const displaySources = [...sortedSources].sort((a, b) => {
+    if (sourcesSortBy === 'name') return sourcesSortDir === 'asc' ? a[0].localeCompare(b[0]) : b[0].localeCompare(a[0]);
+    return sourcesSortDir === 'asc' ? a[1] - b[1] : b[1] - a[1];
+  });
   const maxSource = sortedSources[0]?.[1] || 1;
   const totalSourceHits = sortedSources.reduce((sum, [, c]) => sum + c, 0);
 
@@ -85,6 +93,20 @@ export default function AnalyticsPage() {
     pages[p] = (pages[p] || 0) + 1;
   });
   const sortedPages = Object.entries(pages).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const displayPages = [...sortedPages].sort((a, b) => {
+    if (pagesSortBy === 'page') return pagesSortDir === 'asc' ? a[0].localeCompare(b[0]) : b[0].localeCompare(a[0]);
+    return pagesSortDir === 'asc' ? a[1] - b[1] : b[1] - a[1];
+  });
+
+  const togglePagesSort = (col: 'page' | 'count') => {
+    if (pagesSortBy === col) setPagesSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setPagesSortBy(col); setPagesSortDir(col === 'count' ? 'desc' : 'asc'); }
+  };
+  const toggleSourcesSort = (col: 'name' | 'count') => {
+    if (sourcesSortBy === col) setSourcesSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSourcesSortBy(col); setSourcesSortDir(col === 'count' ? 'desc' : 'asc'); }
+  };
+  const sortArrow = (active: boolean, dir: 'asc' | 'desc') => active ? (dir === 'asc' ? ' ▲' : ' ▼') : '';
 
   // Devices
   const mobileCount = filtered.filter((e) => {
@@ -392,7 +414,24 @@ export default function AnalyticsPage() {
               <EmptyState icon="bi-diagram-3" text="Sin datos de tráfico en este período" />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {sortedSources.slice(0, 8).map(([name, count]) => {
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+                  <div style={{ width: 28, flexShrink: 0 }} />
+                  <span
+                    onClick={() => toggleSourcesSort('name')}
+                    style={{ fontSize: '0.68rem', color: sourcesSortBy === 'name' ? '#00e5b0' : '#475569', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', minWidth: 70, cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    Fuente{sortArrow(sourcesSortBy === 'name', sourcesSortDir)}
+                  </span>
+                  <div style={{ flex: 1 }} />
+                  <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', minWidth: 50, textAlign: 'right' }}>%</span>
+                  <span
+                    onClick={() => toggleSourcesSort('count')}
+                    style={{ fontSize: '0.68rem', color: sourcesSortBy === 'count' ? '#00e5b0' : '#475569', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', minWidth: 30, textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    Hits{sortArrow(sourcesSortBy === 'count', sourcesSortDir)}
+                  </span>
+                </div>
+                {displaySources.slice(0, 8).map(([name, count]) => {
                   const pct = totalSourceHits > 0 ? ((count / totalSourceHits) * 100).toFixed(1) : '0';
                   const barColor = sourceColor(name);
                   return (
@@ -523,37 +562,43 @@ export default function AnalyticsPage() {
                       #
                     </th>
                     <th
+                      onClick={() => togglePagesSort('page')}
                       style={{
                         textAlign: 'left',
                         padding: '8px 12px',
                         fontSize: '0.68rem',
-                        color: '#475569',
+                        color: pagesSortBy === 'page' ? '#00e5b0' : '#475569',
                         fontWeight: 600,
                         textTransform: 'uppercase',
                         letterSpacing: '0.06em',
                         borderBottom: '1px solid rgba(255,255,255,0.06)',
+                        cursor: 'pointer',
+                        userSelect: 'none',
                       }}
                     >
-                      Página
+                      Página{sortArrow(pagesSortBy === 'page', pagesSortDir)}
                     </th>
                     <th
+                      onClick={() => togglePagesSort('count')}
                       style={{
                         textAlign: 'right',
                         padding: '8px 12px',
                         fontSize: '0.68rem',
-                        color: '#475569',
+                        color: pagesSortBy === 'count' ? '#00e5b0' : '#475569',
                         fontWeight: 600,
                         textTransform: 'uppercase',
                         letterSpacing: '0.06em',
                         borderBottom: '1px solid rgba(255,255,255,0.06)',
+                        cursor: 'pointer',
+                        userSelect: 'none',
                       }}
                     >
-                      Visitas
+                      Visitas{sortArrow(pagesSortBy === 'count', pagesSortDir)}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedPages.map(([page, count], idx) => (
+                  {displayPages.map(([page, count], idx) => (
                     <tr key={page}>
                       <td
                         style={{

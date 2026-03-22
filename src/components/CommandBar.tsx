@@ -15,6 +15,7 @@ interface Command {
 export default function CommandBar() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selected, setSelected] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -41,8 +42,13 @@ export default function CommandBar() {
     { id: 'agent-gemini', icon: '●', label: 'Gemini — SEO & Analytics', group: 'Agentes', action: () => { setOpen(false); router.push('/dashboard/ux-agent?tab=workspace'); }, color: '#22c55e' },
   ], [router]);
 
-  const filtered = query.trim()
-    ? commands.filter(c => c.label.toLowerCase().includes(query.toLowerCase()) || c.group.toLowerCase().includes(query.toLowerCase()))
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), 150);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const filtered = debouncedQuery.trim()
+    ? commands.filter(c => c.label.toLowerCase().includes(debouncedQuery.toLowerCase()) || c.group.toLowerCase().includes(debouncedQuery.toLowerCase()))
     : commands;
 
   const groups = Array.from(new Set(filtered.map(c => c.group)));

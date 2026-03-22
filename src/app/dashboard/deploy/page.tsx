@@ -361,6 +361,7 @@ export default function DeployCenter() {
               key={i}
               onClick={btn.onClick}
               disabled={deploying || btn.disabled}
+              title={btn.label}
               style={{
                 background: '#111827',
                 border: `1px solid ${btn.disabled ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.06)'}`,

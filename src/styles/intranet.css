@@ -332,6 +332,11 @@ body { font-family: var(--font-sans); background: var(--bg-base); color: var(--t
   .main-content { margin-left: var(--sidebar-collapsed); }
   .grid-60-40, .grid-2 { grid-template-columns: 1fr; }
 }
+@media (min-width: 769px) and (max-width: 1024px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .agent-grid { grid-template-columns: 1fr; }
+  .grid-60-40, .grid-2 { grid-template-columns: 1fr; }
+}
 @media (max-width: 768px) {
   .sidebar { display: none; }
   .main-content { margin-left: 0; }
