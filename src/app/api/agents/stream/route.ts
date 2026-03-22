@@ -147,28 +147,55 @@ export async function POST(request: Request) {
       async start(controller) {
         const send = (content: string) => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
 
-        send('🐾 HOKU — Ejecutando 4 agentes en paralelo...\n\n');
+        const HOKU_CLAUDE_KEY = process.env.ANTHROPIC_API_KEY;
+        const HOKU_GROK_KEY = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
 
-        // Run all agents in parallel (Groq + real Claude + Grok + Gemini via Groq)
-        const agentPrompts = [
-          { name: 'Groq', sys: 'Eres un asistente técnico ultra rápido. SIEMPRE genera código funcional con filename=. Responde en español.' },
-          { name: 'Claude', sys: 'Eres un experto en desarrollo de software. Genera código completo con filename=. Responde en español.' },
-          { name: 'Grok', sys: 'Eres un analista de mercado e investigador. Genera reportes HTML con filename=. Responde en español.' },
-          { name: 'Gemini', sys: 'Eres un experto en SEO y analytics. Genera código HTML con mejoras SEO con filename=. Responde en español.' },
-        ];
+        // Helper: call Claude API
+        const callClaude = async (p: string, sys: string): Promise<string> => {
+          if (!HOKU_CLAUDE_KEY) return '(Claude sin API key)';
+          const r = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'x-api-key': HOKU_CLAUDE_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1500, system: sys, messages: [{ role: 'user', content: p }] }),
+          });
+          if (!r.ok) return `(Claude error ${r.status})`;
+          const d = await r.json();
+          return d.content?.[0]?.text || '(sin respuesta)';
+        };
+
+        // Helper: call Grok API
+        const callGrok = async (p: string, sys: string): Promise<string> => {
+          if (!HOKU_GROK_KEY) return '(Grok sin API key)';
+          const r = await fetch('https://api.x.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${HOKU_GROK_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: 'grok-3-mini', messages: [{ role: 'system', content: sys }, { role: 'user', content: p }], max_tokens: 1500 }),
+          });
+          if (!r.ok) return `(Grok error ${r.status})`;
+          const d = await r.json();
+          return d.choices?.[0]?.message?.content || '(sin respuesta)';
+        };
+
+        send('🐾 HOKU — Ejecutando 4 agentes REALES en paralelo...\n\n');
 
         const results: { name: string; result: string }[] = [];
+        const timeout = 25000;
 
-        // Execute all in parallel with 20s timeout
-        const promises = agentPrompts.map(async (ap) => {
+        // Execute ALL 4 agents with their REAL APIs in parallel
+        const promises = [
+          { name: 'Groq', fn: () => groqNonStream(prompt, 'Eres un asistente técnico. SIEMPRE genera código funcional con filename=. Responde en español.') },
+          { name: 'Claude', fn: () => callClaude(prompt, 'Eres un experto en desarrollo. Genera código completo con filename=. Responde en español.') },
+          { name: 'Grok', fn: () => callGrok(prompt, 'Eres un analista de mercado. Genera reportes HTML con filename=. Responde en español.') },
+          { name: 'Gemini', fn: () => groqNonStream(prompt, 'Eres un experto en SEO y analytics. Genera código HTML con filename=. Responde en español.') },
+        ].map(async (agent) => {
           try {
             const result = await Promise.race([
-              groqNonStream(prompt, ap.sys),
-              new Promise<string>((_, rej) => setTimeout(() => rej(new Error('timeout')), 20000)),
+              agent.fn(),
+              new Promise<string>((_, rej) => setTimeout(() => rej(new Error('timeout')), timeout)),
             ]);
-            return { name: ap.name, result };
+            return { name: agent.name, result };
           } catch {
-            return { name: ap.name, result: `(${ap.name} no respondió)` };
+            return { name: agent.name, result: `(${agent.name} no respondió)` };
           }
         });
 
