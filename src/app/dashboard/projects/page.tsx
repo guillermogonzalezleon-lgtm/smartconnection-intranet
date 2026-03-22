@@ -554,7 +554,8 @@ export default function ProjectsPage() {
             <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
                 <label style={labelStyle}>Nombre *</label>
-                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Nombre del proyecto" style={inputStyle} />
+                <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Nombre del proyecto" style={{ ...inputStyle, borderColor: form.name.trim() === '' ? '#ef4444' : 'rgba(255,255,255,0.1)' }} />
+                {form.name.trim() === '' && <span style={{ fontSize: '0.68rem', color: '#ef4444', marginTop: 4, display: 'block' }}>Nombre requerido</span>}
               </div>
               <div>
                 <label style={labelStyle}>Descripción</label>

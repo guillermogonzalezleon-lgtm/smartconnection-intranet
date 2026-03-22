@@ -240,21 +240,25 @@ export default function Dashboard() {
             <div style={{ padding: '1rem', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.72rem', lineHeight: 1.7, maxHeight: 320, overflowY: 'auto', background: '#0a0d14' }}>
               {logs.length === 0 ? (
                 <div style={{ color: '#475569' }}>Esperando actividad...</div>
-              ) : logs.map((l, i) => (
-                <div key={i} onClick={() => setSelectedLog(selectedLog === l ? null : l)} style={{ display: 'flex', gap: 12, marginBottom: 2, cursor: 'pointer', padding: '2px 4px', borderRadius: 4, background: selectedLog === l ? 'rgba(0,229,176,0.06)' : 'transparent', transition: 'background 0.15s' }}>
-                  <span style={{ color: '#475569', minWidth: 62 }}>
+              ) : logs.map((l, i) => {
+                const fullText = (l.detail || l.action) as string || '';
+                const isTruncated = fullText.length > 60;
+                const isExpanded = selectedLog === l;
+                return (
+                <div key={i} onClick={() => setSelectedLog(isExpanded ? null : l)} style={{ display: 'flex', gap: 12, marginBottom: 2, cursor: 'pointer', padding: '2px 4px', borderRadius: 4, background: isExpanded ? 'rgba(0,229,176,0.06)' : 'transparent', transition: 'background 0.15s', borderLeft: isExpanded ? '2px solid rgba(0,229,176,0.4)' : '2px solid transparent' }}>
+                  <span style={{ color: '#475569', minWidth: 62, flexShrink: 0 }}>
                     {l.created_at ? new Date(l.created_at as string).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--'}
                   </span>
-                  <span style={{ fontWeight: 600, minWidth: 50, color: l.status === 'error' ? '#ef4444' : '#00e5b0' }}>
+                  <span style={{ fontWeight: 600, minWidth: 50, flexShrink: 0, color: l.status === 'error' ? '#ef4444' : '#00e5b0' }}>
                     {((l.agent_name || l.agent_id) as string || '').toUpperCase().substring(0, 6)}
                   </span>
-                  <span style={{ color: '#94a3b8', flex: 1 }}>
-                    {selectedLog === l
-                      ? (l.detail || l.action) as string
-                      : ((l.detail || l.action) as string || '').substring(0, 60) + (((l.detail || l.action) as string || '').length > 60 ? '...' : '')}
+                  <span style={{ color: '#94a3b8', flex: 1, whiteSpace: isExpanded ? 'pre-wrap' : 'nowrap', wordBreak: isExpanded ? 'break-word' : undefined, overflow: isExpanded ? 'visible' : 'hidden', textOverflow: isExpanded ? undefined : 'ellipsis' }}>
+                    {isExpanded ? fullText : fullText.substring(0, 60) + (isTruncated ? '...' : '')}
+                    {isTruncated && <span style={{ color: '#475569', fontSize: '0.6rem', marginLeft: 4 }}>{isExpanded ? '▲' : '▼'}</span>}
                   </span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

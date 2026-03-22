@@ -33,7 +33,7 @@
   /* Text */
   --text-primary: #f1f5f9;
   --text-secondary: #94a3b8;
-  --text-muted: #475569;
+  --text-muted: #64748b;
 
   /* Fonts */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
@@ -351,3 +351,18 @@ body { font-family: var(--font-sans); background: var(--bg-base); color: var(--t
 .empty-state { text-align: center; padding: 3rem; color: var(--text-muted); }
 .empty-state i { font-size: 2rem; margin-bottom: 0.75rem; display: block; opacity: 0.3; }
 .empty-state p { font-size: 0.8rem; }
+
+/* Disabled buttons */
+button:disabled, button[disabled] {
+  cursor: not-allowed !important;
+  opacity: 0.5;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
