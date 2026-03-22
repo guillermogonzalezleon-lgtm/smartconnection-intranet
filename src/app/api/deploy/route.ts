@@ -101,7 +101,7 @@ export async function POST(request: Request) {
         impacto: impacto || 'Por evaluar',
         estado: 'en_progreso',
         ciclo: body.ciclo || 1,
-        agente: agente || 'groq',
+        agente: agente || 'hoku',
         codigo: codigo || '',
         created_at: new Date().toISOString(),
       });
@@ -172,7 +172,7 @@ export async function POST(request: Request) {
             impacto: improvement.impacto || 'Por evaluar',
             estado: 'en_progreso',
             ciclo: improvement.ciclo || 1,
-            agente: improvement.agente || 'groq',
+            agente: improvement.agente || 'hoku',
             created_at: new Date().toISOString(),
           });
           steps.push({ step: 'save', success: true, detail: 'Mejora guardada en Supabase' });

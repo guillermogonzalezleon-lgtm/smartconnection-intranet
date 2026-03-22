@@ -273,7 +273,7 @@ export default function UXAgent() {
     setAgentResult('');
     await streamAgent(
       `Analiza esta mejora UX para smconnection.cl:\n\nTitulo: ${insight.titulo}\nDescripcion: ${insight.descripcion}\nCategoria: ${insight.categoria}\nImpacto: ${insight.impacto}\n\nDa pasos concretos y priorizacion.`,
-      'seo', 'groq',
+      'seo', 'hoku',
       (chunk) => setAgentResult(prev => prev + chunk),
       () => setAgentRunning(false),
     );

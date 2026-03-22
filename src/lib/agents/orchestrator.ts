@@ -2,6 +2,7 @@ import * as claude from './claude';
 import * as groq from './groq';
 import * as grok from './grok';
 import * as gemini from './gemini';
+import * as hoku from './hoku';
 import * as deployBot from './deployBot';
 import { supabaseInsert, supabaseQuery } from '@/lib/supabase';
 
@@ -24,6 +25,7 @@ interface AgentConfig {
 }
 
 const AGENT_MODULES: Record<string, typeof claude> = {
+  hoku,
   claude,
   groq,
   grok,

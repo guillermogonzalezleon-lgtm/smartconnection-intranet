@@ -439,7 +439,7 @@ export default function LabsPage() {
       const res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'execute', agentId: 'groq', prompt: flow.prompt, taskType: 'general' }),
+        body: JSON.stringify({ action: 'execute', agentId: 'hoku', prompt: flow.prompt, taskType: 'general' }),
       }).then(r => r.json());
 
       const resultText = res.result || res.error || '';
