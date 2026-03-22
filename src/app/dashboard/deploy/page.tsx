@@ -58,6 +58,8 @@ const api = (payload: Record<string, unknown>) =>
 const deployApi = (payload: Record<string, unknown>) =>
   fetch('/api/deploy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json());
 
+interface GitCommit { sha: string; message: string; date: string; author: string; }
+
 export default function DeployCenter() {
   const [steps, setSteps] = useState<PipelineStep[]>(INITIAL_STEPS);
   const [logs, setLogs] = useState<LogLine[]>([]);
@@ -65,6 +67,10 @@ export default function DeployCenter() {
   const [history, setHistory] = useState<DeployRecord[]>([]);
   const [lastDeploy, setLastDeploy] = useState<string | null>(null);
   const [targetRepo, setTargetRepo] = useState('smartconnection-astro');
+  const [pendingCommits, setPendingCommits] = useState<GitCommit[]>([]);
+  const [selectedCommits, setSelectedCommits] = useState<Set<string>>(new Set());
+  const [showReport, setShowReport] = useState(false);
+  const [reportData, setReportData] = useState<{ totalTime: number; steps: { name: string; time: number; status: string }[]; repo: string } | null>(null);
   const termRef = useRef<HTMLDivElement>(null);
   const stepTimers = useRef<Record<string, number>>({});
 
@@ -99,6 +105,34 @@ export default function DeployCenter() {
   }, []);
 
   useEffect(() => { loadHistory(); }, [loadHistory]);
+
+  // Load pending commits from GitHub
+  const loadCommits = useCallback(async () => {
+    try {
+      const res = await fetch(`https://api.github.com/repos/${selectedRepo.repo}/commits?per_page=10`, {
+        headers: { Accept: 'application/vnd.github.v3+json' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPendingCommits(data.map((c: Record<string, unknown>) => ({
+          sha: (c.sha as string).slice(0, 7),
+          message: ((c.commit as Record<string, unknown>)?.message as string || '').split('\n')[0],
+          date: new Date(((c.commit as Record<string, Record<string, string>>)?.committer?.date) || '').toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+          author: ((c.commit as Record<string, Record<string, string>>)?.author?.name) || '',
+        })));
+      }
+    } catch {}
+  }, [selectedRepo.repo]);
+
+  useEffect(() => { loadCommits(); }, [loadCommits]);
+
+  const toggleCommit = (sha: string) => {
+    setSelectedCommits(prev => {
+      const next = new Set(prev);
+      if (next.has(sha)) next.delete(sha); else next.add(sha);
+      return next;
+    });
+  };
 
   const updateStep = (id: string, update: Partial<PipelineStep>) => {
     setSteps(prev => prev.map(s => s.id === id ? { ...s, ...update } : s));
@@ -190,6 +224,20 @@ export default function DeployCenter() {
       addLog('[success] Deploy completado exitosamente ✓');
       return true;
     });
+
+    // Show report
+    const finalSteps = [
+      { name: 'Build', time: steps.find(s => s.id === 'build')?.duration || 0, status: 'done' },
+      { name: 'S3 Sync', time: steps.find(s => s.id === 's3')?.duration || 0, status: 'done' },
+      { name: 'CDN', time: steps.find(s => s.id === 'cdn')?.duration || 0, status: 'done' },
+      { name: 'Health', time: steps.find(s => s.id === 'health')?.duration || 0, status: 'done' },
+    ];
+    setReportData({
+      totalTime: finalSteps.reduce((s, st) => s + st.time, 0),
+      steps: finalSteps,
+      repo: selectedRepo.label,
+    });
+    setShowReport(true);
 
     setDeploying(false);
     loadHistory();
@@ -417,6 +465,53 @@ export default function DeployCenter() {
           </div>
         </div>
 
+        {/* Pending Commits */}
+        <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '1.5rem', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+              <i className="bi bi-git" style={{ color: '#f59e0b' }}></i> Commits recientes — {selectedRepo.label}
+            </h3>
+            <button onClick={loadCommits} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '3px 8px', color: '#64748b', fontSize: '0.6rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>🔄 Refresh</button>
+          </div>
+          {pendingCommits.length === 0 ? (
+            <p style={{ fontSize: '0.72rem', color: '#475569' }}>Cargando commits...</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {pendingCommits.map(c => (
+                <div key={c.sha} onClick={() => toggleCommit(c.sha)} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                  background: selectedCommits.has(c.sha) ? 'rgba(0,229,176,0.06)' : 'transparent',
+                  border: selectedCommits.has(c.sha) ? '1px solid rgba(0,229,176,0.15)' : '1px solid transparent',
+                  transition: 'all 0.15s',
+                }}>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: 4, border: selectedCommits.has(c.sha) ? '2px solid #00e5b0' : '2px solid #334155',
+                    background: selectedCommits.has(c.sha) ? 'rgba(0,229,176,0.15)' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: '#00e5b0', flexShrink: 0,
+                  }}>{selectedCommits.has(c.sha) ? '✓' : ''}</div>
+                  <span style={{ fontSize: '0.65rem', color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace", fontWeight: 600, flexShrink: 0 }}>{c.sha}</span>
+                  <span style={{ fontSize: '0.72rem', color: '#e2e8f0', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.message}</span>
+                  <span style={{ fontSize: '0.6rem', color: '#475569', flexShrink: 0 }}>{c.date}</span>
+                </div>
+              ))}
+              {selectedCommits.size > 0 && (
+                <div style={{ display: 'flex', gap: 8, marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                  <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {selectedCommits.size} commit{selectedCommits.size > 1 ? 's' : ''} seleccionado{selectedCommits.size > 1 ? 's' : ''}
+                  </span>
+                  <div style={{ flex: 1 }}></div>
+                  <button onClick={triggerFullDeploy} disabled={deploying} style={{
+                    background: 'linear-gradient(135deg, #00e5b0, #00c49a)', color: '#0a0d14', border: 'none',
+                    padding: '6px 16px', borderRadius: 8, fontWeight: 700, fontSize: '0.7rem',
+                    cursor: deploying ? 'not-allowed' : 'pointer', fontFamily: "'Inter', system-ui",
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>🚀 Deploy seleccionados</button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Deploy History */}
         <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '1.5rem' }}>
           <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f1f5f9', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -462,6 +557,58 @@ export default function DeployCenter() {
           )}
         </div>
       </div>
+
+      {/* Report Popup */}
+      {showReport && reportData && (
+        <div onClick={() => setShowReport(false)} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#0f1623', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, width: '100%', maxWidth: 500, boxShadow: '0 25px 60px rgba(0,0,0,0.6)', overflow: 'hidden' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: '1.2rem' }}>✅</span>
+              <span style={{ fontSize: '1rem', fontWeight: 800, color: '#f1f5f9' }}>Deploy Exitoso</span>
+              <button onClick={() => setShowReport(false)} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.06)', border: 'none', color: '#94a3b8', width: 28, height: 28, borderRadius: 6, cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+            </div>
+            <div style={{ padding: '20px 24px' }}>
+              {/* Summary */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                <div style={{ background: '#111827', borderRadius: 10, padding: '12px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ fontSize: '0.6rem', color: '#475569', fontWeight: 600, marginBottom: 4 }}>REPO</div>
+                  <div style={{ fontSize: '0.78rem', color: '#e2e8f0', fontWeight: 600 }}>{reportData.repo}</div>
+                </div>
+                <div style={{ background: '#111827', borderRadius: 10, padding: '12px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ fontSize: '0.6rem', color: '#475569', fontWeight: 600, marginBottom: 4 }}>TIEMPO TOTAL</div>
+                  <div style={{ fontSize: '0.78rem', color: '#22c55e', fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>{reportData.totalTime.toFixed(1)}s</div>
+                </div>
+              </div>
+
+              {/* Steps breakdown */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Desglose</div>
+                {reportData.steps.map(s => (
+                  <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                    <span style={{ fontSize: '0.68rem', color: '#22c55e' }}>✓</span>
+                    <span style={{ fontSize: '0.72rem', color: '#e2e8f0', flex: 1 }}>{s.name}</span>
+                    <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontFamily: "'JetBrains Mono', monospace" }}>{s.time.toFixed(1)}s</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <a href={`mailto:guillermo.gonzalez@smconnection.cl?subject=Deploy Report — ${reportData.repo} — ${new Date().toLocaleDateString('es-CL')}&body=${encodeURIComponent(`Deploy Report\n\nRepo: ${reportData.repo}\nFecha: ${new Date().toLocaleString('es-CL')}\nTiempo total: ${reportData.totalTime.toFixed(1)}s\n\nPasos:\n${reportData.steps.map(s => `✓ ${s.name}: ${s.time.toFixed(1)}s`).join('\n')}\n\n—\nGenerado desde intranet.smconnection.cl`)}`}
+                  style={{ flex: 1, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 10, padding: '10px', color: '#3b82f6', fontSize: '0.72rem', fontWeight: 700, textAlign: 'center', textDecoration: 'none', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer' }}>
+                  📧 Enviar por correo
+                </a>
+                <button onClick={() => { navigator.clipboard.writeText(`Deploy Report\nRepo: ${reportData.repo}\nTiempo: ${reportData.totalTime.toFixed(1)}s\n${reportData.steps.map(s => `✓ ${s.name}: ${s.time.toFixed(1)}s`).join('\n')}`); }} style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px', color: '#94a3b8', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  📋 Copiar reporte
+                </button>
+              </div>
+              <button onClick={() => setShowReport(false)} style={{ width: '100%', marginTop: 8, background: 'linear-gradient(135deg, #00e5b0, #00c49a)', color: '#0a0d14', border: 'none', padding: '10px', borderRadius: 10, fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>
+                Listo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Animations */}
       <style>{`
