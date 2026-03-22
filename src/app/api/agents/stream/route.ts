@@ -235,7 +235,7 @@ export async function POST(request: Request) {
         if (openaiKey) agentList.push({ name: 'OpenAI', fn: () => callOpenAI('https://api.openai.com/v1/chat/completions', openaiKey, 'gpt-4o-mini', prompt, `Eres un desarrollador full-stack. ${codeSys}`, 'OpenAI') });
 
         const cohereKey = process.env.COHERE_API_KEY;
-        if (cohereKey) agentList.push({ name: 'Cohere', fn: () => callOpenAI('https://api.cohere.com/v2/chat', cohereKey, 'command-r', prompt, `Eres un experto en NLP y datos. ${codeSys}`, 'Cohere') });
+        if (cohereKey) agentList.push({ name: 'Cohere', fn: () => callOpenAI('https://api.cohere.com/v2/chat', cohereKey, 'command-a-03-2025', prompt, `Eres un experto en NLP y datos. ${codeSys}`, 'Cohere') });
 
         const openrouterKey = process.env.OPENROUTER_API_KEY;
         if (openrouterKey) agentList.push({ name: 'OpenRouter', fn: () => callOpenAI('https://openrouter.ai/api/v1/chat/completions', openrouterKey, 'meta-llama/llama-3.3-70b-instruct', prompt, `Eres un asistente técnico avanzado. ${codeSys}`, 'OpenRouter') });
