@@ -17,6 +17,8 @@ export default function Dashboard() {
   const [projects, setProjects] = useState<Record<string, unknown>[]>([]);
   const [modal, setModal] = useState<ModalData | null>(null);
   const [selectedLog, setSelectedLog] = useState<Record<string, unknown> | null>(null);
+  const [tokensToday, setTokensToday] = useState(0);
+  const [lastDeploy, setLastDeploy] = useState('—');
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -38,6 +40,18 @@ export default function Dashboard() {
     api({ action: 'query', table: 'leads', order: 'created_at.desc', limit: 100 }).then(d => { if (d.data) { setLeads(d.data.length); setLeadsData(d.data); } }).catch(() => {});
     api({ action: 'query', table: 'reuniones', order: 'created_at.desc', limit: 100 }).then(d => { if (d.data) { setMeetings(d.data.length); setMeetingsData(d.data); } }).catch(() => {});
     api({ action: 'query', table: 'projects', limit: 4 }).then(d => { if (d.data) setProjects(d.data); }).catch(() => {});
+    api({ action: 'query', table: 'agent_logs', order: 'created_at.desc', limit: 100 })
+      .then(d => { if (d.data) { const total = d.data.reduce((s: number, r: Record<string, unknown>) => s + ((r.tokens_used as number) || 0), 0); setTokensToday(total); } }).catch(() => {});
+    api({ action: 'logs', agentId: 'deployer' })
+      .then(d => {
+        if (d.logs && d.logs.length > 0) {
+          const latest = d.logs[0];
+          const mins = Math.round((Date.now() - new Date(latest.created_at as string).getTime()) / 60000);
+          const timeStr = mins < 60 ? `hace ${mins}m` : mins < 1440 ? `hace ${Math.round(mins / 60)}h` : `hace ${Math.round(mins / 1440)}d`;
+          const status = latest.status === 'error' ? '✗ Error' : '✓ AWS';
+          setLastDeploy(`${timeStr} · ${status}`);
+        }
+      }).catch(() => {});
     Promise.all(['claude','groq','grok','gemini','deployer'].map(id => api({ action: 'logs', agentId: id })))
       .then(results => {
         const all = results.flatMap(r => r.logs || []).sort((a: Record<string, unknown>, b: Record<string, unknown>) => new Date(b.created_at as string).getTime() - new Date(a.created_at as string).getTime());
@@ -69,8 +83,9 @@ export default function Dashboard() {
     { icon: 'bi-lightning-charge', value: tasks, label: 'Tareas Hoy', color: '#8b5cf6', onClick: () => setModal({ title: 'Tareas de Hoy', content: `${tasks} tareas ejecutadas por ${agents.length} agentes configurados.` }) },
     { icon: 'bi-people', value: leads, label: 'Leads', color: '#3b82f6', onClick: () => setModal({ title: `Leads (${leads})`, content: leadsData.slice(0, 10) }) },
     { icon: 'bi-calendar-check', value: meetings, label: 'Reuniones', color: '#f59e0b', onClick: () => setModal({ title: `Reuniones (${meetings})`, content: meetingsData.slice(0, 10) }) },
-    { icon: 'bi-rocket-takeoff', value: new Date().toLocaleDateString('es-CL'), label: 'Último Deploy', color: '#22c55e', small: true, onClick: () => setModal({ title: 'Deploy Info', content: 'Deploy automático cada push a main.\n\nAWS Amplify: intranet.smconnection.cl\nAWS S3+CloudFront: www.smconnection.cl' }) },
-    { icon: 'bi-coin', value: 0, label: 'Tokens IA', color: '#f97316', onClick: () => setModal({ title: 'Tokens IA', content: 'Uso de tokens por agente:\n\nClaude: sin créditos\nGroq: gratis (Llama 3.3)\nGemini: rate limited\nGrok: sin API key' }) },
+    { icon: 'bi-rocket-takeoff', value: lastDeploy, label: 'Último Deploy', color: '#22c55e', small: true, onClick: () => setModal({ title: 'Deploy Info', content: 'Deploy automático cada push a main.\n\nAWS Amplify: intranet.smconnection.cl\nAWS S3+CloudFront: www.smconnection.cl' }) },
+    { icon: 'bi-coin', value: tokensToday.toLocaleString(), label: 'Tokens IA', color: '#f97316', onClick: () => setModal({ title: 'Tokens IA', content: 'Uso de tokens por agente:\n\nClaude: sin créditos\nGroq: gratis (Llama 3.3)\nGemini: rate limited\nGrok: sin API key' }) },
+    { icon: 'bi-cloud-check', value: 'Live', label: 'AWS Status', color: '#f97316', onClick: () => router.push('/dashboard/aws') },
   ];
 
   const showAgentDetail = (a: Record<string, unknown>) => {
