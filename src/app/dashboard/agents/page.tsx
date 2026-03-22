@@ -50,6 +50,7 @@ function extractCodeFiles(text: string): { path: string; content: string; lang: 
 
 export default function AgentsWorkspace() {
   const [selectedAgent, setSelectedAgent] = useState('hoku');
+  const [mode, setMode] = useState<'chat' | 'code' | 'sap' | 'deploy'>('chat');
   const [task, setTask] = useState('');
   const [output, setOutput] = useState('');
   const [running, setRunning] = useState(false);
@@ -84,11 +85,11 @@ export default function AgentsWorkspace() {
     setRunning(true); setOutput(''); setElapsed(0); setTokens(0);
     const start = Date.now();
     timerRef.current = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 100);
-    window.dispatchEvent(new CustomEvent('exec-agent', { detail: { agent: selectedAgent, prompt: task, taskType: 'general' } }));
+    window.dispatchEvent(new CustomEvent('exec-agent', { detail: { agent: selectedAgent, prompt: task, taskType: mode === 'sap' ? 'sap_fi' : mode === 'deploy' ? 'devops' : mode === 'code' ? 'dev' : 'general' } }));
     let tokenCount = 0;
     try {
       const codeSystemPrompt = `\n\nIMPORTANTE: Cuando generes código, SIEMPRE usa este formato:\n\n\`\`\`tsx filename="src/components/NombreComponente.tsx"\n// código aquí\n\`\`\`\n\nIncluye el path completo del archivo en el atributo filename. Solo genera código que se pueda commitear directamente. NO generes markdown de documentación — genera archivos .tsx, .css, .ts reales.`;
-      const res = await fetch('/api/agents/stream', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: task + codeSystemPrompt, taskType: 'general', agentId: selectedAgent }) });
+      const res = await fetch('/api/agents/stream', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: task + codeSystemPrompt, taskType: mode === 'sap' ? 'sap_fi' : mode === 'deploy' ? 'devops' : mode === 'code' ? 'dev' : 'general', agentId: selectedAgent }) });
       if (!res.ok || !res.body) { setOutput(`Error: ${res.status}`); setRunning(false); return; }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -343,6 +344,18 @@ export default function AgentsWorkspace() {
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: agent.color }}></span>
             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f1f5f9' }}>{agent.name}</span>
             <span style={{ fontSize: '0.6rem', color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>{agent.model}</span>
+            <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: 2 }}>
+              {(['chat', 'code', 'sap', 'deploy'] as const).map(m => (
+                <button key={m} onClick={() => setMode(m)} style={{
+                  padding: '3px 8px', borderRadius: 4, fontSize: '0.6rem', fontWeight: 600,
+                  background: mode === m ? 'rgba(0,229,176,0.1)' : 'transparent',
+                  color: mode === m ? '#00e5b0' : '#475569',
+                  border: 'none', cursor: 'pointer', fontFamily: "'Inter', system-ui",
+                }}>
+                  {m === 'chat' ? '\u{1F4AC}' : m === 'code' ? '</>' : m === 'sap' ? '\u{1F3E2}' : '\u{1F680}'} {m.toUpperCase()}
+                </button>
+              ))}
+            </div>
             <div style={{ flex: 1 }}></div>
             <button onClick={execute} disabled={running || !task.trim()} style={{ background: running ? '#1a2235' : `linear-gradient(135deg, ${agent.color}, ${agent.color}cc)`, color: running ? '#64748b' : '#0a0d14', border: 'none', padding: '5px 14px', borderRadius: 7, fontWeight: 700, fontSize: '0.7rem', cursor: running ? 'not-allowed' : 'pointer', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', gap: 5 }}>
               {running ? <><span style={{ width: 8, height: 8, border: '2px solid #475569', borderTopColor: agent.color, borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }}></span> {fmtTime(elapsed)}</> : <>▶ Run</>}

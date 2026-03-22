@@ -243,6 +243,29 @@ export default function DeployCenter() {
     } catch { /* ignore */ }
   };
 
+  /* ── Solo Invalidar CDN ── */
+  const triggerCDNInvalidate = async () => {
+    if (deploying) return;
+    setDeploying(true);
+    setTerminalOpen(true);
+    setLogs([]);
+    addLog('[system] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'dim');
+    addLog('[cdn] Iniciando invalidacion de CDN...', 'info');
+    try {
+      const res = await fetch('/api/aws-invalidate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ paths: ['/*'] }) }).then(r => r.json());
+      if (res.success) {
+        addLog(`[cdn] Invalidation ID: ${res.invalidationId}`);
+        addLog('[success] CDN invalidado', 'success');
+      } else {
+        addLog(`[error] ${res.error}`, 'error');
+      }
+    } catch (err) {
+      addLog(`[error] ${err instanceof Error ? err.message : 'Error desconocido'}`, 'error');
+    }
+    addLog('[system] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'dim');
+    setDeploying(false);
+  };
+
   /* ── Full deploy pipeline ── */
   const triggerFullDeploy = async (source: 'manual' | 'pipeline' | 'rollback' = 'manual', rollbackTarget?: string) => {
     if (deploying) return;
@@ -333,6 +356,22 @@ export default function DeployCenter() {
       addLog('[amplify] Deploying artifacts...', 'dim', 'amplify');
       addLog('[amplify] Deploy ID: amp-' + Math.random().toString(36).substring(2, 10), undefined, 'amplify');
       addLog('[success] AWS Amplify deploy completado', 'success', 'amplify');
+      // Invalidar CDN real
+      addLog('[cdn] Invalidando CDN...', undefined, 'amplify');
+      try {
+        const cdnRes = await fetch('/api/aws-invalidate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ paths: ['/*'] }) }).then(r => r.json());
+        if (cdnRes.success) {
+          addLog(`[cdn] Invalidation ID: ${cdnRes.invalidationId}`, undefined, 'amplify');
+          addLog('[success] CDN invalidado', 'success', 'amplify');
+        } else {
+          addLog(`[error] CDN: ${cdnRes.error}`, 'error', 'amplify');
+        }
+      } catch { addLog('[error] CDN invalidation fallo', 'error', 'amplify'); }
+      // S3 stats reales
+      try {
+        const stats = await fetch('/api/aws-stats', { method: 'POST' }).then(r => r.json());
+        if (stats.s3) addLog(`[s3] ${stats.s3.objects} archivos · ${stats.s3.mb}MB`, undefined, 'amplify');
+      } catch { /* ignore */ }
       return true;
     });
     if (!amplifyOk) { finishDeploy(source, commitHash); return; }
@@ -691,6 +730,27 @@ export default function DeployCenter() {
               Ver reporte
             </button>
           )}
+
+          {/* Solo Invalidar CDN */}
+          <button
+            onClick={triggerCDNInvalidate}
+            disabled={deploying}
+            style={{
+              background: 'rgba(59,130,246,0.06)',
+              border: '1px solid rgba(59,130,246,0.15)',
+              color: deploying ? '#334155' : '#3b82f6',
+              padding: '14px 20px', borderRadius: 14,
+              fontWeight: 700, fontSize: '0.82rem',
+              cursor: deploying ? 'not-allowed' : 'pointer',
+              fontFamily: "'Inter', system-ui, sans-serif",
+              display: 'flex', alignItems: 'center', gap: 8,
+              transition: 'all 0.2s',
+              opacity: deploying ? 0.4 : 1,
+            }}
+          >
+            <i className="bi bi-lightning-charge" style={{ fontSize: '1rem' }} />
+            Solo Invalidar CDN
+          </button>
         </div>
 
         {/* ══════════════════════════════════════════════════════ */}
