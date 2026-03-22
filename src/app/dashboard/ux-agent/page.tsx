@@ -27,8 +27,9 @@ const CATEGORIAS = ['Todas', 'Conversion', 'SEO', 'Contenido', 'Navegacion', 'Wh
 const ESTADOS_FILTER = ['Todas', 'Pendiente', 'En progreso', 'Implementado'];
 
 const agentColors: Record<string, string> = {
-  claude: '#00e5b0', groq: '#f59e0b', grok: '#8b5cf6',
-  gemini: '#22c55e', hoku: '#ff6b6b', deployer: '#3b82f6',
+  hoku: '#ff6b6b', groq: '#f59e0b', claude: '#00e5b0', grok: '#8b5cf6',
+  deepseek: '#0ea5e9', mistral: '#f97316', openai: '#10b981', cohere: '#1e3a5f',
+  openrouter: '#6366f1', bedrock: '#f97316', gemini: '#22c55e', deployer: '#3b82f6',
 };
 const estadoColors: Record<string, { bg: string; text: string; border: string }> = {
   pendiente: { bg: 'rgba(245,158,11,0.08)', text: '#f59e0b', border: 'rgba(245,158,11,0.25)' },

@@ -1,9 +1,12 @@
 /**
- * HOKU — Agente fusión de Claude + Groq + Gemini + Grok
+ * HOKU — Agente fusión (orchestrator path)
  *
- * Ejecuta la tarea en paralelo en todos los agentes disponibles,
+ * Ejecuta la tarea en paralelo en los agentes con módulo disponible,
  * luego sintetiza las respuestas en una sola respuesta coherente
  * usando Groq como sintetizador (el más rápido).
+ *
+ * Nota: La versión streaming (/api/agents/stream) fusiona hasta 9 agentes
+ * incluyendo DeepSeek, Mistral, OpenAI, Cohere, OpenRouter y Bedrock.
  */
 
 import { run as runGroq } from './groq';

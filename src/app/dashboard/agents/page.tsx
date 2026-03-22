@@ -14,6 +14,7 @@ const AGENTS = [
   { id: 'cohere', name: 'Cohere', model: 'command-a', color: '#1e3a5f', role: 'NLP · RAG · Documentos' },
   { id: 'openrouter', name: 'OpenRouter', model: 'llama-3.3-70b', color: '#6366f1', role: '100+ modelos · Fallback' },
   { id: 'bedrock', name: 'Bedrock', model: 'claude-3.5-haiku', color: '#f97316', role: 'AWS nativo · Enterprise' },
+  { id: 'gemini', name: 'Gemini', model: 'gemini-2.0-flash', color: '#22c55e', role: 'Multimodal · Google AI' },
 ];
 
 const PLACEHOLDERS: Record<string, string> = {
