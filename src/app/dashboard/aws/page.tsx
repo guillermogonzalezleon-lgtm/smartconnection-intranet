@@ -23,6 +23,7 @@ export default function AWSPage() {
   const [deploys, setDeploys] = useState<DeployLog[]>([]);
   const [invalidating, setInvalidating] = useState(false);
   const [invalidateMsg, setInvalidateMsg] = useState('');
+  const [awsData, setAwsData] = useState<any>(null);
   const [deploySortBy, setDeploySortBy] = useState<'action' | 'status' | 'date'>('date');
   const [deploySortDir, setDeploySortDir] = useState<'asc' | 'desc'>('desc');
   const metricsRef = useRef<HTMLDivElement>(null);
@@ -63,6 +64,7 @@ export default function AWSPage() {
   useEffect(() => {
     checkHealth();
     loadDeploys();
+    fetch('/api/aws-stats', { method: 'POST' }).then(r => r.json()).then(d => setAwsData(d)).catch(() => {});
     const interval = setInterval(checkHealth, 30000);
     return () => clearInterval(interval);
   }, [checkHealth, loadDeploys]);
@@ -71,8 +73,8 @@ export default function AWSPage() {
     setInvalidating(true);
     setInvalidateMsg('');
     try {
-      const res = await deployApi({ action: 'trigger_deploy', repo: 'guillermogonzalezleon-lgtm/smartconnection-astro' });
-      setInvalidateMsg(res.error ? `Error: ${res.error}` : 'Invalidación iniciada');
+      const res = await fetch('/api/aws-invalidate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paths: ['/*'] }) }).then(r => r.json());
+      setInvalidateMsg(res.success ? `CDN invalidado: ${res.invalidationId}` : `Error: ${res.error}`);
       loadDeploys();
     } catch { setInvalidateMsg('Error de conexión'); }
     finally { setInvalidating(false); }
@@ -151,9 +153,9 @@ export default function AWSPage() {
               <div><span style={labelStyle}>Región:</span></div>
               <div style={valStyle}>sa-east-1</div>
               <div><span style={labelStyle}>Objetos:</span></div>
-              <div style={valStyle}>~2,450</div>
+              <div style={valStyle}>{awsData?.s3?.objects?.toLocaleString() ?? '~2,450'}</div>
               <div><span style={labelStyle}>Tamaño:</span></div>
-              <div style={valStyle}>~185 MB</div>
+              <div style={valStyle}>{awsData?.s3?.sizeFormatted ?? '~185 MB'}</div>
               <div><span style={labelStyle}>Versionado:</span></div>
               <div style={{ color: '#22c55e' }}>✓ Habilitado</div>
               <div><span style={labelStyle}>Cifrado:</span></div>
@@ -174,7 +176,7 @@ export default function AWSPage() {
             <h3 style={sectionTitle}>
               <span style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(59,130,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem' }}>⚡</span>
               CloudFront CDN
-              <span style={{ ...badge('#22c55e'), marginLeft: 'auto' }}>● Deployed</span>
+              <span style={{ ...badge(awsData?.cloudfront?.status === 'Deployed' || !awsData ? '#22c55e' : '#f59e0b'), marginLeft: 'auto' }}>● {awsData?.cloudfront?.status ?? 'Deployed'}</span>
             </h3>
             <div style={gridInfo}>
               <div><span style={labelStyle}>Distribution:</span></div>
