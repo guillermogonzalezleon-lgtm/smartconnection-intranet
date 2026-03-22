@@ -1,4 +1,6 @@
 import { getSession } from '@/lib/auth';
+import { routeTask } from '@/lib/agents/hoku-router';
+import { PROMPTS } from '@/lib/agents/prompts';
 
 const GROQ_KEY = process.env.GROQ_API_KEY;
 
@@ -45,7 +47,9 @@ export async function POST(request: Request) {
   if (!prompt) return new Response('Prompt requerido', { status: 400 });
   if (!GROQ_KEY) return new Response('GROQ_API_KEY no configurada', { status: 500 });
 
-  const sysPrompt = SYSTEM_PROMPTS[taskType || 'general'] || SYSTEM_PROMPTS.general;
+  // Use router for smart routing when taskType matches a prompt key
+  const routerPrompt = PROMPTS[taskType as keyof typeof PROMPTS];
+  const sysPrompt = routerPrompt || SYSTEM_PROMPTS[taskType || 'general'] || SYSTEM_PROMPTS.general;
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   const CLAUDE_KEY = process.env.ANTHROPIC_API_KEY;
