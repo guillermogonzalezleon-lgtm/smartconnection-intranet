@@ -16,6 +16,9 @@ const vars = [
   'AWS_SECRET_ACCESS_KEY',
   'AWS_REGION',
   'AWS_AMPLIFY_APP_ID',
+  'GROK_API_KEY',
+  'XAI_API_KEY',
+  'OPENAI_API_KEY',
 ];
 
 const lines = vars

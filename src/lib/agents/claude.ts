@@ -10,7 +10,7 @@ const API_KEY = process.env.ANTHROPIC_API_KEY;
 
 export async function run(task: string, config: { model?: string; systemPrompt?: string; maxTokens?: number; temperature?: number }): Promise<AgentResult> {
   const start = Date.now();
-  const model = config.model || 'claude-sonnet-4-20250514';
+  const model = config.model || 'claude-haiku-4-5-20251001';
 
   const messages: Array<{ role: string; content: string }> = [
     { role: 'user', content: task },

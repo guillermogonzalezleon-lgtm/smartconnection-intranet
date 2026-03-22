@@ -48,6 +48,98 @@ export async function POST(request: Request) {
   const sysPrompt = SYSTEM_PROMPTS[taskType || 'general'] || SYSTEM_PROMPTS.general;
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
+  const CLAUDE_KEY = process.env.ANTHROPIC_API_KEY;
+
+  // ═══ CLAUDE: real streaming with Haiku ═══
+  if (agentId === 'claude' && CLAUDE_KEY) {
+    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': CLAUDE_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2048,
+        system: sysPrompt,
+        stream: true,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!claudeRes.ok || !claudeRes.body) return new Response(`Claude error: ${claudeRes.status}`, { status: 502 });
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const reader = claudeRes.body!.getReader();
+        let buffer = '';
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed.startsWith('data: ')) continue;
+              const data = trimmed.slice(6);
+              if (data === '[DONE]') continue;
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: parsed.delta.text })}\n\n`));
+                }
+              } catch {}
+            }
+          }
+        } catch (err) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: String(err) })}\n\n`));
+        }
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    });
+
+    return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' } });
+  }
+
+  // ═══ GROK: real streaming with xAI ═══
+  const GROK_KEY = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+  if (agentId === 'grok' && GROK_KEY) {
+    const grokRes = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${GROK_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'grok-3-mini',
+        messages: [{ role: 'system', content: sysPrompt }, { role: 'user', content: prompt }],
+        stream: true, max_tokens: 2048, temperature: 0.7,
+      }),
+    });
+
+    if (!grokRes.ok || !grokRes.body) return new Response(`Grok error: ${grokRes.status}`, { status: 502 });
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const reader = grokRes.body!.getReader();
+        let buffer = '';
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n'); buffer = lines.pop() || '';
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed.startsWith('data: ')) continue;
+              const data = trimmed.slice(6);
+              if (data === '[DONE]') { controller.enqueue(encoder.encode('data: [DONE]\n\n')); continue; }
+              try { const p = JSON.parse(data); const c = p.choices?.[0]?.delta?.content; if (c) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: c })}\n\n`)); } catch {}
+            }
+          }
+        } catch (err) { controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: String(err) })}\n\n`)); }
+        controller.close();
+      },
+    });
+    return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' } });
+  }
 
   // ═══ HOKU: parallel execution + synthesis ═══
   if (agentId === 'hoku') {
@@ -55,13 +147,14 @@ export async function POST(request: Request) {
       async start(controller) {
         const send = (content: string) => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
 
-        send('🐾 HOKU — Ejecutando 3 agentes en paralelo...\n\n');
+        send('🐾 HOKU — Ejecutando 4 agentes en paralelo...\n\n');
 
-        // Run all agents in parallel (using Groq with different system prompts)
+        // Run all agents in parallel (Groq + real Claude + Grok + Gemini via Groq)
         const agentPrompts = [
-          { name: 'Groq', sys: 'Eres un asistente técnico ultra rápido. Responde en español de forma concisa.' },
-          { name: 'Claude', sys: 'Eres un experto en desarrollo de software y code review. Responde en español con detalle técnico.' },
-          { name: 'Gemini', sys: 'Eres un experto en SEO, analytics y datos. Responde en español con métricas y datos.' },
+          { name: 'Groq', sys: 'Eres un asistente técnico ultra rápido. SIEMPRE genera código funcional con filename=. Responde en español.' },
+          { name: 'Claude', sys: 'Eres un experto en desarrollo de software. Genera código completo con filename=. Responde en español.' },
+          { name: 'Grok', sys: 'Eres un analista de mercado e investigador. Genera reportes HTML con filename=. Responde en español.' },
+          { name: 'Gemini', sys: 'Eres un experto en SEO y analytics. Genera código HTML con mejoras SEO con filename=. Responde en español.' },
         ];
 
         const results: { name: string; result: string }[] = [];

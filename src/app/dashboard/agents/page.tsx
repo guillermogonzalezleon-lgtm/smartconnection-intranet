@@ -2,16 +2,18 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 const AGENTS = [
-  { id: 'hoku', name: 'Hoku', model: 'fusión 4 agentes', color: '#ff6b6b', role: 'Síntesis — ejecuta los 4 y combina lo mejor' },
-  { id: 'groq', name: 'Groq', model: 'llama-3.3-70b', color: '#f59e0b', role: 'Inferencia ultra rápida' },
-  { id: 'claude', name: 'Claude', model: 'claude-sonnet-4-5', color: '#00e5b0', role: 'Desarrollo & Code Review' },
+  { id: 'hoku', name: 'Hoku', model: 'fusión 4 agentes', color: '#ff6b6b', role: 'Síntesis — ejecuta todos y combina lo mejor' },
+  { id: 'groq', name: 'Groq', model: 'llama-3.3-70b', color: '#f59e0b', role: 'Inferencia ultra rápida (gratis)' },
+  { id: 'claude', name: 'Claude', model: 'claude-haiku-4.5', color: '#00e5b0', role: 'Código funcional + code review' },
+  { id: 'grok', name: 'Grok', model: 'grok-3-mini', color: '#8b5cf6', role: 'Análisis & Research (xAI)' },
   { id: 'gemini', name: 'Gemini', model: 'gemini-2.0-flash', color: '#22c55e', role: 'SEO & Analytics' },
 ];
 
 const PLACEHOLDERS: Record<string, string> = {
   hoku: 'Analiza smconnection.cl desde todos los ángulos...',
   groq: 'Escribe el copy para la sección hero...',
-  claude: 'Revisa el código y sugiere mejoras...',
+  claude: 'Revisa el código y sugiere mejoras de rendimiento...',
+  grok: 'Investiga tendencias de conversión en SaaS B2B...',
   gemini: 'Genera mejoras SEO para la landing...',
 };
 
