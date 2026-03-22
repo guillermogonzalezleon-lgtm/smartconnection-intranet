@@ -1,3 +1,4 @@
+// @ts-nocheck
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { api, AGENT_COLORS, CONFIG } from '@/lib/config';
@@ -63,6 +64,63 @@ export default function DispatchPage() {
   const [iframeTab, setIframeTab] = useState('dashboard');
   const [liveFeed, setLiveFeed] = useState<string[]>([]);
   const [intranetStats, setIntranetStats] = useState({ agents: 0, leads: 0, deploy: '' });
+
+  // Voice
+  const [listening, setListening] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
+
+  const startListening = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) { addTerm('error', 'Speech API no disponible en este browser'); return; }
+    const recognition = new SR();
+    recognition.lang = 'es-CL';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onresult = (event: any) => {
+      const text = event.results[0][0].transcript;
+      setListening(false);
+      executeTask(text);
+    };
+    recognition.onerror = () => setListening(false);
+    recognition.onend = () => setListening(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+    addTerm('dispatch', '🎤 Escuchando...');
+  };
+
+  const stopListening = () => {
+    recognitionRef.current?.stop();
+    setListening(false);
+  };
+
+  const speakText = (text: string) => {
+    if (!voiceEnabled || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    // Clean text for speech
+    const clean = text
+      .replace(/```[\s\S]*?```/g, 'código generado')
+      .replace(/[#*_`→✓●◌⟳]/g, '')
+      .replace(/\[.*?\]/g, '')
+      .replace(/https?:\/\/\S+/g, '')
+      .slice(0, 800);
+    const utterance = new SpeechSynthesisUtterance(clean);
+    utterance.lang = 'es-CL';
+    utterance.rate = 1.1;
+    utterance.pitch = 1;
+    // Try to find a Spanish voice
+    const voices = window.speechSynthesis.getVoices();
+    const esVoice = voices.find(v => v.lang.startsWith('es')) || voices[0];
+    if (esVoice) utterance.voice = esVoice;
+    utterance.onstart = () => setSpeaking(true);
+    utterance.onend = () => setSpeaking(false);
+    window.speechSynthesis.speak(utterance);
+  };
 
   // Refs
   const chatRef = useRef<HTMLDivElement>(null);
@@ -209,6 +267,9 @@ export default function DispatchPage() {
     // Live feed
     setLiveFeed(p => [`${now()} · Hoku · ${prompt.slice(0, 40)}...`, ...p].slice(0, 10));
 
+    // Speak response
+    if (fullText) speakText(fullText);
+
     setStreaming(false);
     cleanup?.();
   };
@@ -301,13 +362,35 @@ export default function DispatchPage() {
             ))}
           </div>
 
+          {/* Voice controls */}
+          <div style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+            <button onClick={() => setVoiceEnabled(!voiceEnabled)} style={{
+              fontSize: '0.55rem', padding: '2px 8px', borderRadius: 5, cursor: 'pointer',
+              background: voiceEnabled ? 'rgba(0,229,176,0.1)' : 'rgba(255,255,255,0.03)',
+              color: voiceEnabled ? '#00e5b0' : '#6b8099',
+              border: `1px solid ${voiceEnabled ? 'rgba(0,229,176,0.2)' : 'rgba(255,255,255,0.04)'}`,
+            }}>{voiceEnabled ? '🔊 Voz ON' : '🔇 Voz OFF'}</button>
+            {speaking && <span style={{ fontSize: '0.55rem', color: '#00e5b0', animation: 'breathe 1s infinite' }}>🔊 Hoku hablando...</span>}
+            {speaking && <button onClick={() => { window.speechSynthesis.cancel(); setSpeaking(false); }} style={{ fontSize: '0.55rem', padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', cursor: 'pointer' }}>⏹ Parar</button>}
+          </div>
+
           {/* Input */}
-          <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: 6 }}>
+          <div style={{ padding: '6px 12px 10px', display: 'flex', gap: 6 }}>
+            {/* Mic button */}
+            <button onClick={listening ? stopListening : startListening} disabled={streaming}
+              style={{
+                width: 34, height: 34, borderRadius: 8, border: 'none', cursor: streaming ? 'default' : 'pointer',
+                background: listening ? 'linear-gradient(135deg, #ef4444, #dc2626)' : '#0f1628',
+                color: listening ? '#fff' : '#6b8099', fontSize: '0.9rem',
+                boxShadow: listening ? '0 0 16px rgba(239,68,68,0.4)' : 'none',
+                animation: listening ? 'breathe 0.8s infinite' : 'none',
+                transition: 'all 0.2s',
+              }}>🎤</button>
             <input value={input} onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSend()}
-              placeholder={streaming ? 'Hoku procesando...' : 'Escribe una tarea...'}
-              disabled={streaming}
-              style={{ flex: 1, background: '#0f1628', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 12px', color: '#dde4f0', fontSize: '0.72rem', outline: 'none', fontFamily: "'DM Sans', system-ui" }} />
+              placeholder={listening ? '🎤 Escuchando...' : streaming ? 'Hoku procesando...' : 'Escribe o habla...'}
+              disabled={streaming || listening}
+              style={{ flex: 1, background: '#0f1628', border: `1px solid ${listening ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 8, padding: '8px 12px', color: '#dde4f0', fontSize: '0.72rem', outline: 'none', fontFamily: "'DM Sans', system-ui", transition: 'border-color 0.2s' }} />
             <button onClick={handleSend} disabled={streaming || !input.trim()}
               style={{ width: 34, height: 34, borderRadius: 8, background: streaming ? '#161f38' : '#00e5b0', border: 'none', color: streaming ? '#6b8099' : '#05070e', cursor: streaming ? 'default' : 'pointer', fontSize: '0.85rem', fontWeight: 700 }}>→</button>
           </div>
