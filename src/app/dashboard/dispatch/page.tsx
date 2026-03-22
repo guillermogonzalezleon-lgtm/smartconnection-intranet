@@ -115,12 +115,19 @@ export default function DispatchPage() {
 
   const voiceSend = async (text: string) => {
     if (!text.trim()) { setVoiceState('idle'); return; }
-    const hint = HINTS[model] || '';
+    const voicePrompt = `IMPORTANTE: Estás en modo CONVERSACIÓN POR VOZ. Responde como si estuvieras HABLANDO, no escribiendo. Reglas estrictas:
+- Máximo 2-3 oraciones cortas
+- NO uses bullets, listas, código, markdown, ni emojis
+- NO dictes: conversa naturalmente como un humano
+- Sé directo y conciso, como responderías hablando por teléfono
+- Responde en español chileno informal
+
+${text}`;
     let full = '';
     try {
       const res = await fetch('/api/agents/stream', {
         method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: hint ? `${hint}\n\n${text}` : text, taskType: 'general', agentId: ['hoku', 'panchita'].includes(model) ? 'hoku' : model, chatMode: true }),
+        body: JSON.stringify({ prompt: voicePrompt, taskType: 'general', agentId: ['hoku', 'panchita'].includes(model) ? 'hoku' : model, chatMode: true }),
       });
       if (!res.ok || !res.body) { setVoiceState('idle'); return; }
       const reader = res.body.getReader();
