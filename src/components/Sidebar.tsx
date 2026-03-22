@@ -52,7 +52,7 @@ export default function Sidebar({ user }: { user: string }) {
   ];
 
   const statusItems = [
-    { label: 'Vercel', status: 'Live' },
+    { label: 'Amplify', status: 'Live' },
     { label: 'AWS', status: 'Active' },
     { label: 'Supabase', status: 'Connected' },
   ];

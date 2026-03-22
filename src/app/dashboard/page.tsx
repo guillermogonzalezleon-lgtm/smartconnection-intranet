@@ -67,7 +67,7 @@ export default function Dashboard() {
     { icon: 'bi-lightning-charge', value: tasks, label: 'Tareas Hoy', color: '#8b5cf6', onClick: () => setModal({ title: 'Tareas de Hoy', content: `${tasks} tareas ejecutadas por ${agents.length} agentes configurados.` }) },
     { icon: 'bi-people', value: leads, label: 'Leads', color: '#3b82f6', onClick: () => setModal({ title: `Leads (${leads})`, content: leadsData.slice(0, 10) }) },
     { icon: 'bi-calendar-check', value: meetings, label: 'Reuniones', color: '#f59e0b', onClick: () => setModal({ title: `Reuniones (${meetings})`, content: meetingsData.slice(0, 10) }) },
-    { icon: 'bi-rocket-takeoff', value: new Date().toLocaleDateString('es-CL'), label: 'Último Deploy', color: '#22c55e', small: true, onClick: () => setModal({ title: 'Deploy Info', content: 'Deploy automático cada push a main.\n\nVercel: smartconnection-astro.vercel.app\nAWS: intranet.smconnection.cl\nS3: www.smconnection.cl' }) },
+    { icon: 'bi-rocket-takeoff', value: new Date().toLocaleDateString('es-CL'), label: 'Último Deploy', color: '#22c55e', small: true, onClick: () => setModal({ title: 'Deploy Info', content: 'Deploy automático cada push a main.\n\nAWS Amplify: intranet.smconnection.cl\nAWS S3+CloudFront: www.smconnection.cl' }) },
     { icon: 'bi-coin', value: 0, label: 'Tokens IA', color: '#f97316', onClick: () => setModal({ title: 'Tokens IA', content: 'Uso de tokens por agente:\n\nClaude: sin créditos\nGroq: gratis (Llama 3.3)\nGemini: rate limited\nGrok: sin API key' }) },
   ];
 

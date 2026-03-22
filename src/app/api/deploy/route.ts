@@ -146,7 +146,7 @@ export async function POST(request: Request) {
     if (action === 'trigger_deploy') {
       const { repo, workflow } = body;
       const targetRepo = repo || 'guillermogonzalezleon-lgtm/smartconnection-astro';
-      const workflowId = workflow || 'deploy-vercel.yml';
+      const workflowId = workflow || 'deploy-aws.yml';
       const result = await triggerWorkflow(targetRepo, workflowId);
       await supabaseInsert('agent_logs', {
         agent_id: 'deployer', agent_name: 'Deploy Bot',
@@ -190,7 +190,7 @@ export async function POST(request: Request) {
         }
       }
 
-      // Step 3: Deploy (push to main auto-triggers Amplify/Vercel, but also trigger workflow if specified)
+      // Step 3: Deploy (push to main auto-triggers AWS Amplify)
       if (workflow) {
         const r = await triggerWorkflow(targetRepo, workflow);
         steps.push({ step: 'deploy', success: r.success, detail: r.success ? 'Workflow triggered' : r.error });

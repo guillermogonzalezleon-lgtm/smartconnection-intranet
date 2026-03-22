@@ -26,14 +26,13 @@ export default function AgentsWorkspace() {
   const [tokens, setTokens] = useState(0);
   const [pipeline, setPipeline] = useState<PipelineStep>('idle');
   const [pipelineLog, setPipelineLog] = useState<string[]>([]);
-  const [targetRepo, setTargetRepo] = useState('smartconnection-astro');
+  const [targetRepo, setTargetRepo] = useState('smartconnection-intranet');
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const outputRef = useRef<HTMLDivElement>(null);
 
   const agent = AGENTS.find(a => a.id === selectedAgent) || AGENTS[0];
   const repos = [
-    { id: 'smartconnection-astro', label: 'Astro (Vercel)', repo: 'guillermogonzalezleon-lgtm/smartconnection-astro', url: 'https://www.smconnection.cl' },
-    { id: 'smartconnection-intranet', label: 'Intranet (AWS)', repo: 'guillermogonzalezleon-lgtm/smartconnection-intranet', url: 'https://intranet.smconnection.cl' },
+    { id: 'smartconnection-intranet', label: 'Intranet (AWS Amplify)', repo: 'guillermogonzalezleon-lgtm/smartconnection-intranet', url: 'https://intranet.smconnection.cl' },
   ];
 
   const deployApi = (p: Record<string, unknown>) => fetch('/api/deploy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }).then(r => r.json());

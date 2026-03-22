@@ -75,7 +75,6 @@ export default function DeployCenter() {
   const stepTimers = useRef<Record<string, number>>({});
 
   const repos = [
-    { id: 'smartconnection-astro', label: 'Astro (Vercel + S3)', repo: 'guillermogonzalezleon-lgtm/smartconnection-astro' },
     { id: 'smartconnection-intranet', label: 'Intranet (AWS Amplify)', repo: 'guillermogonzalezleon-lgtm/smartconnection-intranet' },
   ];
 
