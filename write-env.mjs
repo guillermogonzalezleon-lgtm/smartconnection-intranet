@@ -19,6 +19,13 @@ const vars = [
   'GROK_API_KEY',
   'XAI_API_KEY',
   'OPENAI_API_KEY',
+  'GENSPARK_API_KEY',
+  'OLLAMA_API_KEY',
+  'DEEPSEEK_API_KEY',
+  'COHERE_API_KEY',
+  'OPENROUTER_API_KEY',
+  'BEDROCK_API_KEY',
+  'MISTRAL_API_KEY',
 ];
 
 const lines = vars

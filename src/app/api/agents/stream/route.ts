@@ -141,53 +141,111 @@ export async function POST(request: Request) {
     return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' } });
   }
 
+  // ═══ DEEPSEEK / MISTRAL / OPENAI: OpenAI-compatible streaming ═══
+  const openaiCompatible: Record<string, { url: string; keyEnv: string; model: string }> = {
+    deepseek: { url: 'https://api.deepseek.com/v1/chat/completions', keyEnv: 'DEEPSEEK_API_KEY', model: 'deepseek-chat' },
+    mistral: { url: 'https://api.mistral.ai/v1/chat/completions', keyEnv: 'MISTRAL_API_KEY', model: 'mistral-small-latest' },
+    openai: { url: 'https://api.openai.com/v1/chat/completions', keyEnv: 'OPENAI_API_KEY', model: 'gpt-4o-mini' },
+  };
+  const oaiConfig = openaiCompatible[agentId];
+  if (oaiConfig) {
+    const apiKey = process.env[oaiConfig.keyEnv];
+    if (!apiKey) return new Response(`${oaiConfig.keyEnv} no configurada`, { status: 500 });
+    const oaiRes = await fetch(oaiConfig.url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: oaiConfig.model, messages: [{ role: 'system', content: sysPrompt }, { role: 'user', content: prompt }], stream: true, max_tokens: 2048, temperature: 0.7 }),
+    });
+    if (!oaiRes.ok || !oaiRes.body) return new Response(`${agentId} error: ${oaiRes.status}`, { status: 502 });
+    const stream = new ReadableStream({
+      async start(controller) {
+        const reader = oaiRes.body!.getReader(); let buffer = '';
+        try {
+          while (true) {
+            const { done, value } = await reader.read(); if (done) break;
+            buffer += decoder.decode(value, { stream: true }); const lines = buffer.split('\n'); buffer = lines.pop() || '';
+            for (const line of lines) {
+              const t = line.trim(); if (!t.startsWith('data: ')) continue; const data = t.slice(6);
+              if (data === '[DONE]') { controller.enqueue(encoder.encode('data: [DONE]\n\n')); continue; }
+              try { const p = JSON.parse(data); const c = p.choices?.[0]?.delta?.content; if (c) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: c })}\n\n`)); } catch {}
+            }
+          }
+        } catch (err) { controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: String(err) })}\n\n`)); }
+        controller.close();
+      },
+    });
+    return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' } });
+  }
+
   // ═══ HOKU: parallel execution + synthesis ═══
   if (agentId === 'hoku') {
     const stream = new ReadableStream({
       async start(controller) {
         const send = (content: string) => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
 
-        const HOKU_CLAUDE_KEY = process.env.ANTHROPIC_API_KEY;
-        const HOKU_GROK_KEY = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+        // Helper: call OpenAI-compatible API
+        const callOpenAI = async (url: string, key: string, model: string, p: string, sys: string, name: string): Promise<string> => {
+          if (!key) return `(${name} sin API key)`;
+          try {
+            const r = await fetch(url, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ model, messages: [{ role: 'system', content: sys }, { role: 'user', content: p }], max_tokens: 1500, temperature: 0.7 }),
+            });
+            if (!r.ok) return `(${name} error ${r.status})`;
+            const d = await r.json();
+            return d.choices?.[0]?.message?.content || '(sin respuesta)';
+          } catch (e) { return `(${name} error: ${String(e).slice(0, 80)})`; }
+        };
 
         // Helper: call Claude API
         const callClaude = async (p: string, sys: string): Promise<string> => {
-          if (!HOKU_CLAUDE_KEY) return '(Claude sin API key)';
-          const r = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: { 'x-api-key': HOKU_CLAUDE_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1500, system: sys, messages: [{ role: 'user', content: p }] }),
-          });
-          if (!r.ok) return `(Claude error ${r.status})`;
-          const d = await r.json();
-          return d.content?.[0]?.text || '(sin respuesta)';
+          const k = process.env.ANTHROPIC_API_KEY;
+          if (!k) return '(Claude sin API key)';
+          try {
+            const r = await fetch('https://api.anthropic.com/v1/messages', {
+              method: 'POST',
+              headers: { 'x-api-key': k, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+              body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1500, system: sys, messages: [{ role: 'user', content: p }] }),
+            });
+            if (!r.ok) return `(Claude error ${r.status})`;
+            const d = await r.json();
+            return d.content?.[0]?.text || '(sin respuesta)';
+          } catch (e) { return `(Claude error: ${String(e).slice(0, 80)})`; }
         };
 
-        // Helper: call Grok API
-        const callGrok = async (p: string, sys: string): Promise<string> => {
-          if (!HOKU_GROK_KEY) return '(Grok sin API key)';
-          const r = await fetch('https://api.x.ai/v1/chat/completions', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${HOKU_GROK_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: 'grok-3-mini', messages: [{ role: 'system', content: sys }, { role: 'user', content: p }], max_tokens: 1500 }),
-          });
-          if (!r.ok) return `(Grok error ${r.status})`;
-          const d = await r.json();
-          return d.choices?.[0]?.message?.content || '(sin respuesta)';
-        };
+        const codeSys = 'SIEMPRE genera código funcional completo. Usa formato: ```tsx filename="src/ruta/archivo.tsx"\n código \n```. Responde en español.';
 
-        send('🐾 HOKU — Ejecutando 4 agentes REALES en paralelo...\n\n');
+        // Build agent list dynamically based on available keys
+        const agentList: { name: string; fn: () => Promise<string> }[] = [
+          { name: 'Groq', fn: () => groqNonStream(prompt, `Eres un asistente técnico ultra rápido. ${codeSys}`) },
+          { name: 'Claude', fn: () => callClaude(prompt, `Eres un experto en desarrollo de software. ${codeSys}`) },
+        ];
+
+        const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+        if (grokKey) agentList.push({ name: 'Grok', fn: () => callOpenAI('https://api.x.ai/v1/chat/completions', grokKey, 'grok-3-mini', prompt, `Eres un analista de mercado. ${codeSys}`, 'Grok') });
+
+        const deepseekKey = process.env.DEEPSEEK_API_KEY;
+        if (deepseekKey) agentList.push({ name: 'DeepSeek', fn: () => callOpenAI('https://api.deepseek.com/v1/chat/completions', deepseekKey, 'deepseek-chat', prompt, `Eres un programador experto. ${codeSys}`, 'DeepSeek') });
+
+        const mistralKey = process.env.MISTRAL_API_KEY;
+        if (mistralKey) agentList.push({ name: 'Mistral', fn: () => callOpenAI('https://api.mistral.ai/v1/chat/completions', mistralKey, 'mistral-small-latest', prompt, `Eres un ingeniero de software. ${codeSys}`, 'Mistral') });
+
+        const openaiKey = process.env.OPENAI_API_KEY;
+        if (openaiKey) agentList.push({ name: 'OpenAI', fn: () => callOpenAI('https://api.openai.com/v1/chat/completions', openaiKey, 'gpt-4o-mini', prompt, `Eres un desarrollador full-stack. ${codeSys}`, 'OpenAI') });
+
+        const cohereKey = process.env.COHERE_API_KEY;
+        if (cohereKey) agentList.push({ name: 'Cohere', fn: () => callOpenAI('https://api.cohere.com/v2/chat', cohereKey, 'command-r', prompt, `Eres un experto en NLP y datos. ${codeSys}`, 'Cohere') });
+
+        const openrouterKey = process.env.OPENROUTER_API_KEY;
+        if (openrouterKey) agentList.push({ name: 'OpenRouter', fn: () => callOpenAI('https://openrouter.ai/api/v1/chat/completions', openrouterKey, 'meta-llama/llama-3.3-70b-instruct', prompt, `Eres un asistente técnico avanzado. ${codeSys}`, 'OpenRouter') });
+
+        send(`🐾 HOKU — Ejecutando ${agentList.length} agentes REALES en paralelo...\n\n`);
 
         const results: { name: string; result: string }[] = [];
-        const timeout = 25000;
+        const timeout = 30000;
 
-        // Execute ALL 4 agents with their REAL APIs in parallel
-        const promises = [
-          { name: 'Groq', fn: () => groqNonStream(prompt, 'Eres un asistente técnico. SIEMPRE genera código funcional con filename=. Responde en español.') },
-          { name: 'Claude', fn: () => callClaude(prompt, 'Eres un experto en desarrollo. Genera código completo con filename=. Responde en español.') },
-          { name: 'Grok', fn: () => callGrok(prompt, 'Eres un analista de mercado. Genera reportes HTML con filename=. Responde en español.') },
-          { name: 'Gemini', fn: () => groqNonStream(prompt, 'Eres un experto en SEO y analytics. Genera código HTML con filename=. Responde en español.') },
-        ].map(async (agent) => {
+        const promises = agentList.map(async (agent) => {
           try {
             const result = await Promise.race([
               agent.fn(),
