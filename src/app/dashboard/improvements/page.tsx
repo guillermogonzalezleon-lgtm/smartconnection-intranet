@@ -44,6 +44,8 @@ export default function ImprovementsPage() {
   const [rollbackConfirm, setRollbackConfirm] = useState<string | null>(null);
   const [showRecentOnly, setShowRecentOnly] = useState(false);
   const [compareItem, setCompareItem] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState('');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -54,6 +56,40 @@ export default function ImprovementsPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Hoku analysis (fusionado de UX Agent)
+  const runHokuAnalysis = async (item?: Improvement) => {
+    setAnalyzing(true);
+    setAnalysisResult('');
+    const prompt = item
+      ? `Analiza esta mejora UX para smconnection.cl:\n\nTítulo: ${item.titulo}\nDescripción: ${item.descripcion}\nCategoría: ${item.categoria}\nImpacto: ${item.impacto}\n\nDa pasos concretos y priorización.`
+      : `Analiza las ${improvements.length} mejoras UX actuales de smconnection.cl. Resume: cuáles son prioritarias, cuáles están implementadas, y qué falta. Sé conciso (máx 5 bullets).`;
+    try {
+      const res = await fetch('/api/agents/stream', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, taskType: 'seo', agentId: 'hoku', chatMode: true }),
+      });
+      if (!res.ok || !res.body) { setAnalysisResult('Error al conectar con Hoku'); setAnalyzing(false); return; }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n'); buffer = lines.pop() || '';
+        for (const line of lines) {
+          const t = line.trim();
+          if (!t.startsWith('data: ')) continue;
+          const d = t.slice(6);
+          if (d === '[DONE]') continue;
+          try { const p = JSON.parse(d); if (p.content) setAnalysisResult(prev => prev + p.content); } catch {}
+        }
+      }
+    } catch { setAnalysisResult('Error de conexión'); }
+    setAnalyzing(false);
+  };
 
   const recentCount = improvements.filter(i => (Date.now() - new Date(i.created_at).getTime()) < 24 * 60 * 60 * 1000).length;
 
@@ -142,10 +178,13 @@ export default function ImprovementsPage() {
       <div style={{ flexShrink: 0, background: 'rgba(15,22,35,0.92)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ height: 48, display: 'flex', alignItems: 'center', padding: '0 1.5rem', gap: 10 }}>
           <img src="/img/hoku.jpg" alt="Hoku" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
-          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f1f5f9' }}>Improvements</span>
+          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f1f5f9' }}>Mejoras & UX</span>
           <span style={{ fontSize: '0.65rem', color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>{improvements.length} mejoras</span>
           <div style={{ flex: 1 }} />
-          <a href="/dashboard/agents" style={{ background: 'linear-gradient(135deg, #00e5b0, #00c49a)', color: '#0a0d14', padding: '5px 12px', borderRadius: 7, fontWeight: 700, fontSize: '0.65rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>🐾 Nueva mejora</a>
+          <button onClick={() => runHokuAnalysis()} disabled={analyzing} style={{ background: analyzing ? '#1e293b' : 'linear-gradient(135deg, #ff6b6b, #ff8e8e)', color: analyzing ? '#475569' : '#fff', padding: '5px 12px', borderRadius: 7, fontWeight: 700, fontSize: '0.65rem', border: 'none', cursor: analyzing ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+            {analyzing ? '⏳ Analizando...' : '🐾 Análisis Hoku'}
+          </button>
+          <a href="/dashboard/agents" style={{ background: 'rgba(0,229,176,0.08)', border: '1px solid rgba(0,229,176,0.15)', color: '#00e5b0', padding: '5px 12px', borderRadius: 7, fontWeight: 700, fontSize: '0.65rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>+ Nueva</a>
           <button onClick={load} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '4px 10px', color: '#64748b', fontSize: '0.65rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>🔄</button>
         </div>
       </div>
@@ -164,6 +203,21 @@ export default function ImprovementsPage() {
             </div>
           ))}
         </div>
+
+        {/* Hoku Analysis Panel */}
+        {(analysisResult || analyzing) && (
+          <div style={{ marginBottom: '1rem', background: '#111827', border: '1px solid rgba(255,107,107,0.15)', borderRadius: 14, padding: '1rem 1.25rem', position: 'relative' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ff6b6b' }}>🐾 Análisis Hoku</span>
+              {!analyzing && <button onClick={() => setAnalysisResult('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: '0.8rem' }}>✕</button>}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#d1d5db', lineHeight: 1.7, whiteSpace: 'pre-wrap', maxHeight: 200, overflowY: 'auto' }}>
+              {analysisResult}
+              {analyzing && <span style={{ animation: 'hokuBlink 1s infinite', color: '#ff6b6b' }}>▊</span>}
+            </div>
+            <style>{`@keyframes hokuBlink { 0%,100% { opacity:1 } 50% { opacity:0 } }`}</style>
+          </div>
+        )}
 
         {/* Filters */}
         <div style={{ display: 'flex', gap: 6, marginBottom: '1rem' }}>
@@ -220,6 +274,7 @@ export default function ImprovementsPage() {
                 {lifecycle === 'deployed' && <a href="https://intranet.smconnection.cl" target="_blank" rel="noopener" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 6, padding: '4px 8px', color: '#22c55e', fontSize: '0.62rem', textDecoration: 'none', fontFamily: "'Inter', system-ui" }}>🔗 Live</a>}
                 {lifecycle === 'deployed' && <button onClick={() => setRollbackConfirm(item.id)} disabled={!!rollingBack} style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 6, padding: '4px 8px', color: '#ef4444', fontSize: '0.62rem', cursor: rollingBack ? 'not-allowed' : 'pointer', fontFamily: "'Inter', system-ui" }}>↩ Rollback</button>}
                 {lifecycle === 'deployed' && <button onClick={() => setCompareItem(compareItem === item.id ? null : item.id)} style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: 6, padding: '4px 8px', color: '#8b5cf6', fontSize: '0.62rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>📊 Antes/Después</button>}
+                <button onClick={() => runHokuAnalysis(item)} disabled={analyzing} style={{ background: 'rgba(255,107,107,0.08)', border: '1px solid rgba(255,107,107,0.15)', borderRadius: 6, padding: '4px 8px', color: '#ff6b6b', fontSize: '0.62rem', cursor: analyzing ? 'not-allowed' : 'pointer', fontFamily: "'Inter', system-ui" }}>🐾 Analizar</button>
                 <button onClick={() => navigator.clipboard.writeText(item.descripcion)} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 6, padding: '4px 8px', color: '#475569', fontSize: '0.62rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>📋</button>
               </div>
 

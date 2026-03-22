@@ -52,9 +52,8 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
     { href: '/dashboard/leads', icon: 'bi-people', label: 'Leads & CRM', shortcut: '⌘3' },
     { href: '/dashboard/analytics', icon: 'bi-graph-up', label: 'Analytics', shortcut: '⌘4' },
     { href: '/dashboard/projects', icon: 'bi-kanban', label: 'Proyectos', shortcut: '⌘5' },
-    { href: '/dashboard/ux-agent', icon: 'bi-lightning-charge', label: 'Agente UX', shortcut: '⌘6' },
+    { href: '/dashboard/improvements', icon: 'bi-stars', label: 'Mejoras & UX', shortcut: '⌘6' },
     { href: '/dashboard/labs', icon: 'bi-rocket-takeoff', label: 'Labs', shortcut: '⌘7' },
-    { href: '/dashboard/improvements', icon: 'bi-stars', label: 'Improvements', shortcut: '⌘8' },
   ];
 
   const infraItems = [
