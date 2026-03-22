@@ -13,12 +13,11 @@ interface Improvement {
   created_at: string;
 }
 
-type Lifecycle = 'draft' | 'preview' | 'approved' | 'deployed';
+type Lifecycle = 'draft' | 'in_progress' | 'deployed';
 
 const LIFECYCLE: { key: Lifecycle; label: string; color: string; icon: string }[] = [
   { key: 'draft', label: 'Borrador', color: '#f59e0b', icon: '📝' },
-  { key: 'preview', label: 'Preview', color: '#3b82f6', icon: '👁' },
-  { key: 'approved', label: 'Aprobado', color: '#8b5cf6', icon: '✅' },
+  { key: 'in_progress', label: 'En progreso', color: '#3b82f6', icon: '🔄' },
   { key: 'deployed', label: 'Deployado', color: '#22c55e', icon: '🚀' },
 ];
 
@@ -26,7 +25,7 @@ import { AGENT_COLORS, api, deployApi, formatDate } from '@/lib/config';
 
 function mapEstado(estado: string): Lifecycle {
   if (estado === 'implementado') return 'deployed';
-  if (estado === 'en_progreso') return 'approved';
+  if (estado === 'en_progreso') return 'in_progress';
   return 'draft';
 }
 
@@ -34,8 +33,6 @@ export default function ImprovementsPage() {
   const [improvements, setImprovements] = useState<Improvement[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Lifecycle | 'all'>('all');
-  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
-  const [previewTitle, setPreviewTitle] = useState('');
   const [selectedItem, setSelectedItem] = useState<Improvement | null>(null);
   const [deploying, setDeploying] = useState<string | null>(null);
   const [deployLog, setDeployLog] = useState<string[]>([]);
@@ -43,7 +40,6 @@ export default function ImprovementsPage() {
   const [rollbackLog, setRollbackLog] = useState<string[]>([]);
   const [rollbackConfirm, setRollbackConfirm] = useState<string | null>(null);
   const [showRecentOnly, setShowRecentOnly] = useState(false);
-  const [compareItem, setCompareItem] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState('');
 
@@ -95,15 +91,6 @@ export default function ImprovementsPage() {
 
   const baseFiltered = filter === 'all' ? improvements : improvements.filter(i => mapEstado(i.estado) === filter);
   const filtered = showRecentOnly ? baseFiltered.filter(i => (Date.now() - new Date(i.created_at).getTime()) < 24 * 60 * 60 * 1000) : baseFiltered;
-
-  const extractHtml = (text: string): string | null => {
-    const htmlMatch = text.match(/```html\s*([\s\S]*?)```/);
-    if (htmlMatch) return htmlMatch[1].trim();
-    const tsxMatch = text.match(/```tsx[^\n]*\n([\s\S]*?)```/);
-    if (tsxMatch) return `<pre style="font-family:monospace;color:#e2e8f0;background:#0a0d14;padding:20px;border-radius:10px;font-size:13px;line-height:1.6;overflow:auto">${tsxMatch[1].replace(/</g, '&lt;')}</pre>`;
-    if (text.includes('<div') || text.includes('<section') || text.includes('<h1')) return text;
-    return null;
-  };
 
   const extractFiles = (text: string): { path: string; lang: string; preview: string }[] => {
     const files: { path: string; lang: string; preview: string }[] = [];
@@ -171,7 +158,7 @@ export default function ImprovementsPage() {
     return steps;
   };
 
-  const counts = { all: improvements.length, draft: improvements.filter(i => mapEstado(i.estado) === 'draft').length, preview: 0, approved: improvements.filter(i => mapEstado(i.estado) === 'approved').length, deployed: improvements.filter(i => mapEstado(i.estado) === 'deployed').length };
+  const counts = { all: improvements.length, draft: improvements.filter(i => mapEstado(i.estado) === 'draft').length, in_progress: improvements.filter(i => mapEstado(i.estado) === 'in_progress').length, deployed: improvements.filter(i => mapEstado(i.estado) === 'deployed').length };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 34px)', overflow: 'hidden' }}>
@@ -245,7 +232,6 @@ export default function ImprovementsPage() {
           const lifecycle = mapEstado(item.estado);
           const lc = LIFECYCLE.find(l => l.key === lifecycle) || LIFECYCLE[0];
           const files = extractFiles(item.descripcion);
-          const hasHtml = !!extractHtml(item.descripcion);
           const isDeploying = deploying === item.id;
 
           return (
@@ -268,19 +254,20 @@ export default function ImprovementsPage() {
               )}
 
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                <button onClick={() => setSelectedItem(selectedItem?.id === item.id ? null : item)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '4px 8px', color: '#94a3b8', fontSize: '0.62rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>{selectedItem?.id === item.id ? '▼ Cerrar' : '▶ Detalle'}</button>
-                {hasHtml && <button onClick={() => { setPreviewHtml(extractHtml(item.descripcion)); setPreviewTitle(item.titulo); }} style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 6, padding: '4px 8px', color: '#3b82f6', fontSize: '0.62rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>👁 Preview</button>}
+                <button onClick={() => setSelectedItem(selectedItem?.id === item.id ? null : item)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '4px 8px', color: '#94a3b8', fontSize: '0.62rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>{selectedItem?.id === item.id ? '▼ Cerrar' : '▶ Ver'}</button>
                 {lifecycle !== 'deployed' && <button onClick={() => deployImprovement(item)} disabled={!!deploying} style={{ background: 'rgba(0,229,176,0.08)', border: '1px solid rgba(0,229,176,0.15)', borderRadius: 6, padding: '4px 8px', color: '#00e5b0', fontSize: '0.62rem', cursor: deploying ? 'not-allowed' : 'pointer', fontFamily: "'Inter', system-ui" }}>🚀 Deploy</button>}
                 {lifecycle === 'deployed' && <a href="https://intranet.smconnection.cl" target="_blank" rel="noopener" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 6, padding: '4px 8px', color: '#22c55e', fontSize: '0.62rem', textDecoration: 'none', fontFamily: "'Inter', system-ui" }}>🔗 Live</a>}
-                {lifecycle === 'deployed' && <button onClick={() => setRollbackConfirm(item.id)} disabled={!!rollingBack} style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 6, padding: '4px 8px', color: '#ef4444', fontSize: '0.62rem', cursor: rollingBack ? 'not-allowed' : 'pointer', fontFamily: "'Inter', system-ui" }}>↩ Rollback</button>}
-                {lifecycle === 'deployed' && <button onClick={() => setCompareItem(compareItem === item.id ? null : item.id)} style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: 6, padding: '4px 8px', color: '#8b5cf6', fontSize: '0.62rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>📊 Antes/Después</button>}
                 <button onClick={() => runHokuAnalysis(item)} disabled={analyzing} style={{ background: 'rgba(255,107,107,0.08)', border: '1px solid rgba(255,107,107,0.15)', borderRadius: 6, padding: '4px 8px', color: '#ff6b6b', fontSize: '0.62rem', cursor: analyzing ? 'not-allowed' : 'pointer', fontFamily: "'Inter', system-ui" }}>🐾 Analizar</button>
-                <button onClick={() => navigator.clipboard.writeText(item.descripcion)} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 6, padding: '4px 8px', color: '#475569', fontSize: '0.62rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>📋</button>
               </div>
 
               {selectedItem?.id === item.id && (
                 <div style={{ marginTop: 10, padding: '10px', background: '#0a0d14', borderRadius: 8, border: '1px solid rgba(255,255,255,0.03)', maxHeight: 350, overflow: 'auto' }}>
                   <div style={{ fontSize: '0.7rem', color: '#cbd5e1', lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: "'JetBrains Mono', monospace" }}>{item.descripcion}</div>
+                  {lifecycle === 'deployed' && (
+                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                      <button onClick={() => setRollbackConfirm(item.id)} disabled={!!rollingBack} style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 6, padding: '4px 8px', color: '#ef4444', fontSize: '0.62rem', cursor: rollingBack ? 'not-allowed' : 'pointer', fontFamily: "'Inter', system-ui" }}>↩ Rollback</button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -312,16 +299,6 @@ export default function ImprovementsPage() {
                 </div>
               )}
 
-              {/* Comparar antes/después */}
-              {compareItem === item.id && lifecycle === 'deployed' && (
-                <div style={{ marginTop: 10, padding: '12px', background: '#0a0d14', borderRadius: 8, border: '1px solid rgba(139,92,246,0.12)' }}>
-                  <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#8b5cf6', marginBottom: 6 }}>📊 ANTES / DESPUÉS</div>
-                  <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#e2e8f0', marginBottom: 4 }}>Mejora aplicada:</div>
-                  <div style={{ fontSize: '0.65rem', color: '#94a3b8', lineHeight: 1.6, marginBottom: 10, padding: '8px', background: 'rgba(139,92,246,0.05)', borderRadius: 6, border: '1px solid rgba(139,92,246,0.08)' }}>{item.descripcion.slice(0, 300)}{item.descripcion.length > 300 ? '...' : ''}</div>
-                  <a href="https://intranet.smconnection.cl" target="_blank" rel="noopener" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 6, padding: '5px 12px', color: '#22c55e', fontSize: '0.62rem', textDecoration: 'none', fontWeight: 600, fontFamily: "'Inter', system-ui" }}>🔗 Ver resultado en producción</a>
-                </div>
-              )}
-
               {/* Timeline */}
               {selectedItem?.id === item.id && (
                 <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap' }}>
@@ -337,23 +314,6 @@ export default function ImprovementsPage() {
           );
         })}
       </div>
-
-      {/* Preview popup — iframe */}
-      {previewHtml && (
-        <div onClick={() => setPreviewHtml(null)} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, width: '90%', maxWidth: 900, height: '80vh', overflow: 'hidden', boxShadow: '0 25px 60px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ height: 38, background: '#f1f5f9', display: 'flex', alignItems: 'center', padding: '0 12px', gap: 8, borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <span onClick={() => setPreviewHtml(null)} style={{ width: 12, height: 12, borderRadius: '50%', background: '#ef4444', cursor: 'pointer' }} />
-                <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#f59e0b' }} />
-                <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#22c55e' }} />
-              </div>
-              <div style={{ flex: 1, background: '#fff', borderRadius: 6, padding: '3px 12px', fontSize: '0.68rem', color: '#64748b', border: '1px solid #e2e8f0', textAlign: 'center' }}>Preview: {previewTitle}</div>
-            </div>
-            <iframe srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:20px;font-family:Inter,system-ui,sans-serif;background:#fff;color:#0f172a}*{box-sizing:border-box}</style></head><body>${previewHtml}</body></html>`} style={{ flex: 1, border: 'none', width: '100%' }} sandbox="allow-scripts" title="Preview" />
-          </div>
-        </div>
-      )}
 
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}`}</style>
     </div>

@@ -43,7 +43,7 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard';
-    return pathname.startsWith(href);
+    return pathname?.startsWith(href) ?? false;
   };
 
   const navItems = [
