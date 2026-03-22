@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { api, deployApi, formatDate } from '@/lib/config';
 
 type HealthEntry = { url: string; status: 'checking' | 'ok' | 'error'; latency: number };
 type DeployLog = { id: string; action: string; detail: string; status: string; created_at: string };
@@ -29,11 +30,6 @@ export default function AWSPage() {
   const metricsRef = useRef<HTMLDivElement>(null);
   const logsRef = useRef<HTMLDivElement>(null);
 
-  const api = useCallback((payload: Record<string, unknown>) =>
-    fetch('/api/agents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json()), []);
-
-  const deployApi = useCallback((payload: Record<string, unknown>) =>
-    fetch('/api/deploy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json()), []);
 
   const checkHealth = useCallback(async () => {
     const results = await Promise.all(ENDPOINTS.map(async (url) => {
@@ -59,7 +55,7 @@ export default function AWSPage() {
     api({ action: 'query', table: 'agent_logs', filter: 'agent_id=eq.deployer', order: 'created_at.desc', limit: 5 })
       .then(d => { if (d.data) setDeploys(d.data); })
       .catch(() => {});
-  }, [api]);
+  }, []);
 
   useEffect(() => {
     checkHealth();
@@ -95,14 +91,7 @@ export default function AWSPage() {
     return dir * ((a.created_at || '').localeCompare(b.created_at || ''));
   });
 
-  const timeAgo = (date: string) => {
-    const diff = Date.now() - new Date(date).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 60) return `hace ${mins}m`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `hace ${hrs}h`;
-    return `hace ${Math.floor(hrs / 24)}d`;
-  };
+  const timeAgo = (date: string) => formatDate(date, 'relative');
 
   return (
     <>

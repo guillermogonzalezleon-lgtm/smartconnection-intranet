@@ -143,24 +143,6 @@ const FLOWS = [
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-async function logToSupabase(agentId: string, action: string, detail: string, status: string = 'success') {
-  try {
-    await fetch('/api/agents', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'execute',
-        agentId: 'labs',
-        prompt: `LOG: ${action}`,
-        taskType: 'general',
-      }),
-    });
-    // Also use the toggle pattern which uses supabaseInsert for agent_logs
-    // We do a lightweight log via a query that won't fail if the agent doesn't exist
-  } catch {
-    // silent — don't block UI
-  }
-}
 
 async function insertLog(agentId: string, action: string, detail: string, status: string = 'success') {
   try {

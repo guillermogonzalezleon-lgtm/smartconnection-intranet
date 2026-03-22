@@ -75,23 +75,12 @@ function getTagColor(text: string): string {
   return '#94a3b8';
 }
 
+/* ── API Helpers (from config) ── */
+import { api, deployApi, formatDate } from '@/lib/config';
+
 function timeAgo(dateStr: string): string {
-  const now = new Date();
-  const d = new Date(dateStr);
-  const diff = Math.floor((now.getTime() - d.getTime()) / 1000);
-  if (diff < 60) return 'hace unos segundos';
-  if (diff < 3600) return `hace ${Math.floor(diff / 60)} min`;
-  if (diff < 86400) return `hace ${Math.floor(diff / 3600)}h`;
-  if (diff < 604800) return `hace ${Math.floor(diff / 86400)}d`;
-  return d.toLocaleDateString('es-CL');
+  return formatDate(dateStr, 'relative');
 }
-
-/* ── API Helpers ── */
-const api = (payload: Record<string, unknown>) =>
-  fetch('/api/agents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json());
-
-const deployApi = (payload: Record<string, unknown>) =>
-  fetch('/api/deploy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json());
 
 /* ── Component ── */
 export default function DeployCenter() {

@@ -22,17 +22,7 @@ const LIFECYCLE: { key: Lifecycle; label: string; color: string; icon: string }[
   { key: 'deployed', label: 'Deployado', color: '#22c55e', icon: '🚀' },
 ];
 
-import { AGENT_COLORS } from '@/lib/config';
-
-function timeAgo(d: string) {
-  const diff = Date.now() - new Date(d).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return 'Ahora';
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  return `${Math.floor(h / 24)}d`;
-}
+import { AGENT_COLORS, api, deployApi, formatDate } from '@/lib/config';
 
 function mapEstado(estado: string): Lifecycle {
   if (estado === 'implementado') return 'deployed';
@@ -55,19 +45,13 @@ export default function ImprovementsPage() {
   const [showRecentOnly, setShowRecentOnly] = useState(false);
   const [compareItem, setCompareItem] = useState<string | null>(null);
 
-  const api = useCallback((p: Record<string, unknown>) =>
-    fetch('/api/agents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }).then(r => r.json()), []);
-
-  const deployApi = (p: Record<string, unknown>) =>
-    fetch('/api/deploy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }).then(r => r.json());
-
   const load = useCallback(() => {
     setLoading(true);
     api({ action: 'query', table: 'ux_insights', order: 'created_at.desc', limit: 50 })
       .then(d => { if (d.data) setImprovements(d.data); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [api]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -141,12 +125,12 @@ export default function ImprovementsPage() {
 
   const buildTimeline = (item: Improvement): { icon: string; label: string; time: string }[] => {
     const steps: { icon: string; label: string; time: string }[] = [];
-    steps.push({ icon: '📝', label: 'Creado', time: `hace ${timeAgo(item.created_at)}` });
+    steps.push({ icon: '📝', label: 'Creado', time: `${formatDate(item.created_at, 'relative')}` });
     if (item.estado === 'en_progreso' || item.estado === 'implementado') {
-      steps.push({ icon: '🔄', label: 'En progreso', time: `hace ${timeAgo(item.created_at)}` });
+      steps.push({ icon: '🔄', label: 'En progreso', time: `${formatDate(item.created_at, 'relative')}` });
     }
     if (item.estado === 'implementado') {
-      steps.push({ icon: '🚀', label: 'Deployado', time: `hace ${timeAgo(item.created_at)}` });
+      steps.push({ icon: '🚀', label: 'Deployado', time: `${formatDate(item.created_at, 'relative')}` });
     }
     return steps;
   };
@@ -216,7 +200,7 @@ export default function ImprovementsPage() {
                 <span style={{ fontSize: '0.58rem', fontWeight: 700, padding: '2px 7px', borderRadius: 5, background: `${lc.color}12`, color: lc.color, border: `1px solid ${lc.color}20` }}>{lc.icon} {lc.label}</span>
                 <span style={{ fontSize: '0.55rem', fontWeight: 600, padding: '2px 6px', borderRadius: 5, background: `${AGENT_COLORS[item.agente] || '#475569'}12`, color: AGENT_COLORS[item.agente] || '#94a3b8' }}>{item.agente}</span>
                 {item.impacto && <span style={{ fontSize: '0.55rem', color: '#22c55e', marginLeft: 'auto', fontWeight: 600 }}>{item.impacto}</span>}
-                <span style={{ fontSize: '0.52rem', color: '#334155', fontFamily: "'JetBrains Mono', monospace" }}>hace {timeAgo(item.created_at)}</span>
+                <span style={{ fontSize: '0.52rem', color: '#334155', fontFamily: "'JetBrains Mono', monospace" }}>{formatDate(item.created_at, 'relative')}</span>
               </div>
 
               <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f1f5f9', marginBottom: 4 }}>{item.titulo}</div>

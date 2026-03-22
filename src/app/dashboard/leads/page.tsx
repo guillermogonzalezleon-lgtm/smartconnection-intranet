@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { api } from '@/lib/config';
 
 type Lead = Record<string, unknown>;
 
@@ -25,8 +26,8 @@ export default function LeadsPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const fetchLeads = () => {
-    fetch('/api/agents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'query', table: 'leads', order: 'created_at.desc', limit: 100 }) })
-      .then(r => r.json()).then(d => { if (d.data) setLeads(d.data); }).catch(() => {});
+    api({ action: 'query', table: 'leads', order: 'created_at.desc', limit: 100 })
+      .then(d => { if (d.data) setLeads(d.data); }).catch(() => {});
   };
 
   useEffect(() => { fetchLeads(); }, []);
@@ -72,11 +73,7 @@ export default function LeadsPage() {
     if (!editLead) return;
     setSaving(true);
     try {
-      await fetch('/api/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update_lead', leadId: editLead.id, updates: form }),
-      });
+      await api({ action: 'update_lead', leadId: editLead.id, updates: form });
       setEditLead(null);
       fetchLeads();
     } catch { /* ignore */ }
@@ -87,11 +84,7 @@ export default function LeadsPage() {
     if (!editLead) return;
     setSaving(true);
     try {
-      await fetch('/api/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete_lead', leadId: editLead.id }),
-      });
+      await api({ action: 'delete_lead', leadId: editLead.id });
       setEditLead(null);
       fetchLeads();
     } catch { /* ignore */ }

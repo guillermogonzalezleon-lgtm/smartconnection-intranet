@@ -78,12 +78,13 @@ export function formatDate(d: string | Date, style: 'short' | 'long' | 'relative
   if (style === 'relative') {
     const diff = Date.now() - date.getTime();
     const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'Ahora';
-    if (mins < 60) return `Hace ${mins}m`;
+    if (mins < 1) return 'ahora';
+    if (mins < 60) return `hace ${mins}m`;
     const hours = Math.floor(mins / 60);
-    if (hours < 24) return `Hace ${hours}h`;
+    if (hours < 24) return `hace ${hours}h`;
     const days = Math.floor(hours / 24);
-    return `Hace ${days}d`;
+    if (days < 7) return `hace ${days}d`;
+    return date.toLocaleDateString('es-CL');
   }
 
   if (style === 'long') {
