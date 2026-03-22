@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Assessment — SmartConnection Intranet</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#06080f;--s1:#0d1117;--s2:#161b28;--teal:#00e5b0;--blue:#4f8ef7;--green:#1fd975;--amber:#f5a623;--red:#f04747;--violet:#b794ff;--text:#dce4f0;--muted:#6b8099;--dim:#2a3d58}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden}
+.slide{min-height:100vh;padding:60px 80px;display:flex;flex-direction:column;justify-content:center;border-bottom:1px solid rgba(255,255,255,.04);position:relative}
+.slide-num{position:absolute;top:24px;right:32px;font-size:12px;color:var(--dim);font-family:'JetBrains Mono',monospace}
+h1{font-size:48px;font-weight:900;letter-spacing:-.03em;line-height:1.1;margin-bottom:16px}
+h2{font-size:32px;font-weight:800;letter-spacing:-.02em;margin-bottom:24px}
+h3{font-size:20px;font-weight:700;margin-bottom:12px}
+.sub{font-size:16px;color:var(--muted);line-height:1.6;max-width:700px;margin-bottom:32px}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;margin-right:6px;margin-bottom:6px}
+.t-ok{background:rgba(31,217,117,.1);color:var(--green)}
+.t-warn{background:rgba(245,166,35,.1);color:var(--amber)}
+.t-err{background:rgba(240,71,71,.1);color:var(--red)}
+.t-info{background:rgba(79,142,247,.1);color:var(--blue)}
+.t-teal{background:rgba(0,229,176,.1);color:var(--teal)}
+
+/* Grid */
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:1fr 1fr 1fr}
+.g4{grid-template-columns:1fr 1fr 1fr 1fr}
+
+/* Cards */
+.card{background:var(--s1);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:24px;transition:all .2s}
+.card:hover{border-color:rgba(0,229,176,.15);transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.card-title{font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.card-value{font-size:36px;font-weight:900;letter-spacing:-.02em}
+.card-sub{font-size:12px;color:var(--muted);margin-top:4px}
+
+/* Status table */
+.stable{width:100%;border-collapse:collapse;margin-top:16px}
+.stable th{text-align:left;padding:10px 14px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid rgba(255,255,255,.06)}
+.stable td{padding:10px 14px;font-size:13px;border-bottom:1px solid rgba(255,255,255,.03)}
+.stable tr:hover td{background:rgba(0,229,176,.02)}
+.st-ok{color:var(--green);font-weight:700}
+.st-warn{color:var(--amber);font-weight:700}
+.st-err{color:var(--red);font-weight:700}
+.mono{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim)}
+
+/* Diagram */
+.diagram{background:var(--s1);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:32px;margin-top:24px}
+.d-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.d-box{padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;border:1px solid;white-space:nowrap}
+.d-arrow{color:var(--dim);font-size:16px}
+.d-ok{background:rgba(31,217,117,.08);border-color:rgba(31,217,117,.2);color:var(--green)}
+.d-warn{background:rgba(245,166,35,.08);border-color:rgba(245,166,35,.2);color:var(--amber)}
+.d-err{background:rgba(240,71,71,.08);border-color:rgba(240,71,71,.2);color:var(--red)}
+.d-teal{background:rgba(0,229,176,.08);border-color:rgba(0,229,176,.2);color:var(--teal)}
+.d-blue{background:rgba(79,142,247,.08);border-color:rgba(79,142,247,.2);color:var(--blue)}
+
+/* Roadmap */
+.rm-item{display:flex;gap:20px;margin-bottom:20px;position:relative}
+.rm-line{position:absolute;left:15px;top:32px;bottom:-8px;width:2px;background:rgba(255,255,255,.04)}
+.rm-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;font-weight:700;z-index:1}
+.rm-content{flex:1;background:var(--s1);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:16px 20px}
+.rm-title{font-size:14px;font-weight:700;margin-bottom:4px}
+.rm-desc{font-size:12px;color:var(--muted);line-height:1.6}
+.rm-tags{margin-top:8px;display:flex;gap:4px;flex-wrap:wrap}
+
+/* Progress bars */
+.pbar{height:6px;background:rgba(255,255,255,.04);border-radius:3px;overflow:hidden;margin-top:8px}
+.pfill{height:100%;border-radius:3px;transition:width .6s}
+
+/* Score */
+.score-ring{width:120px;height:120px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;margin:0 auto 16px}
+.score-num{font-size:42px;font-weight:900}
+.score-of{font-size:12px;color:var(--muted)}
+
+/* Nav */
+.nav{position:fixed;top:0;left:0;right:0;height:48px;background:rgba(6,8,15,.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;padding:0 32px;gap:16px;z-index:100}
+.nav-brand{font-size:14px;font-weight:800;color:var(--teal)}
+.nav-sep{width:1px;height:18px;background:rgba(255,255,255,.1)}
+.nav-title{font-size:13px;color:var(--muted)}
+.nav-right{margin-left:auto;font-size:11px;color:var(--dim);font-family:'JetBrains Mono',monospace}
+.slide:first-of-type{padding-top:108px}
+
+@media(max-width:768px){
+  .slide{padding:40px 24px}
+  h1{font-size:32px}
+  h2{font-size:24px}
+  .g2,.g3,.g4{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<div class="nav">
+  <span class="nav-brand">SC</span>
+  <div class="nav-sep"></div>
+  <span class="nav-title">Assessment — SmartConnection Intranet</span>
+  <span class="nav-right">22 marzo 2026</span>
+</div>
+
+<!-- SLIDE 1: COVER -->
+<div class="slide" style="background:radial-gradient(ellipse at 30% 50%,rgba(0,229,176,.06) 0%,transparent 60%)">
+  <span class="slide-num">01</span>
+  <div style="margin-bottom:24px">
+    <span class="tag t-teal">ASSESSMENT</span>
+    <span class="tag t-info">v2.0</span>
+    <span class="tag t-ok">22-03-2026</span>
+  </div>
+  <h1>SmartConnection<br>Intranet Assessment</h1>
+  <p class="sub">Scan completo del estado de la plataforma: qué funciona, qué no, qué falta, y roadmap de mejoras. 18 componentes analizados, 12 agentes IA, 50+ extensiones.</p>
+  <div class="grid g4" style="max-width:800px;margin-top:16px">
+    <div class="card" style="text-align:center"><div class="card-value" style="color:var(--green)">10</div><div class="card-sub">Páginas</div></div>
+    <div class="card" style="text-align:center"><div class="card-value" style="color:var(--teal)">12</div><div class="card-sub">Agentes IA</div></div>
+    <div class="card" style="text-align:center"><div class="card-value" style="color:var(--blue)">16</div><div class="card-sub">API Actions</div></div>
+    <div class="card" style="text-align:center"><div class="card-value" style="color:var(--violet)">8</div><div class="card-sub">Tablas BD</div></div>
+  </div>
+</div>
+
+<!-- SLIDE 2: SCORE -->
+<div class="slide">
+  <span class="slide-num">02</span>
+  <h2>Score General</h2>
+  <div class="grid g3" style="max-width:900px">
+    <div class="card" style="text-align:center">
+      <div class="score-ring" style="border:4px solid var(--green)">
+        <div class="score-num" style="color:var(--green)">85</div>
+        <div class="score-of">/100</div>
+      </div>
+      <h3>Funcionalidad</h3>
+      <p class="card-sub">10/10 páginas funcionan. APIs conectadas. Streaming real.</p>
+    </div>
+    <div class="card" style="text-align:center">
+      <div class="score-ring" style="border:4px solid var(--amber)">
+        <div class="score-num" style="color:var(--amber)">55</div>
+        <div class="score-of">/100</div>
+      </div>
+      <h3>Conectividad</h3>
+      <p class="card-sub">Secciones conectadas a Supabase pero aisladas entre sí.</p>
+    </div>
+    <div class="card" style="text-align:center">
+      <div class="score-ring" style="border:4px solid var(--amber)">
+        <div class="score-num" style="color:var(--amber)">65</div>
+        <div class="score-of">/100</div>
+      </div>
+      <h3>Producción</h3>
+      <p class="card-sub">Deploy funciona. Health checks reales. Algunos flows simulados.</p>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 3: STATUS TABLE -->
+<div class="slide">
+  <span class="slide-num">03</span>
+  <h2>Estado por Sección</h2>
+  <table class="stable">
+    <thead><tr><th>Sección</th><th>Estado</th><th>Supabase</th><th>APIs Reales</th><th>Conectada</th><th>Notas</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Dashboard</strong></td><td class="st-ok">✅ 100%</td><td class="st-ok">✅</td><td class="st-ok">✅</td><td class="st-ok">✅ 5 secciones</td><td>8 KPIs, refresh 10s</td></tr>
+      <tr><td><strong>Agentes IA</strong></td><td class="st-ok">✅ 95%</td><td class="st-ok">✅</td><td class="st-ok">✅ 9 streaming</td><td class="st-ok">✅</td><td>Preview POC antes de deploy</td></tr>
+      <tr><td><strong>Leads & CRM</strong></td><td class="st-ok">✅ 100%</td><td class="st-ok">✅</td><td class="st-ok">✅</td><td class="st-warn">⚠️ parcial</td><td>CRUD completo, CSV export</td></tr>
+      <tr><td><strong>Analytics</strong></td><td class="st-ok">✅ 95%</td><td class="st-ok">✅</td><td class="st-ok">✅</td><td class="st-warn">⚠️</td><td>Data source tabla analytics</td></tr>
+      <tr><td><strong>Proyectos</strong></td><td class="st-ok">✅ 100%</td><td class="st-ok">✅</td><td class="st-ok">✅</td><td class="st-ok">✅ leads</td><td>Kanban + drag&drop + lead_id</td></tr>
+      <tr><td><strong>Mejoras & UX</strong></td><td class="st-ok">✅ 100%</td><td class="st-ok">✅</td><td class="st-ok">✅</td><td class="st-ok">✅ deploy</td><td>Lifecycle + Hoku análisis</td></tr>
+      <tr><td><strong>Extensiones</strong></td><td class="st-warn">⚠️ 50%</td><td class="st-ok">✅</td><td class="st-warn">⚠️ 10/50</td><td class="st-warn">⚠️</td><td>40 conectores sin backend real</td></tr>
+      <tr><td><strong>Deploy Center</strong></td><td class="st-ok">✅ 100%</td><td class="st-ok">✅</td><td class="st-ok">✅</td><td class="st-ok">✅</td><td>7 pasos, health real, CDN</td></tr>
+      <tr><td><strong>AWS Panel</strong></td><td class="st-ok">✅ 100%</td><td class="st-ok">✅</td><td class="st-ok">✅</td><td class="st-warn">⚠️ duplica Deploy</td><td>S3, CloudFront, Amplify</td></tr>
+      <tr><td><strong>Discovery</strong></td><td class="st-ok">✅ 100%</td><td class="st-err">❌</td><td class="st-err">❌</td><td class="st-err">❌ estático</td><td>14 cursos, iframe split-view</td></tr>
+      <tr><td><strong>Hoku Chat 🐾</strong></td><td class="st-ok">✅ 90%</td><td class="st-ok">✅</td><td class="st-ok">✅</td><td class="st-ok">✅ todo</td><td>ML, feedback, knowledge base</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SLIDE 4: ARCHITECTURE -->
+<div class="slide">
+  <span class="slide-num">04</span>
+  <h2>Arquitectura de Conexiones</h2>
+  <div class="diagram">
+    <h3 style="margin-bottom:20px;color:var(--teal)">Flujo de datos actual</h3>
+    <div class="d-row">
+      <div class="d-box d-teal">Usuario</div>
+      <span class="d-arrow">→</span>
+      <div class="d-box d-ok">Dashboard</div>
+      <span class="d-arrow">→</span>
+      <div class="d-box d-blue">/api/agents</div>
+      <span class="d-arrow">→</span>
+      <div class="d-box d-ok">Supabase</div>
+    </div>
+    <div class="d-row">
+      <div class="d-box d-teal">Hoku Chat</div>
+      <span class="d-arrow">→</span>
+      <div class="d-box d-blue">/api/agents/stream</div>
+      <span class="d-arrow">→</span>
+      <div class="d-box d-ok">9 Providers IA</div>
+      <span class="d-arrow">→</span>
+      <div class="d-box d-ok">hoku_knowledge (ML)</div>
+    </div>
+    <div class="d-row">
+      <div class="d-box d-teal">Mejoras</div>
+      <span class="d-arrow">→</span>
+      <div class="d-box d-blue">/api/deploy</div>
+      <span class="d-arrow">→</span>
+      <div class="d-box d-ok">GitHub API</div>
+      <span class="d-arrow">→</span>
+      <div class="d-box d-ok">AWS Amplify</div>
+    </div>
+    <h3 style="margin:24px 0 16px;color:var(--amber)">Conexiones faltantes</h3>
+    <div class="d-row">
+      <div class="d-box d-warn">Labs (40 conectores)</div>
+      <span class="d-arrow">✗</span>
+      <div class="d-box d-err">Sin backend real</div>
+    </div>
+    <div class="d-row">
+      <div class="d-box d-warn">Analytics</div>
+      <span class="d-arrow">✗</span>
+      <div class="d-box d-err">Sin tracking real</div>
+    </div>
+    <div class="d-row">
+      <div class="d-box d-warn">AWS Panel</div>
+      <span class="d-arrow">≈</span>
+      <div class="d-box d-warn">Duplica Deploy Center</div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 5: AGENTS -->
+<div class="slide">
+  <span class="slide-num">05</span>
+  <h2>Agentes IA — Estado Real</h2>
+  <div class="grid g3">
+    <div class="card"><div class="card-title">⚡ Groq</div><div class="card-sub">llama-3.3-70b · gratis</div><span class="tag t-ok">✅ Streaming</span><span class="tag t-ok">✅ Módulo</span></div>
+    <div class="card"><div class="card-title">🤖 Claude</div><div class="card-sub">haiku-4.5</div><span class="tag t-ok">✅ Streaming</span><span class="tag t-ok">✅ Módulo</span></div>
+    <div class="card"><div class="card-title">🔮 Grok</div><div class="card-sub">grok-3-mini</div><span class="tag t-ok">✅ Streaming</span><span class="tag t-ok">✅ Módulo</span></div>
+    <div class="card"><div class="card-title">💎 Gemini</div><div class="card-sub">gemini-2.0-flash</div><span class="tag t-ok">✅ Streaming</span><span class="tag t-ok">✅ Módulo</span></div>
+    <div class="card"><div class="card-title">🔷 DeepSeek</div><div class="card-sub">deepseek-chat</div><span class="tag t-ok">✅ Streaming</span><span class="tag t-warn">⚠️ Sin módulo orchestrator</span></div>
+    <div class="card"><div class="card-title">🟠 Mistral</div><div class="card-sub">mistral-small</div><span class="tag t-ok">✅ Streaming</span><span class="tag t-warn">⚠️ Sin módulo orchestrator</span></div>
+    <div class="card"><div class="card-title">🟢 OpenAI</div><div class="card-sub">gpt-4o-mini</div><span class="tag t-ok">✅ Streaming</span><span class="tag t-warn">⚠️ Sin módulo orchestrator</span></div>
+    <div class="card"><div class="card-title">📘 Cohere</div><div class="card-sub">command-a</div><span class="tag t-ok">✅ Streaming</span><span class="tag t-warn">⚠️ Sin módulo orchestrator</span></div>
+    <div class="card"><div class="card-title">🔀 OpenRouter</div><div class="card-sub">llama-3.3-70b</div><span class="tag t-ok">✅ Streaming</span><span class="tag t-warn">⚠️ Sin módulo orchestrator</span></div>
+    <div class="card"><div class="card-title">☁ Bedrock</div><div class="card-sub">claude-3.5-haiku</div><span class="tag t-ok">✅ Streaming</span><span class="tag t-warn">⚠️ Sin módulo orchestrator</span></div>
+    <div class="card"><div class="card-title">🐾 Hoku</div><div class="card-sub">fusión 4 agentes (orchestrator) / 9 (streaming)</div><span class="tag t-ok">✅ ML</span><span class="tag t-ok">✅ Knowledge</span></div>
+    <div class="card"><div class="card-title">🐕 Panchita</div><div class="card-sub">fusión cuidadosa</div><span class="tag t-ok">✅ Chat</span><span class="tag t-info">Mismo motor que Hoku</span></div>
+  </div>
+</div>
+
+<!-- SLIDE 6: PROBLEMS -->
+<div class="slide">
+  <span class="slide-num">06</span>
+  <h2>Problemas Críticos</h2>
+  <div class="grid g2">
+    <div class="card" style="border-color:rgba(240,71,71,.2)">
+      <div class="card-title" style="color:var(--red)">🔴 Labs — 40 conectores fake</div>
+      <p class="card-sub" style="line-height:1.6">SAP, MeLi, Amazon, Shopify, Stripe definidos pero sin backend. Se ven como reales pero no hacen nada. Health checks simulados con setTimeout.</p>
+      <div class="pbar"><div class="pfill" style="width:25%;background:var(--red)"></div></div>
+      <p class="mono" style="margin-top:8px">10/50 conectores operacionales (20%)</p>
+    </div>
+    <div class="card" style="border-color:rgba(245,166,35,.2)">
+      <div class="card-title" style="color:var(--amber)">🟡 Orchestrator incompleto</div>
+      <p class="card-sub" style="line-height:1.6">Solo 5 módulos (claude, groq, grok, gemini, deployBot). Streaming soporta 9 pero orchestrator.ts falla con deepseek, mistral, openai, cohere, openrouter, bedrock.</p>
+      <div class="pbar"><div class="pfill" style="width:45%;background:var(--amber)"></div></div>
+      <p class="mono" style="margin-top:8px">5/11 módulos implementados (45%)</p>
+    </div>
+    <div class="card" style="border-color:rgba(245,166,35,.2)">
+      <div class="card-title" style="color:var(--amber)">🟡 AWS Panel duplica Deploy</div>
+      <p class="card-sub" style="line-height:1.6">Dos páginas muestran la misma información (S3, CloudFront, health checks). Sin razón para mantener ambas.</p>
+    </div>
+    <div class="card" style="border-color:rgba(245,166,35,.2)">
+      <div class="card-title" style="color:var(--amber)">🟡 Analytics sin tracking real</div>
+      <p class="card-sub" style="line-height:1.6">La tabla analytics existe pero no se ve dónde se originan los eventos. No hay script de tracking en smconnection.cl.</p>
+    </div>
+    <div class="card" style="border-color:rgba(79,142,247,.2)">
+      <div class="card-title" style="color:var(--blue)">🔵 Hoku fusion mismatch</div>
+      <p class="card-sub" style="line-height:1.6">hoku.ts fusiona 4 agentes. Streaming fusiona 9. El orchestrator y streaming tienen lógicas separadas. Debería ser uno solo.</p>
+    </div>
+    <div class="card" style="border-color:rgba(79,142,247,.2)">
+      <div class="card-title" style="color:var(--blue)">🔵 Discovery Center estático</div>
+      <p class="card-sub" style="line-height:1.6">14 cursos con links externos en iframe. No conectado a Supabase, no trackea progreso en BD, no genera insights.</p>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 7: WHAT WORKS -->
+<div class="slide" style="background:radial-gradient(ellipse at 70% 50%,rgba(31,217,117,.04) 0%,transparent 60%)">
+  <span class="slide-num">07</span>
+  <h2>Lo que SÍ funciona bien</h2>
+  <div class="grid g2">
+    <div class="card" style="border-color:rgba(31,217,117,.2)">
+      <div class="card-title" style="color:var(--green)">✅ Streaming de 9 agentes IA</div>
+      <p class="card-sub">SSE real desde /api/agents/stream. Claude, Groq, Grok, DeepSeek, Mistral, OpenAI, Cohere, OpenRouter, Bedrock.</p>
+    </div>
+    <div class="card" style="border-color:rgba(31,217,117,.2)">
+      <div class="card-title" style="color:var(--green)">✅ CRM completo (Leads)</div>
+      <p class="card-sub">CRUD real en Supabase. Crear, editar, eliminar, filtrar, ordenar, exportar CSV.</p>
+    </div>
+    <div class="card" style="border-color:rgba(31,217,117,.2)">
+      <div class="card-title" style="color:var(--green)">✅ Kanban de Proyectos</div>
+      <p class="card-sub">Drag & drop entre columnas. CRUD completo. Vinculación con leads. Persistencia real.</p>
+    </div>
+    <div class="card" style="border-color:rgba(31,217,117,.2)">
+      <div class="card-title" style="color:var(--green)">✅ Deploy pipeline real</div>
+      <p class="card-sub">7 pasos: Build, Tests IA, Push, Amplify, Health Check, Stress Test, Live. Commit a GitHub real.</p>
+    </div>
+    <div class="card" style="border-color:rgba(31,217,117,.2)">
+      <div class="card-title" style="color:var(--green)">✅ ML con feedback loop</div>
+      <p class="card-sub">hoku_knowledge con FTS español. Feedback 👍/👎 ajusta quality_score. Aprende de cada interacción.</p>
+    </div>
+    <div class="card" style="border-color:rgba(31,217,117,.2)">
+      <div class="card-title" style="color:var(--green)">✅ Preview POC antes de deploy</div>
+      <p class="card-sub">Sandbox iframe que muestra el código generado antes de commitear a producción.</p>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 8: SUPABASE -->
+<div class="slide">
+  <span class="slide-num">08</span>
+  <h2>Base de Datos — Supabase</h2>
+  <table class="stable">
+    <thead><tr><th>Tabla</th><th>Registros</th><th>Usada por</th><th>Estado</th></tr></thead>
+    <tbody>
+      <tr><td><strong>agent_config</strong></td><td>12</td><td>Dashboard, Agents, Deploy</td><td class="st-ok">✅ Activa</td></tr>
+      <tr><td><strong>agent_logs</strong></td><td>100+</td><td>Dashboard, Deploy, AWS, Labs</td><td class="st-ok">✅ Activa</td></tr>
+      <tr><td><strong>leads</strong></td><td>~50</td><td>Leads, Dashboard, Analytics, Projects</td><td class="st-ok">✅ Activa</td></tr>
+      <tr><td><strong>projects</strong></td><td>~10</td><td>Projects, Dashboard</td><td class="st-ok">✅ Activa</td></tr>
+      <tr><td><strong>ux_insights</strong></td><td>~30</td><td>Improvements, UX Agent, Deploy</td><td class="st-ok">✅ Activa</td></tr>
+      <tr><td><strong>hoku_chat</strong></td><td>~200</td><td>HokuChat, ML</td><td class="st-ok">✅ Activa</td></tr>
+      <tr><td><strong>hoku_knowledge</strong></td><td>~50</td><td>HokuChat ML, Streaming</td><td class="st-ok">✅ FTS español</td></tr>
+      <tr><td><strong>analytics</strong></td><td>?</td><td>Analytics</td><td class="st-warn">⚠️ Sin fuente de datos</td></tr>
+      <tr><td><strong>reuniones</strong></td><td>~5</td><td>Dashboard, Analytics</td><td class="st-warn">⚠️ Solo lectura</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SLIDE 9: ROADMAP -->
+<div class="slide" style="background:radial-gradient(ellipse at 30% 80%,rgba(0,229,176,.04) 0%,transparent 50%)">
+  <span class="slide-num">09</span>
+  <h2>Roadmap de Mejoras</h2>
+
+  <div style="max-width:700px">
+    <div class="rm-item">
+      <div class="rm-line"></div>
+      <div class="rm-dot" style="background:rgba(240,71,71,.15);color:var(--red)">1</div>
+      <div class="rm-content">
+        <div class="rm-title">🔴 Limpiar Labs — eliminar conectores fake</div>
+        <div class="rm-desc">Reducir de 50 a solo los 10-15 operacionales. Los demás moverlos a un roadmap visual sin simular que funcionan.</div>
+        <div class="rm-tags"><span class="tag t-err">Crítico</span><span class="tag t-info">1 día</span></div>
+      </div>
+    </div>
+
+    <div class="rm-item">
+      <div class="rm-line"></div>
+      <div class="rm-dot" style="background:rgba(240,71,71,.15);color:var(--red)">2</div>
+      <div class="rm-content">
+        <div class="rm-title">🔴 Unificar Hoku fusion</div>
+        <div class="rm-desc">Eliminar hoku.ts (4 agentes) y que todo use el streaming (9 agentes). Un solo path de fusión.</div>
+        <div class="rm-tags"><span class="tag t-err">Crítico</span><span class="tag t-info">0.5 día</span></div>
+      </div>
+    </div>
+
+    <div class="rm-item">
+      <div class="rm-line"></div>
+      <div class="rm-dot" style="background:rgba(245,166,35,.15);color:var(--amber)">3</div>
+      <div class="rm-content">
+        <div class="rm-title">🟡 Fusionar AWS Panel con Deploy Center</div>
+        <div class="rm-desc">AWS como tab dentro de Deploy, no página separada. Reducir sidebar a 7 items.</div>
+        <div class="rm-tags"><span class="tag t-warn">Alto</span><span class="tag t-info">0.5 día</span></div>
+      </div>
+    </div>
+
+    <div class="rm-item">
+      <div class="rm-line"></div>
+      <div class="rm-dot" style="background:rgba(245,166,35,.15);color:var(--amber)">4</div>
+      <div class="rm-content">
+        <div class="rm-title">🟡 Implementar tracking real en Analytics</div>
+        <div class="rm-desc">Agregar script de tracking en smconnection.cl que inserte eventos en tabla analytics de Supabase.</div>
+        <div class="rm-tags"><span class="tag t-warn">Alto</span><span class="tag t-info">1 día</span></div>
+      </div>
+    </div>
+
+    <div class="rm-item">
+      <div class="rm-line"></div>
+      <div class="rm-dot" style="background:rgba(79,142,247,.15);color:var(--blue)">5</div>
+      <div class="rm-content">
+        <div class="rm-title">🔵 Voz conversacional real</div>
+        <div class="rm-desc">Implementar OpenAI Realtime API o ElevenLabs para conversación por voz natural estilo ChatGPT Voice. Requiere presupuesto (~$0.10-0.30/min).</div>
+        <div class="rm-tags"><span class="tag t-info">Medio</span><span class="tag t-info">2 días</span></div>
+      </div>
+    </div>
+
+    <div class="rm-item">
+      <div class="rm-line"></div>
+      <div class="rm-dot" style="background:rgba(79,142,247,.15);color:var(--blue)">6</div>
+      <div class="rm-content">
+        <div class="rm-title">🔵 Agent Health monitoring</div>
+        <div class="rm-desc">KPI de salud por agente: uptime, latencia promedio, tasa de error. Alert si agente falla 3x seguidas.</div>
+        <div class="rm-tags"><span class="tag t-info">Medio</span><span class="tag t-info">1 día</span></div>
+      </div>
+    </div>
+
+    <div class="rm-item">
+      <div class="rm-dot" style="background:rgba(183,148,255,.15);color:var(--violet)">7</div>
+      <div class="rm-content">
+        <div class="rm-title">🟣 Integraciones reales SAP/MeLi</div>
+        <div class="rm-desc">Conectar APIs reales de SAP BTP y MercadoLibre cuando haya credenciales y casos de uso concretos.</div>
+        <div class="rm-tags"><span class="tag t-info">Futuro</span><span class="tag t-info">Variable</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 10: SUMMARY -->
+<div class="slide" style="background:radial-gradient(ellipse at 50% 50%,rgba(0,229,176,.06) 0%,transparent 50%)">
+  <span class="slide-num">10</span>
+  <h2>Resumen Ejecutivo</h2>
+  <p class="sub">La intranet SmartConnection es una plataforma funcional con base sólida. El 85% funciona correctamente. Las mejoras principales son de limpieza (eliminar lo fake), unificación (reducir duplicación), y profundización (conexiones reales).</p>
+
+  <div class="grid g3" style="max-width:900px;margin-bottom:32px">
+    <div class="card" style="text-align:center;border-color:rgba(31,217,117,.2)">
+      <div class="card-value" style="color:var(--green);font-size:28px">85%</div>
+      <div class="card-sub">Funciona hoy</div>
+    </div>
+    <div class="card" style="text-align:center;border-color:rgba(245,166,35,.2)">
+      <div class="card-value" style="color:var(--amber);font-size:28px">5 días</div>
+      <div class="card-sub">Para llegar a 95%</div>
+    </div>
+    <div class="card" style="text-align:center;border-color:rgba(0,229,176,.2)">
+      <div class="card-value" style="color:var(--teal);font-size:28px">7</div>
+      <div class="card-sub">Mejoras en roadmap</div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <span class="tag t-ok">✅ 9 agentes IA streaming</span>
+    <span class="tag t-ok">✅ CRM funcional</span>
+    <span class="tag t-ok">✅ Kanban real</span>
+    <span class="tag t-ok">✅ Deploy pipeline</span>
+    <span class="tag t-ok">✅ ML feedback loop</span>
+    <span class="tag t-ok">✅ Preview POC</span>
+    <span class="tag t-warn">⚠️ Labs 20% real</span>
+    <span class="tag t-warn">⚠️ Analytics sin tracking</span>
+    <span class="tag t-warn">⚠️ AWS duplicado</span>
+    <span class="tag t-info">🔵 Voz pendiente</span>
+  </div>
+
+  <p style="margin-top:40px;font-size:12px;color:var(--dim)">Assessment generado por Hoku 🐾 · Smart Connection · 22 marzo 2026</p>
+</div>
+
+</body>
+</html>
