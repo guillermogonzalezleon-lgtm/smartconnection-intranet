@@ -129,7 +129,7 @@ const CONNECTORS: Connector[] = [
   { id: 'slack', name: 'Slack', category: 'Messaging', icon: '💬', color: '#e01e5a', status: 'coming_soon', description: 'Notificaciones y bots', authType: 'OAuth 2.0', businessValue: 2 },
 ];
 
-const TABS = ['Conectores', 'Flujos', 'Monitoreo'];
+const TABS = ['Extensiones', 'Automatizaciones', 'Health'];
 
 const FLOWS = [
   { id: 'flow-onboarding', name: 'Client Onboarding → CRM', source: 'Formulario Web', transform: 'Validación + Enrich IA', dest: 'Supabase CRM + Calendar', status: 'active', prompt: 'Analiza el flujo de onboarding de clientes en smconnection.cl. Revisa el formulario de contacto, la validación, y sugiere mejoras para aumentar la conversión. Genera código si es necesario.' },
@@ -204,7 +204,7 @@ function getMonitorDot(entry: MonitorEntry | undefined): { color: string; label:
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function LabsPage() {
   const router = useRouter();
-  const [tab, setTab] = useState('Conectores');
+  const [tab, setTab] = useState('Extensiones');
   const [search, setSearch] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
   const [catFilter, setCatFilter] = useState('Todas');
@@ -567,10 +567,10 @@ export default function LabsPage() {
   });
 
   const statusCfg: Record<string, { label: string; color: string; bg: string }> = {
-    active: { label: '● Activo', color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
-    available: { label: '○ Disponible', color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
+    active: { label: '✓ Instalado', color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
+    available: { label: 'Disponible', color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
     error: { label: '✕ Error', color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
-    coming_soon: { label: '◌ Próximamente', color: '#475569', bg: 'rgba(71,85,105,0.1)' },
+    coming_soon: { label: 'Próximamente', color: '#475569', bg: 'rgba(71,85,105,0.1)' },
   };
 
   const actionBtn = (bg: string, border: string, color: string, extra?: React.CSSProperties): React.CSSProperties => ({
@@ -602,7 +602,7 @@ export default function LabsPage() {
         <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(10,14,26,0.88)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0 2rem' }}>
           <div style={{ height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: '0.82rem', color: '#6b7a90' }}>
-              Intranet <span style={{ margin: '0 8px', color: '#2d3748' }}>/</span> <span style={{ color: '#f1f5f9', fontWeight: 700, letterSpacing: '-0.01em' }}>Integration Hub</span>
+              Intranet <span style={{ margin: '0 8px', color: '#2d3748' }}>/</span> <span style={{ color: '#f1f5f9', fontWeight: 700, letterSpacing: '-0.01em' }}>Extensiones</span>
             </div>
             <div style={{ fontSize: '0.6rem', color: '#3a4a60', display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
@@ -658,7 +658,7 @@ export default function LabsPage() {
           </div>
 
           {/* ─── CONECTORES TAB ───────────────────────────────────────── */}
-          {tab === 'Conectores' && (
+          {tab === 'Extensiones' && (
             <>
               {/* Filters */}
               <div style={{ display: 'flex', gap: 8, marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -744,7 +744,7 @@ export default function LabsPage() {
           )}
 
           {/* ─── FLUJOS TAB ───────────────────────────────────────────── */}
-          {tab === 'Flujos' && (
+          {tab === 'Automatizaciones' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {FLOWS.map((flow, i) => {
                 const exec = flowExecs[flow.id];
@@ -865,7 +865,7 @@ export default function LabsPage() {
           )}
 
           {/* ─── MONITOREO TAB ────────────────────────────────────────── */}
-          {tab === 'Monitoreo' && (
+          {tab === 'Health' && (
             <div>
               {/* Health check results banner */}
               {healthData.length > 0 && (
