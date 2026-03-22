@@ -240,6 +240,23 @@ export async function POST(request: Request) {
         const openrouterKey = process.env.OPENROUTER_API_KEY;
         if (openrouterKey) agentList.push({ name: 'OpenRouter', fn: () => callOpenAI('https://openrouter.ai/api/v1/chat/completions', openrouterKey, 'meta-llama/llama-3.3-70b-instruct', prompt, `Eres un asistente técnico avanzado. ${codeSys}`, 'OpenRouter') });
 
+        // Bedrock uses AWS credentials from the Amplify runtime environment (no API key needed)
+        agentList.push({ name: 'Bedrock', fn: async () => {
+          try {
+            // In Amplify, AWS credentials are injected automatically
+            // Use the Bedrock converse API via fetch with AWS Sig V4 is complex
+            // Simpler: call our own API endpoint that uses the runtime credentials
+            const r = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://intranet.smconnection.cl'}/api/bedrock`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ prompt: prompt, system: `Eres un experto cloud AWS. ${codeSys}` }),
+            });
+            if (!r.ok) return `(Bedrock error ${r.status})`;
+            const d = await r.json();
+            return d.result || '(sin respuesta)';
+          } catch (e) { return `(Bedrock: ${String(e).slice(0, 80)})`; }
+        } });
+
         send(`🐾 HOKU — Ejecutando ${agentList.length} agentes REALES en paralelo...\n\n`);
 
         const results: { name: string; result: string }[] = [];
