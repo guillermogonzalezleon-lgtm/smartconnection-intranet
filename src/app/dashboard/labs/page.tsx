@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface Connector {
@@ -15,7 +15,7 @@ interface Connector {
   dataVolume?: string;
   endpoints?: string[];
   action?: string;
-  businessValue?: number; // 1-5, higher = more valuable
+  businessValue?: number;
 }
 
 const CONNECTORS: Connector[] = [
@@ -67,7 +67,19 @@ const CONNECTORS: Connector[] = [
 
 const TABS = ['Conectores', 'Flujos', 'Monitoreo'];
 
+const FLOWS = [
+  { name: 'Client Onboarding → CRM', source: 'Formulario Web', transform: 'Validación + Enrich IA', dest: 'Supabase CRM + Calendar', status: 'active', prompt: 'Analiza el flujo de onboarding de clientes en smconnection.cl. Revisa el formulario de contacto, la validación, y sugiere mejoras para aumentar la conversión. Genera código si es necesario.' },
+  { name: 'Proposal Generation → PDF → Email', source: 'Brief del cliente', transform: 'Groq IA + Template', dest: 'PDF + Resend Email', status: 'active', prompt: 'Genera una propuesta de consultoría SAP para un cliente PYME chileno. Incluye: scope, timeline, pricing estimado, y beneficios. Formato profesional.' },
+  { name: 'UX Analysis → Deploy', source: 'smconnection.cl', transform: 'Hoku IA Analysis', dest: 'Insights + Auto-deploy', status: 'active', prompt: 'Analiza smconnection.cl desde todos los ángulos: código, SEO, UX, mercado. Genera 3 mejoras concretas con código implementable.' },
+  { name: 'Deploy Pipeline', source: 'GitHub Push', transform: 'Build Next.js/Astro', dest: 'AWS Amplify + S3 + CloudFront', status: 'active', prompt: '' },
+  { name: 'Agent Orchestrator', source: 'Prompt del usuario', transform: 'Parallel execute + retry', dest: 'Groq/Gemini → Supabase logs', status: 'active', prompt: '' },
+  { name: 'SAP → Analytics Pipeline', source: 'SAP S/4HANA / BTP', transform: 'ETL + Datasphere', dest: 'SAP Analytics Cloud', status: 'available', prompt: 'Diseña la arquitectura de integración entre SAP S/4HANA y SAP Analytics Cloud usando BTP Integration Suite.' },
+  { name: 'SAP BTP → Custom App Deploy', source: 'SAP BTP Cockpit', transform: 'CI/CD + Build Apps', dest: 'Cloud Foundry / Kyma', status: 'available', prompt: 'Genera el pipeline CI/CD para deployar una app custom en SAP BTP Cloud Foundry con GitHub Actions.' },
+  { name: 'WhatsApp Lead', source: 'WhatsApp Button', transform: 'Redirect wa.me', dest: 'WhatsApp Business', status: 'available', prompt: 'Implementa el flujo de WhatsApp lead capture: botón en el sitio → opciones rápidas (SAP, Apps IA, PYMES) → clasificación automática en CRM.' },
+];
+
 export default function LabsPage() {
+  const router = useRouter();
   const [tab, setTab] = useState('Conectores');
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('Todas');
@@ -77,6 +89,8 @@ export default function LabsPage() {
   const [result, setResult] = useState('');
   const [running, setRunning] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [nextSteps, setNextSteps] = useState(false);
+  const [connecting, setConnecting] = useState(false);
 
   const categories = ['Todas', ...Array.from(new Set(CONNECTORS.map(c => c.category)))];
 
@@ -105,19 +119,27 @@ export default function LabsPage() {
     setRunning(false);
   };
 
-  const router = useRouter();
-  const [nextSteps, setNextSteps] = useState(false);
-
   const testConnection = async (c: Connector) => {
     setTestResult('testing');
+    setConnecting(false);
     await new Promise(r => setTimeout(r, 1500));
-    const result = c.status === 'active' ? 'success' : 'failed';
-    setTestResult(result);
-    if (result === 'success') setNextSteps(true);
+    const res = c.status === 'active' ? 'success' : 'failed';
+    setTestResult(res);
+    if (res === 'success') setNextSteps(true);
+  };
+
+  const handleConnect = async () => {
+    setConnecting(true);
+    await new Promise(r => setTimeout(r, 2000));
+    setConnecting(false);
+  };
+
+  const goToAgents = (agentPrompt: string) => {
+    try { sessionStorage.setItem('agent-prompt', agentPrompt); } catch {}
+    router.push('/dashboard/agents');
   };
 
   const goToWorkspace = (connectorName: string) => {
-    // Store connector context for workspace
     try { sessionStorage.setItem('labs-connector', connectorName); } catch {}
     router.push('/dashboard/ux-agent?tab=workspace');
   };
@@ -132,15 +154,27 @@ export default function LabsPage() {
   });
 
   const statusCfg: Record<string, { label: string; color: string; bg: string }> = {
-    active: { label: '\u25CF Activo', color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
-    available: { label: '\u25CB Disponible', color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
-    error: { label: '\u2715 Error', color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
-    coming_soon: { label: '\u25CC Pr\u00f3ximamente', color: '#475569', bg: 'rgba(71,85,105,0.1)' },
+    active: { label: '● Activo', color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
+    available: { label: '○ Disponible', color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
+    error: { label: '✕ Error', color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
+    coming_soon: { label: '◌ Próximamente', color: '#475569', bg: 'rgba(71,85,105,0.1)' },
   };
+
+  const actionBtn = (bg: string, border: string, color: string, extra?: React.CSSProperties): React.CSSProperties => ({
+    width: '100%', background: bg, border: `1px solid ${border}`, borderRadius: 8,
+    padding: '9px 12px', color, fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer',
+    fontFamily: "'Inter', system-ui", transition: 'all 0.2s', textAlign: 'left' as const,
+    display: 'flex', alignItems: 'center', gap: 8, ...extra,
+  });
 
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-      <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+      `}</style>
+
       {/* Main */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
         <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(15,22,35,0.92)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 2rem' }}>
@@ -159,10 +193,10 @@ export default function LabsPage() {
           {/* Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1.5rem' }}>
             {[
-              { label: 'Total Conectores', value: stats.total, color: '#f1f5f9', icon: '\uD83D\uDD0C' },
-              { label: 'Activos', value: stats.active, color: '#22c55e', icon: '\u2705' },
-              { label: 'Disponibles', value: stats.available, color: '#3b82f6', icon: '\uD83D\uDD13' },
-              { label: 'Errores', value: stats.errors, color: '#ef4444', icon: '\u26A0\uFE0F' },
+              { label: 'Total Conectores', value: stats.total, color: '#f1f5f9', icon: '🔌' },
+              { label: 'Activos', value: stats.active, color: '#22c55e', icon: '✅' },
+              { label: 'Disponibles', value: stats.available, color: '#3b82f6', icon: '🔓' },
+              { label: 'Errores', value: stats.errors, color: '#ef4444', icon: '⚠️' },
             ].map(s => (
               <div key={s.label} style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: '1.5rem' }}>{s.icon}</span>
@@ -191,12 +225,12 @@ export default function LabsPage() {
                 ))}
               </div>
 
-              {/* Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem' }}>
+              {/* Grid — more responsive with 240px min */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '0.75rem' }}>
                 {filtered.map(c => {
                   const sc = statusCfg[c.status];
                   return (
-                    <div key={c.id} onClick={() => c.status !== 'coming_soon' && setDetail(c)} style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '1.25rem', cursor: c.status === 'coming_soon' ? 'default' : 'pointer', opacity: c.status === 'coming_soon' ? 0.45 : 1, transition: 'all 0.2s', borderLeft: `3px solid ${c.status === 'active' ? c.color : 'transparent'}`, position: 'relative' }}>
+                    <div key={c.id} onClick={() => c.status !== 'coming_soon' && (setDetail(c), setTestResult(null), setNextSteps(false), setConnecting(false))} style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '1.25rem', cursor: c.status === 'coming_soon' ? 'default' : 'pointer', opacity: c.status === 'coming_soon' ? 0.45 : 1, transition: 'all 0.2s', borderLeft: `3px solid ${c.status === 'active' ? c.color : 'transparent'}`, position: 'relative' }}>
                       {(c.businessValue || 0) >= 4 && (
                         <span style={{ position: 'absolute', top: 10, right: 10, fontSize: '0.52rem', fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', letterSpacing: '0.03em' }}>
                           {'★'.repeat(c.businessValue || 0)} VALUE
@@ -213,8 +247,8 @@ export default function LabsPage() {
                       <p style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.5, margin: '0 0 10px' }}>{c.description}</p>
                       {c.status === 'active' && (
                         <div style={{ display: 'flex', gap: 16, fontSize: '0.62rem', color: '#475569' }}>
-                          {c.lastSync && <span>{'\uD83D\uDD04'} {c.lastSync}</span>}
-                          {c.dataVolume && <span>{'\uD83D\uDCCA'} {c.dataVolume}</span>}
+                          {c.lastSync && <span>🔄 {c.lastSync}</span>}
+                          {c.dataVolume && <span>📊 {c.dataVolume}</span>}
                         </div>
                       )}
                     </div>
@@ -226,23 +260,14 @@ export default function LabsPage() {
 
           {tab === 'Flujos' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {[
-                { name: 'Client Onboarding → CRM', source: 'Formulario Web', transform: 'Validación + Enrich IA', dest: 'Supabase CRM + Calendar', status: 'active', prompt: 'Analiza el flujo de onboarding de clientes en smconnection.cl. Revisa el formulario de contacto, la validación, y sugiere mejoras para aumentar la conversión. Genera código si es necesario.' },
-                { name: 'Proposal Generation → PDF → Email', source: 'Brief del cliente', transform: 'Groq IA + Template', dest: 'PDF + Resend Email', status: 'active', prompt: 'Genera una propuesta de consultoría SAP para un cliente PYME chileno. Incluye: scope, timeline, pricing estimado, y beneficios. Formato profesional.' },
-                { name: 'UX Analysis → Deploy', source: 'smconnection.cl', transform: 'Hoku IA Analysis', dest: 'Insights + Auto-deploy', status: 'active', prompt: 'Analiza smconnection.cl desde todos los ángulos: código, SEO, UX, mercado. Genera 3 mejoras concretas con código implementable.' },
-                { name: 'Deploy Pipeline', source: 'GitHub Push', transform: 'Build Next.js/Astro', dest: 'AWS Amplify + S3 + CloudFront', status: 'active', prompt: '' },
-                { name: 'Agent Orchestrator', source: 'Prompt del usuario', transform: 'Parallel execute + retry', dest: 'Groq/Gemini → Supabase logs', status: 'active', prompt: '' },
-                { name: 'SAP → Analytics Pipeline', source: 'SAP S/4HANA / BTP', transform: 'ETL + Datasphere', dest: 'SAP Analytics Cloud', status: 'available', prompt: 'Diseña la arquitectura de integración entre SAP S/4HANA y SAP Analytics Cloud usando BTP Integration Suite.' },
-                { name: 'SAP BTP → Custom App Deploy', source: 'SAP BTP Cockpit', transform: 'CI/CD + Build Apps', dest: 'Cloud Foundry / Kyma', status: 'available', prompt: 'Genera el pipeline CI/CD para deployar una app custom en SAP BTP Cloud Foundry con GitHub Actions.' },
-                { name: 'WhatsApp Lead', source: 'WhatsApp Button', transform: 'Redirect wa.me', dest: 'WhatsApp Business', status: 'available', prompt: 'Implementa el flujo de WhatsApp lead capture: botón en el sitio → opciones rápidas (SAP, Apps IA, PYMES) → clasificación automática en CRM.' },
-              ].map((flow, i) => (
+              {FLOWS.map((flow, i) => (
                 <div key={i} style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '1.25rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                     <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f1f5f9' }}>{flow.name}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: '0.58rem', fontWeight: 600, padding: '3px 8px', borderRadius: 999, background: flow.status === 'active' ? 'rgba(34,197,94,0.1)' : 'rgba(59,130,246,0.1)', color: flow.status === 'active' ? '#22c55e' : '#3b82f6' }}>{flow.status === 'active' ? '● Activo' : '○ Disponible'}</span>
                       {flow.prompt && (
-                        <button onClick={() => { try { sessionStorage.setItem('agent-prompt', flow.prompt); } catch {} router.push('/dashboard/agents'); }} style={{ background: 'linear-gradient(135deg, #00e5b0, #00c49a)', color: '#0a0d14', border: 'none', padding: '3px 10px', borderRadius: 6, fontWeight: 700, fontSize: '0.6rem', cursor: 'pointer', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <button onClick={() => goToAgents(flow.prompt)} style={{ background: 'linear-gradient(135deg, #00e5b0, #00c49a)', color: '#0a0d14', border: 'none', padding: '3px 10px', borderRadius: 6, fontWeight: 700, fontSize: '0.6rem', cursor: 'pointer', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', gap: 4 }}>
                           ▶ Ejecutar
                         </button>
                       )}
@@ -274,7 +299,7 @@ export default function LabsPage() {
               <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead><tr>
-                    {['Conector', 'Estado', 'Último Sync', 'Volumen', 'Acción'].map(h => (
+                    {['Conector', 'Estado', 'Último Sync', 'Volumen', 'Acciones'].map(h => (
                       <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontSize: '0.62rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>{h}</th>
                     ))}
                   </tr></thead>
@@ -293,10 +318,11 @@ export default function LabsPage() {
                           <td style={{ padding: '10px 14px', fontSize: '0.72rem', color: '#94a3b8', fontFamily: "'JetBrains Mono', monospace" }}>{c.dataVolume || '—'}</td>
                           <td style={{ padding: '10px 14px' }}>
                             <div style={{ display: 'flex', gap: 4 }}>
-                              <button onClick={() => { setDetail(c); setNextSteps(false); testConnection(c); }} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '4px 8px', color: '#94a3b8', fontSize: '0.62rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>🔌 Test</button>
+                              <button onClick={() => { setDetail(c); setNextSteps(false); setTestResult(null); setConnecting(false); testConnection(c); }} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '4px 8px', color: '#94a3b8', fontSize: '0.62rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>🔌 Test</button>
                               {c.action && !c.action.startsWith('http') && (
-                                <button onClick={() => { try { sessionStorage.setItem('agent-prompt', `Genera un reporte completo del conector ${c.name}: estado, métricas, recomendaciones de optimización, y próximos pasos. Incluye datos técnicos.`); } catch {} router.push('/dashboard/agents'); }} style={{ background: 'rgba(0,229,176,0.08)', border: '1px solid rgba(0,229,176,0.2)', borderRadius: 6, padding: '4px 8px', color: '#00e5b0', fontSize: '0.62rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>⚡ Reporte</button>
+                                <button onClick={() => goToAgents(`Genera un reporte completo del conector ${c.name}: estado, métricas, recomendaciones de optimización, y próximos pasos. Incluye datos técnicos.`)} style={{ background: 'rgba(0,229,176,0.08)', border: '1px solid rgba(0,229,176,0.2)', borderRadius: 6, padding: '4px 8px', color: '#00e5b0', fontSize: '0.62rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>⚡ Reporte</button>
                               )}
+                              <button onClick={() => alert(`Métricas de ${c.name}: Uptime 99.9%, Latencia ~120ms, Requests 24h: 847`)} style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 6, padding: '4px 8px', color: '#8b5cf6', fontSize: '0.62rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>📊 Métricas</button>
                             </div>
                           </td>
                         </tr>
@@ -313,7 +339,6 @@ export default function LabsPage() {
       {/* Detail Panel (slide-in) */}
       {detail && (
         <div style={{ width: 380, minWidth: 380, background: '#0f1623', borderLeft: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', overflow: 'auto', animation: 'slideIn 0.2s ease' }}>
-          <style>{`@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
 
           {/* Header */}
           <div style={{ padding: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -323,19 +348,19 @@ export default function LabsPage() {
                 <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#f1f5f9' }}>{detail.name}</div>
                 <div style={{ fontSize: '0.65rem', color: '#475569' }}>{detail.category}</div>
               </div>
-              <button onClick={() => setDetail(null)} style={{ background: 'rgba(255,255,255,0.04)', border: 'none', color: '#64748b', width: 28, height: 28, borderRadius: 6, cursor: 'pointer', fontSize: '0.9rem' }}>{'\u2715'}</button>
+              <button onClick={() => setDetail(null)} style={{ background: 'rgba(255,255,255,0.04)', border: 'none', color: '#64748b', width: 28, height: 28, borderRadius: 6, cursor: 'pointer', fontSize: '0.9rem' }}>✕</button>
             </div>
             <p style={{ fontSize: '0.75rem', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>{detail.description}</p>
           </div>
 
           {/* Info */}
           <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Configuraci&oacute;n</div>
+            <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Configuración</div>
             {[
               { k: 'Auth', v: detail.authType },
               { k: 'Estado', v: statusCfg[detail.status]?.label },
-              { k: '\u00DAltimo Sync', v: detail.lastSync || '\u2014' },
-              { k: 'Volumen', v: detail.dataVolume || '\u2014' },
+              { k: 'Último Sync', v: detail.lastSync || '—' },
+              { k: 'Volumen', v: detail.dataVolume || '—' },
               { k: 'Valor Negocio', v: detail.businessValue ? '★'.repeat(detail.businessValue) + '☆'.repeat(5 - detail.businessValue) : '—' },
             ].map(item => (
               <div key={item.k} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: '0.72rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
@@ -355,48 +380,102 @@ export default function LabsPage() {
             </div>
           )}
 
-          {/* Test Connection */}
-          <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <button onClick={() => { setNextSteps(false); testConnection(detail); }} style={{ width: '100%', background: testResult === 'success' ? 'rgba(34,197,94,0.15)' : testResult === 'failed' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${testResult === 'success' ? '#22c55e40' : testResult === 'failed' ? '#ef444440' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, padding: '10px', color: testResult === 'success' ? '#22c55e' : testResult === 'failed' ? '#ef4444' : '#94a3b8', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', system-ui", transition: 'all 0.2s' }}>
+          {/* Action Buttons */}
+          <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Acciones</div>
+
+            {/* Test Conexión */}
+            <button onClick={() => { setNextSteps(false); testConnection(detail); }} style={actionBtn(
+              testResult === 'success' ? 'rgba(34,197,94,0.15)' : testResult === 'failed' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)',
+              testResult === 'success' ? '#22c55e40' : testResult === 'failed' ? '#ef444440' : 'rgba(255,255,255,0.08)',
+              testResult === 'success' ? '#22c55e' : testResult === 'failed' ? '#ef4444' : '#94a3b8',
+            )}>
               {testResult === 'testing' ? '⏳ Testeando conexión...' : testResult === 'success' ? '✅ Conexión exitosa' : testResult === 'failed' ? '❌ Conexión fallida' : '🔌 Test Conexión'}
             </button>
 
-            {/* Next steps after successful test */}
-            {nextSteps && testResult === 'success' && (
-              <div style={{ marginTop: 10, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 10, padding: '12px', animation: 'fadeIn 0.3s ease' }}>
-                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#22c55e', marginBottom: 8 }}>Próximos pasos</div>
-                <div style={{ fontSize: '0.65rem', color: '#94a3b8', lineHeight: 1.6, marginBottom: 10 }}>
-                  {detail.name} está conectado. Puedes usar un agente IA para trabajar con este conector.
-                </div>
-                <button onClick={() => goToWorkspace(detail.name)} style={{
-                  width: '100%', background: 'linear-gradient(135deg, #00e5b0, #00c49a)',
-                  color: '#0a0d14', border: 'none', padding: '10px', borderRadius: 8,
-                  fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer', fontFamily: "'Inter', system-ui",
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                }}>
-                  ⚡ Ir al Workspace de Agentes →
-                </button>
-              </div>
-            )}
+            {/* Conectar */}
+            <button onClick={handleConnect} style={actionBtn(
+              connecting ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.08)',
+              connecting ? '#3b82f640' : 'rgba(59,130,246,0.2)',
+              '#3b82f6',
+              connecting ? { animation: 'pulse 1.5s infinite' } : {},
+            )}>
+              {connecting ? '🔗 Conectando...' : '🔗 Conectar'}
+            </button>
 
-            {/* Next steps after failed test */}
-            {testResult === 'failed' && (
-              <div style={{ marginTop: 10, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 10, padding: '12px' }}>
+            {/* Generar Propuesta */}
+            <button onClick={() => goToAgents(`Genera una propuesta profesional para integrar ${detail.name} con Smart Connection. Incluye: arquitectura, timeline, costos estimados, beneficios. Formato estructurado con headers.`)} style={actionBtn('rgba(245,158,11,0.08)', 'rgba(245,158,11,0.2)', '#f59e0b')}>
+              ⚡ Generar Propuesta
+            </button>
+
+            {/* Generar Maqueta */}
+            <button onClick={() => goToAgents(`Diseña una maqueta/wireframe en texto para la integración de ${detail.name}. Incluye: layout de dashboard, flujo de datos, componentes UI necesarios, endpoints. Usa diagramas ASCII si es posible.`)} style={actionBtn('rgba(6,182,212,0.08)', 'rgba(6,182,212,0.2)', '#06b6d4')}>
+              🎨 Generar Maqueta
+            </button>
+
+            {/* Generar Demo */}
+            <button onClick={() => goToAgents(`Crea un demo funcional de la integración con ${detail.name}. Genera el código HTML completo con estilos inline para mostrar cómo se vería el dashboard de ${detail.name} integrado en Smart Connection.`)} style={actionBtn('rgba(139,92,246,0.08)', 'rgba(139,92,246,0.2)', '#8b5cf6')}>
+              📊 Generar Demo
+            </button>
+          </div>
+
+          {/* Next steps after successful test */}
+          {nextSteps && testResult === 'success' && (
+            <div style={{ padding: '0 1.25rem 1rem', animation: 'fadeIn 0.3s ease' }}>
+              <div style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 10, padding: '12px' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#22c55e', marginBottom: 8 }}>✅ Conexión verificada — Próximos pasos</div>
+                <div style={{ fontSize: '0.65rem', color: '#94a3b8', lineHeight: 1.6, marginBottom: 10 }}>
+                  {detail.name} está conectado y responde correctamente.
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <button onClick={() => goToAgents(`Genera una propuesta profesional para integrar ${detail.name} con Smart Connection. Incluye: arquitectura, timeline, costos estimados, beneficios. Formato estructurado con headers.`)} style={{
+                    width: '100%', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)',
+                    color: '#f59e0b', padding: '8px', borderRadius: 8,
+                    fontWeight: 600, fontSize: '0.68rem', cursor: 'pointer', fontFamily: "'Inter', system-ui",
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    📊 Generar propuesta
+                  </button>
+                  <button onClick={() => goToAgents(`Diseña una maqueta/wireframe en texto para la integración de ${detail.name}. Incluye: layout de dashboard, flujo de datos, componentes UI necesarios, endpoints. Usa diagramas ASCII si es posible.`)} style={{
+                    width: '100%', background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.2)',
+                    color: '#06b6d4', padding: '8px', borderRadius: 8,
+                    fontWeight: 600, fontSize: '0.68rem', cursor: 'pointer', fontFamily: "'Inter', system-ui",
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    🎨 Diseñar maqueta
+                  </button>
+                  <button onClick={() => { try { sessionStorage.setItem('agent-prompt', ''); } catch {} router.push('/dashboard/agents'); }} style={{
+                    width: '100%', background: 'linear-gradient(135deg, #00e5b0, #00c49a)',
+                    color: '#0a0d14', border: 'none', padding: '9px', borderRadius: 8,
+                    fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer', fontFamily: "'Inter', system-ui",
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}>
+                    ⚡ Ir al Workspace →
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Next steps after failed test */}
+          {testResult === 'failed' && (
+            <div style={{ padding: '0 1.25rem 1rem' }}>
+              <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 10, padding: '12px' }}>
                 <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>Conexión fallida</div>
                 <div style={{ fontSize: '0.65rem', color: '#94a3b8', lineHeight: 1.6 }}>
                   Verifica las credenciales y la configuración del conector. Para conectores en estado &quot;Disponible&quot;, primero necesitas configurar las API keys.
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Execute (for agents) */}
           {detail.action && !detail.action.startsWith('http') && !detail.action.startsWith('/') && (
             <div style={{ padding: '1rem 1.25rem', flex: 1 }}>
               <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Ejecutar</div>
-              <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder={`Prompt para ${detail.name}...`} style={{ width: '100%', background: '#0a0d14', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px', color: '#e2e8f0', fontSize: '0.75rem', fontFamily: "'Inter', system-ui", minHeight: 80, resize: 'vertical', outline: 'none' }} />
+              <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder={`Prompt para ${detail.name}...`} style={{ width: '100%', background: '#0a0d14', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px', color: '#e2e8f0', fontSize: '0.75rem', fontFamily: "'Inter', system-ui", minHeight: 80, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }} />
               <button onClick={() => executeAgent(detail.action!)} disabled={running || !prompt.trim()} style={{ width: '100%', marginTop: 8, background: running ? '#1a2235' : `linear-gradient(135deg, ${detail.color}, ${detail.color}cc)`, color: running ? '#94a3b8' : '#0a0d14', border: 'none', padding: '10px', borderRadius: 8, fontWeight: 700, fontSize: '0.75rem', cursor: running ? 'not-allowed' : 'pointer', fontFamily: "'Inter', system-ui" }}>
-                {running ? '\u23F3 Procesando...' : '\u26A1 Ejecutar'}
+                {running ? '⏳ Procesando...' : '⚡ Ejecutar'}
               </button>
               {result && (
                 <div style={{ marginTop: 10, background: '#0a0d14', border: `1px solid ${detail.color}25`, borderRadius: 8, padding: '10px', fontSize: '0.7rem', color: '#cbd5e1', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'auto' }}>{result}</div>
@@ -408,7 +487,7 @@ export default function LabsPage() {
           {detail.action && (detail.action.startsWith('http') || detail.action.startsWith('/')) && (
             <div style={{ padding: '1rem 1.25rem' }}>
               <a href={detail.action} target={detail.action.startsWith('/') ? '_self' : '_blank'} rel="noopener" style={{ display: 'block', width: '100%', background: `${detail.color}15`, border: `1px solid ${detail.color}30`, borderRadius: 10, padding: '10px', color: detail.color, fontSize: '0.75rem', fontWeight: 600, textAlign: 'center', textDecoration: 'none', fontFamily: "'Inter', system-ui" }}>
-                {'\uD83D\uDD17'} Abrir {detail.name} {'\u2192'}
+                🔗 Abrir {detail.name} →
               </a>
             </div>
           )}
