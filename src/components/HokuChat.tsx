@@ -88,6 +88,43 @@ export default function HokuChat() {
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
   useEffect(() => { if (open) { setPulse(false); loadHistory(); if (inputRef.current) inputRef.current.focus(); } }, [open, loadHistory]);
 
+  // Fetch live intranet data for Hoku superagent context
+  const fetchIntranetContext = async (): Promise<string> => {
+    try {
+      const [agentsRes, leadsRes, projectsRes, logsRes] = await Promise.allSettled([
+        apiCall({ action: 'list' }),
+        apiCall({ action: 'query', table: 'leads', order: 'created_at.desc', limit: 5 }),
+        apiCall({ action: 'query', table: 'projects', limit: 5 }),
+        apiCall({ action: 'query', table: 'agent_logs', order: 'created_at.desc', limit: 5 }),
+      ]);
+
+      const parts: string[] = ['DATOS EN TIEMPO REAL DE LA INTRANET SMARTCONNECTION:'];
+
+      if (agentsRes.status === 'fulfilled' && agentsRes.value.agents) {
+        const agents = agentsRes.value.agents;
+        const active = agents.filter((a: Record<string, unknown>) => a.active).length;
+        parts.push(`AGENTES: ${active}/${agents.length} activos — ${agents.map((a: Record<string, unknown>) => `${a.name}(${a.active ? 'ON' : 'OFF'})`).join(', ')}`);
+      }
+
+      if (leadsRes.status === 'fulfilled' && leadsRes.value.data) {
+        const leads = leadsRes.value.data;
+        parts.push(`LEADS (${leads.length} recientes): ${leads.map((l: Record<string, unknown>) => `${l.nombre || l.email}[${l.estado}]`).join(', ')}`);
+      }
+
+      if (projectsRes.status === 'fulfilled' && projectsRes.value.data) {
+        const projects = projectsRes.value.data;
+        parts.push(`PROYECTOS: ${projects.map((p: Record<string, unknown>) => `${p.name}(${p.status},${p.progress}%)`).join(', ')}`);
+      }
+
+      if (logsRes.status === 'fulfilled' && logsRes.value.data) {
+        const logs = logsRes.value.data;
+        parts.push(`ACTIVIDAD RECIENTE: ${logs.map((l: Record<string, unknown>) => `${l.agent_id}:${l.action}[${l.status}]`).join(', ')}`);
+      }
+
+      return '\n\n' + parts.join('\n') + '\n\nUsa estos datos reales para responder con información actualizada. Eres un SUPERAGENTE con acceso total a la intranet.\n';
+    } catch { return ''; }
+  };
+
   const buildContext = (msgs: Message[]): string => {
     const recent = msgs.filter(m => m.content !== WELCOME).slice(-10);
     if (recent.length === 0) return '';
@@ -136,7 +173,11 @@ export default function HokuChat() {
     const hokuMsg: Message = { role: 'hoku', content: '', timestamp: new Date() };
     setMessages(prev => [...prev, hokuMsg]);
 
-    const context = buildContext([...messages, userMsg]);
+    const [chatContext, intranetData] = await Promise.all([
+      Promise.resolve(buildContext([...messages, userMsg])),
+      fetchIntranetContext(),
+    ]);
+    const context = chatContext + intranetData;
     const useCodeMode = wantsCode(text);
     let fullResponse = '';
 
