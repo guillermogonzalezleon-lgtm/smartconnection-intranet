@@ -36,7 +36,7 @@ export default function GlobalTerminal() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<{ startY: number; startH: number } | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const abortRef = useRef<Record<string, AbortController>>({});
   const [customH, setCustomH] = useState(0);
 
   const heights: Record<string, number | string> = { minimized: 34, normal: 240, expanded: 400, fullscreen: '100vh' };
@@ -60,9 +60,8 @@ export default function GlobalTerminal() {
       setMode(m => m === 'minimized' ? 'normal' : m);
 
       // Start streaming
-      abortRef.current?.abort();
       const controller = new AbortController();
-      abortRef.current = controller;
+      abortRef.current[sessionId] = controller;
       fetch('/api/agents/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -114,11 +113,14 @@ export default function GlobalTerminal() {
           }
         }
 
+        delete abortRef.current[sessionId];
         setSessions(prev => prev.map(s => s.id === sessionId ? {
           ...s, running: false,
           lines: [...s.lines, { time: now(), tag: 'success', tagColor: TAG_COLORS.success, text: 'Completado' }],
         } : s));
       }).catch(err => {
+        delete abortRef.current[sessionId];
+        if (err?.name === 'AbortError') return; // ignore manual aborts
         setSessions(prev => prev.map(s => s.id === sessionId ? {
           ...s, running: false,
           lines: [...s.lines, { time: now(), tag: 'error', tagColor: TAG_COLORS.error, text: String(err) }],
@@ -131,9 +133,10 @@ export default function GlobalTerminal() {
     return () => {
       window.removeEventListener('toggle-terminal', toggleHandler);
       window.removeEventListener('exec-agent', execHandler);
-      abortRef.current?.abort();
+      Object.values(abortRef.current).forEach(c => c.abort());
+      abortRef.current = {};
     };
-  }, [activeTab]);
+  }, []); // no dependency on activeTab — event handlers are stable
 
   // Auto-scroll
   useEffect(() => {
