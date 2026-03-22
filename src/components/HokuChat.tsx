@@ -42,14 +42,16 @@ export default function HokuChat() {
     try {
       const res = await fetch('/api/agents/stream', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: text, taskType: 'general', agentId: 'hoku' }),
       });
 
       if (!res.ok || !res.body) {
+        const errText = await res.text().catch(() => '');
         setMessages(prev => {
           const updated = [...prev];
-          updated[updated.length - 1] = { ...updated[updated.length - 1], content: 'Error al conectar con Hoku. Intenta de nuevo.' };
+          updated[updated.length - 1] = { ...updated[updated.length - 1], content: `Error (${res.status}): ${errText || 'No se pudo conectar con Hoku.'}` };
           return updated;
         });
         setStreaming(false);

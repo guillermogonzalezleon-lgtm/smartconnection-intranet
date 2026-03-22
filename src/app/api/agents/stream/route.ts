@@ -185,7 +185,8 @@ export async function POST(request: Request) {
   if (agentId === 'hoku') {
     const stream = new ReadableStream({
       async start(controller) {
-        const send = (content: string) => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+        const send = (content: string) => { try { controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`)); } catch {} };
+        try {
 
         // Helper: call OpenAI-compatible API
         const callOpenAI = async (url: string, key: string, model: string, p: string, sys: string, name: string): Promise<string> => {
@@ -261,10 +262,10 @@ export async function POST(request: Request) {
           } catch (e) { return `(Bedrock: ${String(e).slice(0, 80)})`; }
         } });
 
-        send(`🐾 HOKU — Ejecutando ${agentList.length} agentes REALES en paralelo...\n\n`);
+        send(`🐾 HOKU — Ejecutando ${agentList.length} agentes en paralelo...\n\n`);
 
         const results: { name: string; result: string }[] = [];
-        const timeout = 30000;
+        const timeout = 15000;
 
         const promises = agentList.map(async (agent) => {
           try {
@@ -346,8 +347,10 @@ IMPORTANTE: Cuando generes código, usa este formato:
           }
         }
 
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-        controller.close();
+        } catch (err) {
+          send(`\n\n⚠️ Error: ${String(err).slice(0, 200)}`);
+        }
+        try { controller.enqueue(encoder.encode('data: [DONE]\n\n')); controller.close(); } catch {}
       },
     });
 
