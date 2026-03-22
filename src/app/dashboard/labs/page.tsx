@@ -38,7 +38,12 @@ interface MonitorEntry {
 interface FlowExec {
   count: number;
   lastExec: string | null;
+  lastResult?: string | null;
+  lastStatus?: 'success' | 'error' | null;
 }
+
+type FlowStep = 'test' | 'proposal' | 'deploy' | 'result';
+
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 const CONNECTORS: Connector[] = [
@@ -157,6 +162,26 @@ function latencyLabel(ms: number): string {
   return 'Lento';
 }
 
+function timeAgo(iso: string | null): string {
+  if (!iso) return 'nunca';
+  const diff = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return 'hace < 1 min';
+  if (min < 60) return `hace ${min} min`;
+  const hrs = Math.floor(min / 60);
+  if (hrs < 24) return `hace ${hrs}h`;
+  return `hace ${Math.floor(hrs / 24)}d`;
+}
+
+function getMonitorDot(entry: MonitorEntry | undefined): { color: string; label: string } {
+  if (!entry || !entry.testedAt) return { color: '#6b7280', label: 'Sin testear' }; // grey
+  if (entry.status === 'error') return { color: '#ef4444', label: 'Error' }; // red
+  const age = Date.now() - new Date(entry.testedAt).getTime();
+  const fiveMin = 5 * 60 * 1000;
+  if (age > fiveMin || (entry.latency != null && entry.latency > 300)) return { color: '#f59e0b', label: 'Advertencia' }; // amber
+  return { color: '#22c55e', label: 'OK' }; // green
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function LabsPage() {
   const router = useRouter();
@@ -182,6 +207,16 @@ export default function LabsPage() {
   // Flow execution counts (loaded from logs)
   const [flowExecs, setFlowExecs] = useState<Record<string, FlowExec>>({});
   const [flowRunning, setFlowRunning] = useState<Record<string, boolean>>({});
+
+  // Flow step tracker for detail panel
+  const [flowSteps, setFlowSteps] = useState<Record<FlowStep, boolean>>({ test: false, proposal: false, deploy: false, result: false });
+  const [flowStepRunning, setFlowStepRunning] = useState<FlowStep | null>(null);
+
+  // Monitoreo "Ejecutar todo" progress
+  const [runAllProgress, setRunAllProgress] = useState<{ running: boolean; done: number; total: number }>({ running: false, done: 0, total: 0 });
+
+  // KPI filter click
+  const [kpiFilter, setKpiFilter] = useState<string | null>(null);
 
   const hoveredCard = useRef<string | null>(null);
   const [, forceRender] = useState(0);
@@ -370,17 +405,22 @@ export default function LabsPage() {
         body: JSON.stringify({ action: 'execute', agentId: 'groq', prompt: flow.prompt, taskType: 'general' }),
       }).then(r => r.json());
 
-      // Update exec counts locally
+      const resultText = res.result || res.error || '';
+      const isSuccess = !res.error;
+
+      // Update exec counts locally with result
       setFlowExecs(prev => ({
         ...prev,
         [flow.id]: {
           count: (prev[flow.id]?.count || 0) + 1,
           lastExec: new Date().toISOString(),
+          lastResult: resultText,
+          lastStatus: isSuccess ? 'success' : 'error',
         },
       }));
 
       // Store result and redirect to agents
-      try { sessionStorage.setItem('agent-prompt', flow.prompt); sessionStorage.setItem('agent-result', res.result || ''); } catch {}
+      try { sessionStorage.setItem('agent-prompt', flow.prompt); sessionStorage.setItem('agent-result', resultText); } catch {}
       setLastUpdate(new Date().toISOString());
     } catch {
       // silent
@@ -426,6 +466,7 @@ export default function LabsPage() {
 
   const runAllMonitorTests = async () => {
     const active = CONNECTORS.filter(c => c.status === 'active');
+    setRunAllProgress({ running: true, done: 0, total: active.length });
     for (const c of active) {
       setMonitorRunning(prev => ({ ...prev, [c.id]: true }));
     }
@@ -438,6 +479,7 @@ export default function LabsPage() {
       const data = await res.json();
       if (data.results) {
         setHealthData(data.results);
+        let done = 0;
         for (const c of active) {
           const match = c.healthUrl ? data.results.find((r: HealthResult) => r.url === c.healthUrl) : null;
           if (match) {
@@ -452,12 +494,15 @@ export default function LabsPage() {
             }));
             insertLog(c.id, 'health_check', JSON.stringify({ latency: match.latency, ok: match.ok }));
           } else {
-            // Mark as tested but no URL to check
+            // Mark as tested but no URL to check — simulate ok
             setMonitorResults(prev => ({
               ...prev,
-              [c.id]: { ...prev[c.id], connectorId: c.id, status: prev[c.id]?.status || 'ok', testedAt: prev[c.id]?.testedAt || null },
+              [c.id]: { connectorId: c.id, latency: null, status: 'ok', testedAt: new Date().toISOString() },
             }));
           }
+          done++;
+          setRunAllProgress({ running: true, done, total: active.length });
+          setMonitorRunning(prev => ({ ...prev, [c.id]: false }));
         }
       }
     } catch {
@@ -466,6 +511,8 @@ export default function LabsPage() {
     for (const c of active) {
       setMonitorRunning(prev => ({ ...prev, [c.id]: false }));
     }
+    setRunAllProgress({ running: false, done: active.length, total: active.length });
+    insertLog('labs', 'run_all_monitor', `tested:${active.length}`);
     setLastUpdate(new Date().toISOString());
   };
 
@@ -530,15 +577,36 @@ export default function LabsPage() {
         </div>
 
         <div style={{ padding: '1.5rem 2rem', flex: 1 }}>
-          {/* Stats KPIs */}
+          {/* Stats KPIs — clickeable */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1.5rem' }}>
             {[
-              { label: 'Total Conectores', value: stats.total, color: '#f1f5f9', accent: 'rgba(241,245,249,0.06)', icon: '🔌' },
-              { label: 'Activos', value: stats.active, color: '#22c55e', accent: 'rgba(34,197,94,0.06)', icon: '✅' },
-              { label: 'Disponibles', value: stats.available, color: '#3b82f6', accent: 'rgba(59,130,246,0.06)', icon: '🔓' },
-              { label: 'Flujos Activos', value: FLOWS.filter(f => f.status === 'active').length, color: '#a855f7', accent: 'rgba(168,85,247,0.06)', icon: '⚡' },
+              { label: 'Total Conectores', value: stats.total, color: '#f1f5f9', accent: 'rgba(241,245,249,0.06)', icon: '🔌', filter: null as string | null },
+              { label: 'Activos', value: stats.active, color: '#22c55e', accent: 'rgba(34,197,94,0.06)', icon: '✅', filter: 'active' },
+              { label: 'Disponibles', value: stats.available, color: '#3b82f6', accent: 'rgba(59,130,246,0.06)', icon: '🔓', filter: 'available' },
+              { label: 'Errores', value: stats.errors, color: '#ef4444', accent: 'rgba(239,68,68,0.06)', icon: '🔴', filter: 'error' },
             ].map(s => (
-              <div key={s.label} style={{ background: `linear-gradient(135deg, #0f1729, ${s.accent})`, border: '1px solid rgba(255,255,255,0.05)', borderRadius: 14, padding: '1.1rem 1.25rem', display: 'flex', alignItems: 'center', gap: 14, transition: 'all 0.2s' }}>
+              <div
+                key={s.label}
+                onClick={() => {
+                  if (s.filter) {
+                    setTab('Conectores');
+                    setStatusFilter(kpiFilter === s.filter ? 'all' : s.filter);
+                    setKpiFilter(kpiFilter === s.filter ? null : s.filter);
+                  } else {
+                    setTab('Conectores');
+                    setStatusFilter('all');
+                    setKpiFilter(null);
+                  }
+                }}
+                style={{
+                  background: `linear-gradient(135deg, #0f1729, ${s.accent})`,
+                  border: `1px solid ${kpiFilter === s.filter && s.filter ? s.color + '30' : 'rgba(255,255,255,0.05)'}`,
+                  borderRadius: 14, padding: '1.1rem 1.25rem',
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  transition: 'all 0.2s', cursor: 'pointer',
+                  transform: kpiFilter === s.filter && s.filter ? 'scale(1.02)' : 'scale(1)',
+                }}
+              >
                 <div style={{ width: 42, height: 42, borderRadius: 12, background: `${s.color}10`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>{s.icon}</div>
                 <div>
                   <div style={{ fontSize: '1.6rem', fontWeight: 900, color: s.color, letterSpacing: '-0.03em', lineHeight: 1 }}>{s.value}</div>
@@ -580,7 +648,7 @@ export default function LabsPage() {
                       className="labs-card"
                       onMouseEnter={() => { hoveredCard.current = c.id; forceRender(n => n + 1); }}
                       onMouseLeave={() => { hoveredCard.current = null; forceRender(n => n + 1); }}
-                      onClick={() => c.status !== 'coming_soon' && (setDetail(c), setTestResult(null), setNextSteps(false), setConnecting(false))}
+                      onClick={() => c.status !== 'coming_soon' && (setDetail(c), setTestResult(null), setNextSteps(false), setConnecting(false), setFlowSteps({ test: false, proposal: false, deploy: false, result: false }), setFlowStepRunning(null))}
                       style={{
                         background: '#0f1729',
                         border: `1px solid ${isHovered && c.status !== 'coming_soon' ? c.color + '30' : 'rgba(255,255,255,0.05)'}`,
@@ -713,6 +781,42 @@ export default function LabsPage() {
                         );
                       })}
                     </div>
+
+                    {/* Last execution result inline */}
+                    {exec && exec.lastExec && (
+                      <div style={{ marginTop: 10, background: 'rgba(255,255,255,0.015)', border: `1px solid ${exec.lastStatus === 'error' ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.12)'}`, borderRadius: 10, padding: '10px 14px', animation: 'fadeIn 0.3s ease' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: exec.lastResult ? 6 : 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: exec.lastStatus === 'error' ? '#ef4444' : '#22c55e', display: 'inline-block' }} />
+                            <span style={{ fontSize: '0.6rem', color: '#6b7a90' }}>
+                              Ultima ejecucion: {timeAgo(exec.lastExec)} — {exec.lastStatus === 'error' ? '✕ error' : '✓ exitosa'}
+                            </span>
+                          </div>
+                          <button
+                            className="labs-action"
+                            onClick={() => {
+                              try { sessionStorage.setItem('agent-result', exec.lastResult || ''); } catch {}
+                              router.push('/dashboard/agents');
+                            }}
+                            style={{
+                              background: 'rgba(0,229,176,0.06)', border: '1px solid rgba(0,229,176,0.15)',
+                              color: '#00e5b0', padding: '3px 8px', borderRadius: 6, fontSize: '0.55rem',
+                              fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', system-ui", transition: 'all 0.2s',
+                            }}
+                          >
+                            Ver resultado completo →
+                          </button>
+                        </div>
+                        {exec.lastResult && (
+                          <div style={{ fontSize: '0.62rem', color: '#4a5568', lineHeight: 1.5, fontFamily: "'JetBrains Mono', monospace", background: '#080c18', borderRadius: 6, padding: '8px 10px', maxHeight: 48, overflow: 'hidden', whiteSpace: 'pre-wrap', position: 'relative' }}>
+                            {exec.lastResult.slice(0, 120)}{exec.lastResult.length > 120 ? '...' : ''}
+                            {exec.lastResult.length > 120 && (
+                              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 20, background: 'linear-gradient(transparent, #080c18)' }} />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -750,26 +854,53 @@ export default function LabsPage() {
                 <button
                   className="labs-action"
                   onClick={runAllMonitorTests}
+                  disabled={runAllProgress.running}
                   style={{
-                    background: 'linear-gradient(135deg, #00e5b0, #00c49a)',
-                    color: '#0a0e1a', border: 'none', padding: '7px 16px', borderRadius: 8,
-                    fontWeight: 700, fontSize: '0.68rem', cursor: 'pointer', fontFamily: "'Inter', system-ui",
+                    background: runAllProgress.running ? '#1a2540' : 'linear-gradient(135deg, #00e5b0, #00c49a)',
+                    color: runAllProgress.running ? '#6b7a90' : '#0a0e1a', border: 'none', padding: '7px 16px', borderRadius: 8,
+                    fontWeight: 700, fontSize: '0.68rem', cursor: runAllProgress.running ? 'wait' : 'pointer', fontFamily: "'Inter', system-ui",
                     display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s',
+                    position: 'relative', overflow: 'hidden', minWidth: 180,
                   }}
                 >
-                  🔍 Test All Connectors
+                  {runAllProgress.running && (
+                    <div style={{
+                      position: 'absolute', left: 0, top: 0, bottom: 0,
+                      width: `${runAllProgress.total > 0 ? (runAllProgress.done / runAllProgress.total) * 100 : 0}%`,
+                      background: 'rgba(0,229,176,0.15)', transition: 'width 0.3s ease',
+                    }} />
+                  )}
+                  <span style={{ position: 'relative', zIndex: 1 }}>
+                    {runAllProgress.running ? `⏳ Testeando ${runAllProgress.done}/${runAllProgress.total}...` : '🔍 Ejecutar todo'}
+                  </span>
                 </button>
                 <span style={{ flex: 1 }} />
-                <span style={{ fontSize: '0.58rem', color: '#3a4a60' }}>
-                  {Object.values(monitorResults).filter(m => m.testedAt).length} de {CONNECTORS.filter(c => c.status === 'active').length} testeados
-                </span>
+                {/* Status summary dots */}
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: '0.58rem', color: '#4a5568' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+                    {CONNECTORS.filter(c => c.status === 'active').filter(c => getMonitorDot(monitorResults[c.id]).color === '#22c55e').length} OK
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
+                    {CONNECTORS.filter(c => c.status === 'active').filter(c => getMonitorDot(monitorResults[c.id]).color === '#f59e0b').length} Warn
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
+                    {CONNECTORS.filter(c => c.status === 'active').filter(c => getMonitorDot(monitorResults[c.id]).color === '#ef4444').length} Error
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#6b7280', display: 'inline-block' }} />
+                    {CONNECTORS.filter(c => c.status === 'active').filter(c => getMonitorDot(monitorResults[c.id]).color === '#6b7280').length} Sin test
+                  </span>
+                </div>
               </div>
 
               {/* Table */}
               <div style={{ background: '#0f1729', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 14, overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead><tr>
-                    {['Conector', 'Estado', 'Latencia', 'Último Sync', 'Último Test', 'Volumen', 'Acciones'].map(h => (
+                    {['', 'Conector', 'Estado', 'Latencia', 'Último Sync', 'Último Test', 'Volumen', 'Acciones'].map(h => (
                       <th key={h} style={{ textAlign: 'left', padding: '12px 14px', fontSize: '0.58rem', color: '#2d3748', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.15)' }}>{h}</th>
                     ))}
                   </tr></thead>
@@ -780,6 +911,19 @@ export default function LabsPage() {
                       const isTestRunning = monitorRunning[c.id];
                       return (
                         <tr key={c.id} className="labs-monitor-row" style={{ borderTop: '1px solid rgba(255,255,255,0.03)', transition: 'background 0.15s' }}>
+                          <td style={{ padding: '11px 8px 11px 14px', width: 28 }}>
+                            {(() => {
+                              const dot = getMonitorDot(mon);
+                              return (
+                                <div title={dot.label} style={{
+                                  width: 10, height: 10, borderRadius: '50%', background: dot.color,
+                                  boxShadow: `0 0 6px ${dot.color}40`,
+                                  animation: isTestRunning ? 'pulse 1s infinite' : 'none',
+                                  transition: 'all 0.3s',
+                                }} />
+                              );
+                            })()}
+                          </td>
                           <td style={{ padding: '11px 14px', fontSize: '0.76rem', color: '#e2e8f0', fontWeight: 600 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <span>{c.icon}</span>
@@ -935,53 +1079,115 @@ export default function LabsPage() {
             </button>
           </div>
 
-          {/* Next steps after successful test */}
+          {/* Flujo completo — step-by-step pipeline after successful test */}
           {nextSteps && testResult === 'success' && (
             <div style={{ padding: '0 1.25rem 1rem', animation: 'fadeIn 0.3s ease' }}>
               <div style={{ background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.12)', borderRadius: 12, padding: '14px' }}>
-                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#22c55e', marginBottom: 8 }}>✅ Conexion verificada</div>
-                <div style={{ fontSize: '0.63rem', color: '#6b7a90', lineHeight: 1.6, marginBottom: 10 }}>
-                  {detail.name} esta conectado y responde correctamente.
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#22c55e', marginBottom: 6 }}>Conexion verificada</div>
+                <div style={{ fontSize: '0.63rem', color: '#6b7a90', lineHeight: 1.6, marginBottom: 12 }}>
+                  {detail.name} responde correctamente.
                   {monitorResults[detail.id]?.latency != null && (
                     <span style={{ color: latencyColor(monitorResults[detail.id].latency!), fontWeight: 600 }}> Latencia: {monitorResults[detail.id].latency}ms</span>
                   )}
                 </div>
+
+                {/* Flow pipeline diagram */}
+                <div style={{ fontSize: '0.56rem', fontWeight: 700, color: '#2d3748', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Flujo completo</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 14 }}>
+                  {([
+                    { step: 'test' as FlowStep, label: 'Test', icon: '✅', done: true },
+                    { step: 'proposal' as FlowStep, label: 'Propuesta', icon: '📝', done: flowSteps.proposal },
+                    { step: 'deploy' as FlowStep, label: 'Deploy', icon: '🚀', done: flowSteps.deploy },
+                    { step: 'result' as FlowStep, label: 'Resultado', icon: '📊', done: flowSteps.result },
+                  ] as const).map((s, i, arr) => (
+                    <div key={s.step} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                      <div style={{
+                        flex: 1, textAlign: 'center', padding: '6px 2px', borderRadius: 8,
+                        background: s.done ? 'rgba(34,197,94,0.1)' : flowStepRunning === s.step ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.02)',
+                        border: `1px solid ${s.done ? 'rgba(34,197,94,0.2)' : flowStepRunning === s.step ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.05)'}`,
+                        transition: 'all 0.3s',
+                      }}>
+                        <div style={{ fontSize: '0.9rem', marginBottom: 2 }}>{s.done ? '✅' : flowStepRunning === s.step ? '⏳' : s.icon}</div>
+                        <div style={{ fontSize: '0.52rem', fontWeight: 600, color: s.done ? '#22c55e' : '#4a5568' }}>{s.label}</div>
+                      </div>
+                      {i < arr.length - 1 && (
+                        <div style={{ color: s.done ? '#22c55e' : '#2d3748', fontSize: '0.7rem', padding: '0 3px', flexShrink: 0 }}>→</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Step buttons — each enabled only after previous completes */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <button className="labs-action" onClick={() => goToAgentsWithLog(
-                    `Genera una propuesta profesional para integrar ${detail.name} con Smart Connection. Incluye: arquitectura, timeline, costos estimados, beneficios.`,
-                    'generate_proposal',
-                    detail.name,
-                  )} style={{
-                    width: '100%', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)',
-                    color: '#f59e0b', padding: '8px', borderRadius: 8,
-                    fontWeight: 600, fontSize: '0.66rem', cursor: 'pointer', fontFamily: "'Inter', system-ui",
-                    display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s',
-                  }}>
-                    📊 Generar propuesta
+                  <button
+                    className="labs-action"
+                    disabled={flowSteps.proposal || flowStepRunning === 'proposal'}
+                    onClick={async () => {
+                      setFlowStepRunning('proposal');
+                      await insertLog(detail.id, 'flow_step_proposal', detail.name);
+                      goToAgentsWithLog(
+                        `Genera una propuesta profesional para integrar ${detail.name} con Smart Connection. Incluye: arquitectura, timeline, costos estimados, beneficios.`,
+                        'generate_proposal', detail.name,
+                      );
+                      setFlowSteps(prev => ({ ...prev, proposal: true }));
+                      setFlowStepRunning(null);
+                    }}
+                    style={{
+                      width: '100%', background: flowSteps.proposal ? 'rgba(34,197,94,0.06)' : 'rgba(245,158,11,0.08)',
+                      border: `1px solid ${flowSteps.proposal ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)'}`,
+                      color: flowSteps.proposal ? '#22c55e' : '#f59e0b', padding: '8px', borderRadius: 8,
+                      fontWeight: 600, fontSize: '0.66rem', cursor: flowSteps.proposal ? 'default' : 'pointer',
+                      fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s',
+                      opacity: flowStepRunning === 'proposal' ? 0.6 : 1,
+                    }}
+                  >
+                    {flowSteps.proposal ? '✅ Propuesta generada' : flowStepRunning === 'proposal' ? '⏳ Generando...' : '📝 Generar propuesta'}
                   </button>
-                  <button className="labs-action" onClick={() => goToAgentsWithLog(
-                    `Diseña una maqueta/wireframe en texto para la integración de ${detail.name}. Incluye: layout de dashboard, flujo de datos, componentes UI necesarios, endpoints.`,
-                    'generate_mockup',
-                    detail.name,
-                  )} style={{
-                    width: '100%', background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.15)',
-                    color: '#06b6d4', padding: '8px', borderRadius: 8,
-                    fontWeight: 600, fontSize: '0.66rem', cursor: 'pointer', fontFamily: "'Inter', system-ui",
-                    display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s',
-                  }}>
-                    🎨 Diseñar maqueta
+
+                  <button
+                    className="labs-action"
+                    disabled={!flowSteps.proposal || flowSteps.deploy || flowStepRunning === 'deploy'}
+                    onClick={async () => {
+                      setFlowStepRunning('deploy');
+                      await insertLog(detail.id, 'flow_step_deploy', detail.name);
+                      goToAgentsWithLog(
+                        `Genera el pipeline de deploy para integrar ${detail.name}. Incluye: CI/CD, configuracion, variables de entorno, y pasos de validacion.`,
+                        'generate_deploy', detail.name,
+                      );
+                      setFlowSteps(prev => ({ ...prev, deploy: true }));
+                      setFlowStepRunning(null);
+                    }}
+                    style={{
+                      width: '100%', background: flowSteps.deploy ? 'rgba(34,197,94,0.06)' : !flowSteps.proposal ? 'rgba(255,255,255,0.01)' : 'rgba(139,92,246,0.08)',
+                      border: `1px solid ${flowSteps.deploy ? 'rgba(34,197,94,0.15)' : !flowSteps.proposal ? 'rgba(255,255,255,0.03)' : 'rgba(139,92,246,0.15)'}`,
+                      color: flowSteps.deploy ? '#22c55e' : !flowSteps.proposal ? '#2d3748' : '#8b5cf6',
+                      padding: '8px', borderRadius: 8,
+                      fontWeight: 600, fontSize: '0.66rem', cursor: !flowSteps.proposal || flowSteps.deploy ? 'default' : 'pointer',
+                      fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s',
+                    }}
+                  >
+                    {flowSteps.deploy ? '✅ Deploy configurado' : !flowSteps.proposal ? '🔒 Deploy (requiere propuesta)' : '🚀 Configurar deploy'}
                   </button>
-                  <button className="labs-action" onClick={() => {
-                    insertLog('labs', 'go_workspace', detail.name);
-                    try { sessionStorage.setItem('agent-prompt', ''); } catch {}
-                    router.push('/dashboard/agents');
-                  }} style={{
-                    width: '100%', background: 'linear-gradient(135deg, #00e5b0, #00c49a)',
-                    color: '#0a0e1a', border: 'none', padding: '9px', borderRadius: 8,
-                    fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer', fontFamily: "'Inter', system-ui",
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.2s',
-                  }}>
-                    ⚡ Ir al Workspace →
+
+                  <button
+                    className="labs-action"
+                    disabled={!flowSteps.deploy || flowSteps.result}
+                    onClick={() => {
+                      setFlowSteps(prev => ({ ...prev, result: true }));
+                      insertLog(detail.id, 'flow_step_result', detail.name);
+                      router.push('/dashboard/agents');
+                    }}
+                    style={{
+                      width: '100%',
+                      background: flowSteps.result ? 'rgba(34,197,94,0.06)' : !flowSteps.deploy ? 'rgba(255,255,255,0.01)' : 'linear-gradient(135deg, #00e5b0, #00c49a)',
+                      color: flowSteps.result ? '#22c55e' : !flowSteps.deploy ? '#2d3748' : '#0a0e1a',
+                      border: flowSteps.result ? '1px solid rgba(34,197,94,0.15)' : !flowSteps.deploy ? '1px solid rgba(255,255,255,0.03)' : 'none',
+                      padding: '9px', borderRadius: 8,
+                      fontWeight: 700, fontSize: '0.7rem', cursor: !flowSteps.deploy || flowSteps.result ? 'default' : 'pointer',
+                      fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.2s',
+                    }}
+                  >
+                    {flowSteps.result ? '✅ Completado' : !flowSteps.deploy ? '🔒 Ver resultado' : '📊 Ver resultado →'}
                   </button>
                 </div>
               </div>

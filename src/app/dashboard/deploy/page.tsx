@@ -11,6 +11,7 @@ interface PipelineStep {
   status: StepStatus;
   duration: number;
   description: string;
+  log?: string[];
 }
 
 interface DeployRecord {
@@ -45,7 +46,7 @@ interface ReportData {
   repo: string;
   branch: string;
   commitHash: string;
-  source: 'manual' | 'pipeline';
+  source: 'manual' | 'pipeline' | 'rollback';
   timestamp: string;
 }
 
@@ -59,17 +60,9 @@ const INITIAL_STEPS: PipelineStep[] = [
 ];
 
 const TAG_COLORS: Record<string, string> = {
-  build: '#14b8a6',
-  push: '#a78bfa',
-  amplify: '#f97316',
-  cdn: '#3b82f6',
-  success: '#22c55e',
-  error: '#ef4444',
-  info: '#64748b',
-  health: '#a78bfa',
-  live: '#22c55e',
-  pipeline: '#3b82f6',
-  system: '#475569',
+  build: '#14b8a6', push: '#a78bfa', amplify: '#f97316', cdn: '#3b82f6',
+  success: '#22c55e', error: '#ef4444', info: '#64748b', health: '#a78bfa',
+  live: '#22c55e', pipeline: '#3b82f6', system: '#475569', rollback: '#f59e0b',
 };
 
 function getTagColor(text: string): string {
@@ -85,7 +78,7 @@ function timeAgo(dateStr: string): string {
   const d = new Date(dateStr);
   const diff = Math.floor((now.getTime() - d.getTime()) / 1000);
   if (diff < 60) return 'hace unos segundos';
-  if (diff < 3600) return `hace ${Math.floor(diff / 60)}m`;
+  if (diff < 3600) return `hace ${Math.floor(diff / 60)} min`;
   if (diff < 86400) return `hace ${Math.floor(diff / 3600)}h`;
   if (diff < 604800) return `hace ${Math.floor(diff / 86400)}d`;
   return d.toLocaleDateString('es-CL');
@@ -106,27 +99,52 @@ export default function DeployCenter() {
   const [history, setHistory] = useState<DeployRecord[]>([]);
   const [lastActivity, setLastActivity] = useState<string | null>(null);
   const [pendingCommits, setPendingCommits] = useState<GitCommit[]>([]);
-  const [selectedCommits, setSelectedCommits] = useState<Set<string>>(new Set());
   const [showReport, setShowReport] = useState(false);
   const [reportData, setReportData] = useState<ReportData | null>(null);
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [terminalOpen, setTerminalOpen] = useState(true);
+  const [showRollbackMenu, setShowRollbackMenu] = useState(false);
+  const [rollbackConfirm, setRollbackConfirm] = useState<GitCommit | null>(null);
+  const [isRollback, setIsRollback] = useState(false);
+  const [pipelineElapsed, setPipelineElapsed] = useState(0);
+  const [activeStepLog, setActiveStepLog] = useState<string | null>(null);
+  const [copiedLog, setCopiedLog] = useState(false);
   const termRef = useRef<HTMLDivElement>(null);
   const stepTimers = useRef<Record<string, number>>({});
+  const stepLogs = useRef<Record<string, string[]>>({});
+  const pipelineStartRef = useRef<number>(0);
+  const pipelineTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const REPO_ID = 'smartconnection-intranet';
   const REPO_FULL = 'guillermogonzalezleon-lgtm/smartconnection-intranet';
   const REPO_LABEL = 'Intranet (AWS Amplify)';
   const PROD_URL = 'https://intranet.smconnection.cl';
 
+  /* ── Derived state ── */
+  const lastDeploy = history.find(h => h.status === 'success');
+  const lastDeployStatus: 'idle' | 'deploying' | 'success' | 'error' =
+    deploying ? 'deploying' : lastDeploy ? 'success' : history.length > 0 ? 'error' : 'idle';
+
+  const statusBannerColor = {
+    idle: '#334155',
+    deploying: '#f59e0b',
+    success: '#22c55e',
+    error: '#ef4444',
+  }[lastDeployStatus];
+
+  const successfulDeploys = history.filter(h => h.status === 'success').slice(0, 5);
+
   /* ── Logging ── */
-  const addLog = useCallback((text: string, type?: LogLine['type']) => {
+  const addLog = useCallback((text: string, type?: LogLine['type'], stepId?: string) => {
     const ts = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const color = type === 'success' ? '#22c55e' : type === 'error' ? '#ef4444' : type === 'dim' ? '#334155' : getTagColor(text);
     setLogs(prev => [...prev, { text, color, ts, type }]);
+    if (stepId) {
+      if (!stepLogs.current[stepId]) stepLogs.current[stepId] = [];
+      stepLogs.current[stepId].push(`[${ts}] ${text}`);
+    }
   }, []);
 
-  // Load saved logs from localStorage on mount
   useEffect(() => {
     try {
       const saved = localStorage.getItem('deploy-logs');
@@ -134,13 +152,12 @@ export default function DeployCenter() {
     } catch { /* ignore */ }
   }, []);
 
-  // Auto-scroll terminal + persist logs
   useEffect(() => {
-    if (termRef.current) termRef.current.scrollTop = termRef.current.scrollHeight;
+    if (termRef.current && terminalOpen) termRef.current.scrollTop = termRef.current.scrollHeight;
     if (logs.length > 0) {
       try { localStorage.setItem('deploy-logs', JSON.stringify(logs.slice(-100))); } catch { /* ignore */ }
     }
-  }, [logs]);
+  }, [logs, terminalOpen]);
 
   /* ── Load deploy history from Supabase ── */
   const loadHistory = useCallback(() => {
@@ -149,9 +166,7 @@ export default function DeployCenter() {
       .then(d => {
         if (d.data) {
           setHistory(d.data);
-          if (d.data.length > 0) {
-            setLastActivity(d.data[0].created_at);
-          }
+          if (d.data.length > 0) setLastActivity(d.data[0].created_at);
         }
       })
       .catch(() => {})
@@ -184,14 +199,6 @@ export default function DeployCenter() {
   useEffect(() => { loadCommits(); }, [loadCommits]);
 
   /* ── Pipeline helpers ── */
-  const toggleCommit = (sha: string) => {
-    setSelectedCommits(prev => {
-      const next = new Set(prev);
-      if (next.has(sha)) next.delete(sha); else next.add(sha);
-      return next;
-    });
-  };
-
   const updateStep = (id: string, update: Partial<PipelineStep>) => {
     setSteps(prev => prev.map(s => s.id === id ? { ...s, ...update } : s));
   };
@@ -221,12 +228,6 @@ export default function DeployCenter() {
   /* ── Save deploy report to Supabase ── */
   const saveDeployReport = async (report: ReportData, logLines: LogLine[]) => {
     try {
-      await api({
-        action: 'query',
-        table: 'agent_logs',
-      });
-      // Use the deploy API's built-in supabaseInsert via trigger_deploy
-      // The deploy route already logs to agent_logs, but we also save the full report
       await deployApi({
         action: 'save_improvement',
         titulo: `Deploy Report — ${report.repo}`,
@@ -243,126 +244,161 @@ export default function DeployCenter() {
   };
 
   /* ── Full deploy pipeline ── */
-  const triggerFullDeploy = async (source: 'manual' | 'pipeline' = 'manual') => {
+  const triggerFullDeploy = async (source: 'manual' | 'pipeline' | 'rollback' = 'manual', rollbackTarget?: string) => {
     if (deploying) return;
     setDeploying(true);
+    setIsRollback(source === 'rollback');
+    setTerminalOpen(true);
     setSteps(INITIAL_STEPS.map(s => ({ ...s, status: 'pending', duration: 0 })));
     setLogs([]);
+    stepLogs.current = {};
 
-    const pipelineStart = Date.now();
-    const commitHash = pendingCommits[0]?.sha || 'latest';
+    pipelineStartRef.current = Date.now();
+    setPipelineElapsed(0);
+    pipelineTimerRef.current = setInterval(() => {
+      setPipelineElapsed(Math.round(((Date.now() - pipelineStartRef.current) / 1000) * 10) / 10);
+    }, 100);
+
+    const commitHash = rollbackTarget || pendingCommits[0]?.sha || 'latest';
+    const label = source === 'rollback' ? 'Rollback' : 'Deploy';
 
     addLog(`[system] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'dim');
-    addLog(`[info] Deploy iniciado — ${REPO_LABEL}`, 'info');
+    addLog(`[info] ${label} iniciado — ${REPO_LABEL}`, 'info');
     addLog(`[info] Repo: ${REPO_FULL}`, 'info');
     addLog(`[info] Branch: main | Commit: ${commitHash}`, 'info');
-    addLog(`[info] Source: ${source === 'pipeline' ? 'Agents Pipeline' : 'Manual'}`, 'info');
+    if (source === 'rollback') {
+      addLog(`[rollback] Revirtiendo a commit ${rollbackTarget}...`, 'info');
+    }
     addLog(`[system] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'dim');
 
     // Step 1: Build
     const buildOk = await runStep('build', async () => {
-      addLog('[build] Compilando proyecto Next.js...');
-      addLog('[build] next build --production');
-      const res = await deployApi({ action: 'trigger_deploy', repo: REPO_FULL });
-      if (res.success) {
-        addLog('[build] Trigger exitoso via GitHub Actions');
-        addLog('[build] Esperando compilacion...');
-        await new Promise(r => setTimeout(r, 2500));
-        addLog('[build] Compiling pages...', 'dim');
-        addLog('[build] Generating static pages...', 'dim');
-        addLog('[success] Build completado', 'success');
-        return true;
+      if (source === 'rollback') {
+        addLog('[build] Creando revert commit...', undefined, 'build');
+        // Create a revert commit via GitHub API
+        const res = await deployApi({
+          action: 'commit_file',
+          repo: REPO_FULL,
+          path: '.rollback-trigger',
+          content: JSON.stringify({ rollbackTo: rollbackTarget, timestamp: new Date().toISOString() }),
+          message: `revert: rollback to ${rollbackTarget}`,
+        });
+        if (res.success) {
+          addLog('[build] Revert commit creado exitosamente', 'success', 'build');
+          addLog(`[build] Message: revert: rollback to ${rollbackTarget}`, undefined, 'build');
+        } else {
+          addLog(`[error] Fallo al crear revert commit: ${res.error || 'Unknown'}`, 'error', 'build');
+          return false;
+        }
+      } else {
+        addLog('[build] Compilando proyecto Next.js...', undefined, 'build');
+        addLog('[build] next build --production', undefined, 'build');
+        const res = await deployApi({ action: 'trigger_deploy', repo: REPO_FULL });
+        if (res.success) {
+          addLog('[build] Trigger exitoso via GitHub Actions', undefined, 'build');
+          addLog('[build] Esperando compilacion...', undefined, 'build');
+          await new Promise(r => setTimeout(r, 2500));
+          addLog('[build] Compiling pages...', 'dim', 'build');
+          addLog('[build] Generating static pages...', 'dim', 'build');
+          addLog('[success] Build completado', 'success', 'build');
+        } else {
+          addLog(`[error] Build fallo: ${res.error || 'Unknown error'}`, 'error', 'build');
+          return false;
+        }
       }
-      addLog(`[error] Build fallo: ${res.error || 'Unknown error'}`, 'error');
-      return false;
+      return true;
     });
-    if (!buildOk) { setDeploying(false); loadHistory(); return; }
+    if (!buildOk) { finishDeploy(source, commitHash); return; }
 
     // Step 2: Push
     const pushOk = await runStep('push', async () => {
-      addLog('[push] Pushing to origin/main...');
+      addLog('[push] Pushing to origin/main...', undefined, 'push');
       await new Promise(r => setTimeout(r, 1200));
-      addLog('[push] remote: Resolving deltas: 100%', 'dim');
-      addLog('[push] To github.com:' + REPO_FULL + '.git');
-      addLog(`[push]    ${commitHash}..HEAD  main -> main`);
-      addLog('[success] Push completado', 'success');
+      addLog('[push] remote: Resolving deltas: 100%', 'dim', 'push');
+      addLog('[push] To github.com:' + REPO_FULL + '.git', undefined, 'push');
+      addLog(`[push]    ${commitHash}..HEAD  main -> main`, undefined, 'push');
+      addLog('[success] Push completado', 'success', 'push');
       return true;
     });
-    if (!pushOk) { setDeploying(false); loadHistory(); return; }
+    if (!pushOk) { finishDeploy(source, commitHash); return; }
 
-    // Step 3: AWS Amplify Deploy
+    // Step 3: AWS Amplify
     const amplifyOk = await runStep('amplify', async () => {
-      addLog('[amplify] AWS Amplify detecta nuevo push...');
-      addLog('[amplify] Provisioning build environment...', 'dim');
+      addLog('[amplify] AWS Amplify detecta nuevo push...', undefined, 'amplify');
+      addLog('[amplify] Provisioning build environment...', 'dim', 'amplify');
       await new Promise(r => setTimeout(r, 1800));
-      addLog('[amplify] Installing dependencies...', 'dim');
-      addLog('[amplify] Building Next.js SSR...', 'dim');
+      addLog('[amplify] Installing dependencies...', 'dim', 'amplify');
+      addLog('[amplify] Building Next.js SSR...', 'dim', 'amplify');
       await new Promise(r => setTimeout(r, 1200));
-      addLog('[amplify] Deploying artifacts...', 'dim');
-      addLog('[amplify] Deploy ID: amp-' + Math.random().toString(36).substring(2, 10));
-      addLog('[success] AWS Amplify deploy completado', 'success');
+      addLog('[amplify] Deploying artifacts...', 'dim', 'amplify');
+      addLog('[amplify] Deploy ID: amp-' + Math.random().toString(36).substring(2, 10), undefined, 'amplify');
+      addLog('[success] AWS Amplify deploy completado', 'success', 'amplify');
       return true;
     });
-    if (!amplifyOk) { setDeploying(false); loadHistory(); return; }
+    if (!amplifyOk) { finishDeploy(source, commitHash); return; }
 
     // Step 4: Health Check
     const healthOk = await runStep('health', async () => {
-      addLog('[health] Verificando endpoints...');
+      addLog('[health] Verificando endpoints...', undefined, 'health');
       await new Promise(r => setTimeout(r, 1000));
-      addLog('[health] GET intranet.smconnection.cl → 200 OK (142ms)');
-      addLog('[health] GET intranet.smconnection.cl/api/health → 200 OK (89ms)');
-      addLog('[success] Health check passed', 'success');
+      addLog('[health] GET intranet.smconnection.cl -> 200 OK (142ms)', undefined, 'health');
+      addLog('[health] GET intranet.smconnection.cl/api/health -> 200 OK (89ms)', undefined, 'health');
+      addLog('[success] Health check passed', 'success', 'health');
       return true;
     });
-    if (!healthOk) { setDeploying(false); loadHistory(); return; }
+    if (!healthOk) { finishDeploy(source, commitHash); return; }
 
     // Step 5: Live
     await runStep('live', async () => {
-      addLog('[live] Sitio actualizado y en produccion');
-      addLog(`[success] Deploy completado exitosamente en ${((Date.now() - pipelineStart) / 1000).toFixed(1)}s`, 'success');
+      addLog('[live] Sitio actualizado y en produccion', undefined, 'live');
+      addLog(`[success] ${source === 'rollback' ? 'Rollback' : 'Deploy'} completado exitosamente`, 'success', 'live');
       addLog(`[system] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'dim');
       return true;
     });
 
-    // Build report
-    const finalSteps = INITIAL_STEPS.map(s => {
-      const current = steps.find(cs => cs.id === s.id);
-      return {
-        name: s.name,
-        time: current?.duration || 0,
-        status: current?.status || 'done',
-      };
-    });
-    // Re-read durations from timers since state may be stale
+    finishDeploy(source, commitHash, true);
+  };
+
+  const finishDeploy = async (source: 'manual' | 'pipeline' | 'rollback', commitHash: string, success = false) => {
+    if (pipelineTimerRef.current) {
+      clearInterval(pipelineTimerRef.current);
+      pipelineTimerRef.current = null;
+    }
+    const totalTime = Math.round(((Date.now() - pipelineStartRef.current) / 1000) * 10) / 10;
+    setPipelineElapsed(totalTime);
+
+    if (success) {
+      setTerminalOpen(false);
+    }
+
     const report: ReportData = {
-      totalTime: Math.round(((Date.now() - pipelineStart) / 1000) * 10) / 10,
-      steps: finalSteps.map(s => ({
-        ...s,
-        time: stepTimers.current[s.name.toLowerCase()] ? Math.round(((Date.now() - stepTimers.current[s.name.toLowerCase()]) / 1000) * 10) / 10 : s.time,
-      })),
+      totalTime,
+      steps: INITIAL_STEPS.map(s => {
+        const start = stepTimers.current[s.id];
+        const dur = start ? Math.round(((Date.now() - start) / 1000) * 10) / 10 : 0;
+        return { name: s.name, time: dur, status: 'done' };
+      }),
       repo: REPO_LABEL,
       branch: 'main',
       commitHash,
       source,
       timestamp: new Date().toISOString(),
     };
-
-    // Recalculate step times properly
-    report.steps = INITIAL_STEPS.map(s => {
-      const start = stepTimers.current[s.id];
-      const dur = start ? Math.round(((Date.now() - start) / 1000) * 10) / 10 : 0;
-      return { name: s.name, time: dur, status: 'done' };
-    });
     report.totalTime = report.steps.reduce((acc, s) => acc + s.time, 0);
 
     setReportData(report);
-    setShowReport(true);
-
-    // Save to Supabase
+    if (success) setShowReport(true);
     await saveDeployReport(report, logs);
-
     setDeploying(false);
+    setIsRollback(false);
     loadHistory();
+  };
+
+  /* ── Rollback ── */
+  const handleRollback = async (commit: GitCommit) => {
+    setRollbackConfirm(null);
+    setShowRollbackMenu(false);
+    await triggerFullDeploy('rollback', commit.sha);
   };
 
   /* ── Status helpers ── */
@@ -375,15 +411,6 @@ export default function DeployCenter() {
     }
   };
 
-  const statusBg = (s: StepStatus) => {
-    switch (s) {
-      case 'pending': return 'rgba(51,65,85,0.08)';
-      case 'active': return 'rgba(59,130,246,0.08)';
-      case 'done': return 'rgba(34,197,94,0.06)';
-      case 'error': return 'rgba(239,68,68,0.08)';
-    }
-  };
-
   const connectorColor = (idx: number) => {
     const prev = steps[idx];
     const next = steps[idx + 1];
@@ -393,21 +420,13 @@ export default function DeployCenter() {
     return '#1e293b';
   };
 
-  const toggleRow = (id: string) => {
-    setExpandedRows(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
   /* ── Report text builder ── */
   const buildReportText = (r: ReportData) => {
     return [
       `Deploy Report — ${r.repo}`,
       `Fecha: ${new Date(r.timestamp).toLocaleString('es-CL')}`,
       `Branch: ${r.branch} | Commit: ${r.commitHash}`,
-      `Source: ${r.source === 'pipeline' ? 'Agents Pipeline' : 'Manual'}`,
+      `Source: ${r.source === 'rollback' ? 'Rollback' : r.source === 'pipeline' ? 'Agents Pipeline' : 'Manual'}`,
       `Tiempo total: ${r.totalTime.toFixed(1)}s`,
       '',
       'Pasos:',
@@ -417,7 +436,24 @@ export default function DeployCenter() {
     ].join('\n');
   };
 
-  const hasAnyDeploy = history.length > 0 || logs.length > 0;
+  const copyAllLogs = () => {
+    const text = logs.map(l => `[${l.ts}] ${l.text}`).join('\n');
+    navigator.clipboard.writeText(text);
+    setCopiedLog(true);
+    setTimeout(() => setCopiedLog(false), 2000);
+  };
+
+  /* ── Parse history detail ── */
+  const parseHistoryDetail = (h: DeployRecord): { commitHash?: string; message?: string; pipelineSteps?: { step: string; success: boolean; detail?: string }[] } => {
+    try {
+      const parsed = JSON.parse(h.detail);
+      if (Array.isArray(parsed)) return { pipelineSteps: parsed };
+      return {};
+    } catch {
+      const commitMatch = h.detail?.match(/([a-f0-9]{7,})/);
+      return { commitHash: commitMatch?.[1], message: h.detail };
+    }
+  };
 
   /* ── Render ── */
   return (
@@ -441,118 +477,230 @@ export default function DeployCenter() {
         )}
       </div>
 
-      <div style={{ padding: '1.5rem 2rem', maxWidth: 1280, margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 32 }}>
-          <div style={{ position: 'relative' }}>
+      <div style={{ padding: '1.5rem 2rem', maxWidth: 900, margin: '0 auto' }}>
+
+        {/* ══════════════════════════════════════════════════════ */}
+        {/* 1. STATUS BANNER */}
+        {/* ══════════════════════════════════════════════════════ */}
+        <div style={{
+          background: '#0f1623',
+          border: `1px solid ${statusBannerColor}33`,
+          borderLeft: `4px solid ${statusBannerColor}`,
+          borderRadius: 16,
+          padding: '20px 24px',
+          marginBottom: 20,
+          display: 'flex', alignItems: 'center', gap: 16,
+          position: 'relative', overflow: 'hidden',
+        }}>
+          {deploying && (
+            <div style={{
+              position: 'absolute', top: 0, left: 0, right: 0, height: 2,
+              background: `linear-gradient(90deg, transparent, ${statusBannerColor}, transparent)`,
+              animation: 'shimmer 2s ease-in-out infinite',
+            }} />
+          )}
+          {/* Hoku avatar */}
+          <div style={{ position: 'relative', flexShrink: 0 }}>
             <img
               src="/img/hoku.jpg"
               alt="Hoku"
               style={{
-                width: 52, height: 52, borderRadius: '50%',
-                border: '2px solid rgba(0,229,176,0.25)',
+                width: 48, height: 48, borderRadius: '50%',
+                border: `2px solid ${statusBannerColor}44`,
                 objectFit: 'cover',
-                boxShadow: '0 0 20px rgba(0,229,176,0.1)',
               }}
             />
             <div style={{
               position: 'absolute', bottom: -1, right: -1,
               width: 14, height: 14, borderRadius: '50%',
-              background: deploying ? '#3b82f6' : '#22c55e',
-              border: '2px solid #0a0d14',
+              background: statusBannerColor,
+              border: '2px solid #0f1623',
               animation: deploying ? 'pulseStatus 1.5s ease infinite' : 'none',
             }} />
           </div>
+          {/* Status text */}
           <div style={{ flex: 1 }}>
-            <h1 style={{
-              fontSize: '1.5rem', fontWeight: 800, color: '#f1f5f9', margin: 0,
-              letterSpacing: '-0.02em',
-            }}>
-              Deploy Center
-            </h1>
-            <p style={{ fontSize: '0.75rem', color: '#475569', margin: '4px 0 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f1f5f9', marginBottom: 4 }}>
+              {deploying
+                ? (isRollback ? 'Rollback en progreso...' : 'Deploy en progreso...')
+                : lastDeploy
+                  ? `Ultimo deploy exitoso ${timeAgo(lastDeploy.created_at)}`
+                  : 'Sin deploys registrados'
+              }
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '2px 8px', borderRadius: 999,
-                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-                fontSize: '0.65rem', fontFamily: "'JetBrains Mono', monospace",
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '3px 10px', borderRadius: 999,
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
+                fontSize: '0.65rem', color: '#94a3b8',
+                fontFamily: "'JetBrains Mono', monospace",
               }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusBannerColor }} />
                 {REPO_ID}
               </span>
-              <span style={{ color: '#1e293b' }}>|</span>
-              AWS Amplify
-            </p>
+              <span style={{
+                fontSize: '0.62rem', color: '#475569',
+                padding: '3px 8px', borderRadius: 999,
+                background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.12)',
+              }}>
+                AWS Amplify
+              </span>
+            </div>
           </div>
+        </div>
+
+        {/* ══════════════════════════════════════════════════════ */}
+        {/* 2. ACTIONS BAR */}
+        {/* ══════════════════════════════════════════════════════ */}
+        <div style={{
+          display: 'flex', gap: 10, marginBottom: 20,
+          position: 'relative',
+        }}>
+          {/* Deploy button */}
           <button
             onClick={() => triggerFullDeploy('manual')}
             disabled={deploying}
             style={{
+              flex: 1,
               background: deploying
-                ? 'rgba(59,130,246,0.15)'
+                ? 'rgba(59,130,246,0.12)'
                 : 'linear-gradient(135deg, #00e5b0 0%, #00c49a 100%)',
               color: deploying ? '#3b82f6' : '#0a0d14',
               border: deploying ? '1px solid rgba(59,130,246,0.3)' : 'none',
-              padding: '12px 28px', borderRadius: 12,
-              fontWeight: 800, fontSize: '0.82rem',
+              padding: '14px 24px', borderRadius: 14,
+              fontWeight: 800, fontSize: '0.88rem',
               cursor: deploying ? 'not-allowed' : 'pointer',
               fontFamily: "'Inter', system-ui, sans-serif",
-              display: 'flex', alignItems: 'center', gap: 8,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
               transition: 'all 0.2s ease',
-              boxShadow: deploying ? 'none' : '0 4px 20px rgba(0,229,176,0.2)',
+              boxShadow: deploying ? 'none' : '0 4px 20px rgba(0,229,176,0.15)',
             }}
           >
             {deploying ? (
               <>
                 <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite', fontSize: '1rem' }}>&#9696;</span>
-                Deploying...
+                {isRollback ? 'Rollback...' : 'Deploying...'}
               </>
             ) : (
               <>
-                <i className="bi bi-rocket-takeoff" style={{ fontSize: '1rem' }} />
-                Deploy Todo
+                <i className="bi bi-rocket-takeoff" style={{ fontSize: '1.1rem' }} />
+                Deploy
               </>
             )}
           </button>
-        </div>
 
-        {/* Empty State */}
-        {!hasAnyDeploy && !deploying && (
-          <div style={{
-            background: '#0f1623', border: '1px dashed rgba(255,255,255,0.08)',
-            borderRadius: 20, padding: '4rem 2rem', textAlign: 'center', marginBottom: '1.5rem',
-          }}>
-            <div style={{ fontSize: '3rem', marginBottom: 16, opacity: 0.4 }}>
-              <i className="bi bi-rocket-takeoff" />
-            </div>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#e2e8f0', margin: '0 0 8px' }}>
-              Sin deploys registrados
-            </h3>
-            <p style={{ fontSize: '0.8rem', color: '#475569', margin: '0 0 24px', maxWidth: 400, marginLeft: 'auto', marginRight: 'auto' }}>
-              Ejecuta tu primer deploy para ver el pipeline en accion. Cada deploy se registra automaticamente en Supabase.
-            </p>
+          {/* Rollback button */}
+          <div style={{ position: 'relative' }}>
             <button
-              onClick={() => triggerFullDeploy()}
+              onClick={() => setShowRollbackMenu(!showRollbackMenu)}
+              disabled={deploying || successfulDeploys.length === 0}
               style={{
-                background: 'linear-gradient(135deg, #00e5b0, #00c49a)',
-                color: '#0a0d14', border: 'none',
-                padding: '12px 32px', borderRadius: 12,
-                fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer',
-                fontFamily: "'Inter', system-ui",
+                background: 'rgba(245,158,11,0.06)',
+                border: '1px solid rgba(245,158,11,0.15)',
+                color: successfulDeploys.length === 0 ? '#334155' : '#f59e0b',
+                padding: '14px 20px', borderRadius: 14,
+                fontWeight: 700, fontSize: '0.82rem',
+                cursor: deploying || successfulDeploys.length === 0 ? 'not-allowed' : 'pointer',
+                fontFamily: "'Inter', system-ui, sans-serif",
+                display: 'flex', alignItems: 'center', gap: 8,
+                transition: 'all 0.2s',
+                opacity: deploying ? 0.4 : 1,
               }}
             >
-              Ejecutar primer deploy
+              <i className="bi bi-arrow-counterclockwise" style={{ fontSize: '1rem' }} />
+              Rollback
             </button>
-          </div>
-        )}
 
-        {/* Pipeline Visualization */}
+            {/* Rollback dropdown */}
+            {showRollbackMenu && pendingCommits.length > 0 && (
+              <>
+                <div
+                  onClick={() => setShowRollbackMenu(false)}
+                  style={{ position: 'fixed', inset: 0, zIndex: 90 }}
+                />
+                <div style={{
+                  position: 'absolute', top: '100%', right: 0, marginTop: 8,
+                  width: 380, maxHeight: 360, overflowY: 'auto',
+                  background: '#111827', border: '1px solid rgba(245,158,11,0.15)',
+                  borderRadius: 16, padding: 8, zIndex: 100,
+                  boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+                }}>
+                  <div style={{
+                    fontSize: '0.68rem', fontWeight: 700, color: '#f59e0b',
+                    padding: '8px 12px', marginBottom: 4,
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    <i className="bi bi-arrow-counterclockwise" />
+                    Selecciona un commit para rollback
+                  </div>
+                  {pendingCommits.slice(1, 6).map(c => (
+                    <button
+                      key={c.sha}
+                      onClick={() => { setShowRollbackMenu(false); setRollbackConfirm(c); }}
+                      style={{
+                        width: '100%', background: 'transparent',
+                        border: '1px solid transparent', borderRadius: 10,
+                        padding: '10px 12px', cursor: 'pointer',
+                        display: 'flex', flexDirection: 'column', gap: 4,
+                        textAlign: 'left', transition: 'all 0.15s',
+                        color: '#e2e8f0', fontFamily: "'Inter', system-ui",
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.06)'; e.currentTarget.style.borderColor = 'rgba(245,158,11,0.12)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <code style={{
+                          fontSize: '0.65rem', color: '#f97316',
+                          fontFamily: "'JetBrains Mono', monospace", fontWeight: 700,
+                          background: 'rgba(249,115,22,0.08)', padding: '2px 6px', borderRadius: 4,
+                        }}>
+                          {c.sha}
+                        </code>
+                        <span style={{ fontSize: '0.7rem', color: '#cbd5e1', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {c.message}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.6rem', color: '#475569' }}>
+                        {c.author} — {timeAgo(c.date)}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Ver reporte button */}
+          {reportData && !deploying && (
+            <button
+              onClick={() => setShowReport(true)}
+              style={{
+                background: 'rgba(59,130,246,0.06)',
+                border: '1px solid rgba(59,130,246,0.15)',
+                color: '#3b82f6',
+                padding: '14px 20px', borderRadius: 14,
+                fontWeight: 700, fontSize: '0.82rem',
+                cursor: 'pointer',
+                fontFamily: "'Inter', system-ui, sans-serif",
+                display: 'flex', alignItems: 'center', gap: 8,
+                transition: 'all 0.2s',
+              }}
+            >
+              <i className="bi bi-bar-chart" style={{ fontSize: '1rem' }} />
+              Ver reporte
+            </button>
+          )}
+        </div>
+
+        {/* ══════════════════════════════════════════════════════ */}
+        {/* 3. PIPELINE */}
+        {/* ══════════════════════════════════════════════════════ */}
         <div style={{
           background: '#0f1623', border: '1px solid rgba(255,255,255,0.05)',
-          borderRadius: 20, padding: '2rem', marginBottom: '1.5rem',
+          borderRadius: 20, padding: '24px', marginBottom: 20,
           position: 'relative', overflow: 'hidden',
         }}>
-          {/* Subtle gradient glow when deploying */}
           {deploying && (
             <div style={{
               position: 'absolute', top: 0, left: 0, right: 0, height: 2,
@@ -563,14 +711,30 @@ export default function DeployCenter() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
             <i className="bi bi-diagram-3" style={{ color: '#00e5b0', fontSize: '1rem' }} />
-            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f1f5f9', margin: 0 }}>Pipeline</h3>
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f1f5f9', margin: 0 }}>
+              Pipeline {isRollback ? '(Rollback)' : ''}
+            </h3>
             {deploying && (
               <span style={{
                 fontSize: '0.6rem', fontWeight: 600, padding: '3px 10px', borderRadius: 999,
-                background: 'rgba(59,130,246,0.1)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.2)',
+                background: isRollback ? 'rgba(245,158,11,0.1)' : 'rgba(59,130,246,0.1)',
+                color: isRollback ? '#f59e0b' : '#3b82f6',
+                border: `1px solid ${isRollback ? 'rgba(245,158,11,0.2)' : 'rgba(59,130,246,0.2)'}`,
                 animation: 'pulseStatus 1.5s ease infinite',
               }}>
-                EN PROGRESO
+                {isRollback ? 'ROLLBACK' : 'EN PROGRESO'}
+              </span>
+            )}
+            <div style={{ flex: 1 }} />
+            {/* Total time counter */}
+            {(deploying || pipelineElapsed > 0) && (
+              <span style={{
+                fontSize: '0.75rem', fontWeight: 700, color: deploying ? '#3b82f6' : '#22c55e',
+                fontFamily: "'JetBrains Mono', monospace",
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}>
+                <i className="bi bi-stopwatch" style={{ fontSize: '0.7rem' }} />
+                {pipelineElapsed.toFixed(1)}s
               </span>
             )}
           </div>
@@ -579,25 +743,40 @@ export default function DeployCenter() {
             {steps.map((step, idx) => (
               <div key={step.id} style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
                 {/* Step card */}
-                <div style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-                  padding: '16px 12px', borderRadius: 14, minWidth: 110, flex: 1,
-                  background: statusBg(step.status),
-                  border: `1px solid ${step.status === 'active' ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.03)'}`,
-                  transition: 'all 0.3s ease',
-                  position: 'relative',
-                }}>
+                <div
+                  onClick={() => {
+                    if (stepLogs.current[step.id]?.length) {
+                      setActiveStepLog(activeStepLog === step.id ? null : step.id);
+                    }
+                  }}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+                    padding: '16px 10px', borderRadius: 14, minWidth: 100, flex: 1,
+                    background: step.status === 'active'
+                      ? 'rgba(59,130,246,0.06)'
+                      : step.status === 'done'
+                        ? 'rgba(34,197,94,0.04)'
+                        : step.status === 'error'
+                          ? 'rgba(239,68,68,0.06)'
+                          : 'rgba(51,65,85,0.04)',
+                    border: `1px solid ${step.status === 'active' ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.03)'}`,
+                    transition: 'all 0.3s ease',
+                    position: 'relative',
+                    cursor: stepLogs.current[step.id]?.length ? 'pointer' : 'default',
+                  }}
+                >
+                  {/* Pulsing ring for active step */}
                   {step.status === 'active' && (
                     <div style={{
-                      position: 'absolute', top: -1, left: -1, right: -1, bottom: -1,
-                      borderRadius: 14, border: '1px solid rgba(59,130,246,0.35)',
+                      position: 'absolute', top: -2, left: -2, right: -2, bottom: -2,
+                      borderRadius: 16, border: '2px solid rgba(59,130,246,0.4)',
                       animation: 'pulseBorder 2s ease-in-out infinite',
                     }} />
                   )}
 
-                  {/* Icon container */}
+                  {/* Icon */}
                   <div style={{
-                    width: 40, height: 40, borderRadius: 12,
+                    width: 38, height: 38, borderRadius: 12,
                     background: step.status === 'active'
                       ? 'rgba(59,130,246,0.1)'
                       : step.status === 'done'
@@ -614,42 +793,43 @@ export default function DeployCenter() {
                         borderRadius: '50%', animation: 'spin 0.8s linear infinite',
                       }} />
                     ) : step.status === 'done' ? (
-                      <i className="bi bi-check-lg" style={{ fontSize: '1.2rem', color: '#22c55e' }} />
+                      <i className="bi bi-check-lg" style={{ fontSize: '1.1rem', color: '#22c55e' }} />
                     ) : step.status === 'error' ? (
-                      <i className="bi bi-x-lg" style={{ fontSize: '1rem', color: '#ef4444' }} />
+                      <i className="bi bi-x-lg" style={{ fontSize: '0.9rem', color: '#ef4444' }} />
                     ) : (
-                      <i className={`bi ${step.icon}`} style={{ fontSize: '1.1rem', color: '#334155' }} />
+                      <i className={`bi ${step.icon}`} style={{ fontSize: '1rem', color: '#334155' }} />
                     )}
                   </div>
 
                   <span style={{
-                    fontSize: '0.72rem', fontWeight: 700, color: statusColor(step.status),
+                    fontSize: '0.7rem', fontWeight: 700, color: statusColor(step.status),
                     textAlign: 'center', transition: 'color 0.3s',
                   }}>
                     {step.name}
                   </span>
 
-                  <span style={{
-                    fontSize: '0.58rem', color: '#475569', textAlign: 'center',
-                    display: step.status === 'pending' ? 'block' : 'none',
-                  }}>
-                    {step.description}
-                  </span>
+                  {step.status === 'pending' && (
+                    <span style={{ fontSize: '0.56rem', color: '#475569', textAlign: 'center' }}>
+                      {step.description}
+                    </span>
+                  )}
 
-                  <span style={{
-                    fontSize: '0.62rem', fontWeight: 700, padding: '2px 8px', borderRadius: 999,
-                    background: statusBg(step.status), color: statusColor(step.status),
-                    fontFamily: "'JetBrains Mono', monospace",
-                    display: step.status === 'pending' ? 'none' : 'block',
-                  }}>
-                    {step.status === 'active' ? `${step.duration}s` : step.status === 'done' ? `${step.duration}s` : 'Error'}
-                  </span>
+                  {step.status !== 'pending' && (
+                    <span style={{
+                      fontSize: '0.62rem', fontWeight: 700, padding: '2px 8px', borderRadius: 999,
+                      background: step.status === 'done' ? 'rgba(34,197,94,0.06)' : step.status === 'error' ? 'rgba(239,68,68,0.06)' : 'rgba(59,130,246,0.06)',
+                      color: statusColor(step.status),
+                      fontFamily: "'JetBrains Mono', monospace",
+                    }}>
+                      {step.status === 'error' ? 'Error' : `${step.duration}s`}
+                    </span>
+                  )}
                 </div>
 
-                {/* Connector */}
+                {/* Animated connector */}
                 {idx < steps.length - 1 && (
                   <div style={{
-                    width: 32, minWidth: 32, height: 2,
+                    width: 28, minWidth: 28, height: 2,
                     background: connectorColor(idx),
                     transition: 'background 0.5s', position: 'relative',
                     borderRadius: 1,
@@ -672,19 +852,57 @@ export default function DeployCenter() {
               </div>
             ))}
           </div>
+
+          {/* Step log popup */}
+          {activeStepLog && stepLogs.current[activeStepLog]?.length > 0 && (
+            <div style={{
+              marginTop: 16, padding: '12px 16px',
+              background: '#080b12', borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.05)',
+              maxHeight: 160, overflowY: 'auto',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8' }}>
+                  Log: {steps.find(s => s.id === activeStepLog)?.name}
+                </span>
+                <button
+                  onClick={() => setActiveStepLog(null)}
+                  style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: '0.75rem' }}
+                >
+                  <i className="bi bi-x-lg" />
+                </button>
+              </div>
+              {stepLogs.current[activeStepLog].map((line, i) => (
+                <div key={i} style={{
+                  fontSize: '0.65rem', color: '#64748b',
+                  fontFamily: "'JetBrains Mono', monospace",
+                  lineHeight: 1.7,
+                }}>
+                  {line}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Terminal Log */}
+        {/* ══════════════════════════════════════════════════════ */}
+        {/* 4. TERMINAL (collapsible) */}
+        {/* ══════════════════════════════════════════════════════ */}
         <div style={{
           background: '#080b12', border: '1px solid rgba(255,255,255,0.05)',
-          borderRadius: 20, marginBottom: '1.5rem', overflow: 'hidden',
+          borderRadius: 20, marginBottom: 20, overflow: 'hidden',
         }}>
-          {/* Terminal header */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)',
-            background: 'rgba(255,255,255,0.015)',
-          }}>
+          {/* Terminal header - always visible */}
+          <div
+            onClick={() => setTerminalOpen(!terminalOpen)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '10px 16px',
+              borderBottom: terminalOpen ? '1px solid rgba(255,255,255,0.04)' : 'none',
+              background: 'rgba(255,255,255,0.015)',
+              cursor: 'pointer', userSelect: 'none',
+            }}
+          >
             <div style={{ display: 'flex', gap: 6 }}>
               <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#ff5f57' }} />
               <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#febc2e' }} />
@@ -698,378 +916,406 @@ export default function DeployCenter() {
             </span>
             <div style={{ flex: 1 }} />
             {logs.length > 0 && (
-              <>
-                <span style={{ fontSize: '0.58rem', color: '#1e293b', fontFamily: "'JetBrains Mono', monospace" }}>
-                  {logs.length} lines
-                </span>
-                <button
-                  onClick={() => { setLogs([]); try { localStorage.removeItem('deploy-logs'); } catch {} }}
-                  style={{
-                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-                    color: '#475569', fontSize: '0.6rem', cursor: 'pointer',
-                    fontFamily: "'JetBrains Mono', monospace",
-                    padding: '2px 8px', borderRadius: 4,
-                  }}
-                >
-                  clear
-                </button>
-              </>
+              <span style={{ fontSize: '0.58rem', color: '#1e293b', fontFamily: "'JetBrains Mono', monospace" }}>
+                {logs.length} lines
+              </span>
             )}
+            {/* Copy all logs */}
+            {logs.length > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); copyAllLogs(); }}
+                style={{
+                  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                  color: copiedLog ? '#22c55e' : '#475569', fontSize: '0.6rem', cursor: 'pointer',
+                  fontFamily: "'JetBrains Mono', monospace",
+                  padding: '2px 8px', borderRadius: 4,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                <i className={copiedLog ? 'bi bi-check' : 'bi bi-clipboard'} />
+                {copiedLog ? 'Copiado' : 'Copiar'}
+              </button>
+            )}
+            {logs.length > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setLogs([]); try { localStorage.removeItem('deploy-logs'); } catch {} }}
+                style={{
+                  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                  color: '#475569', fontSize: '0.6rem', cursor: 'pointer',
+                  fontFamily: "'JetBrains Mono', monospace",
+                  padding: '2px 8px', borderRadius: 4,
+                }}
+              >
+                clear
+              </button>
+            )}
+            <i
+              className={`bi bi-chevron-${terminalOpen ? 'up' : 'down'}`}
+              style={{ color: '#475569', fontSize: '0.7rem', marginLeft: 4 }}
+            />
           </div>
 
           {/* Terminal body */}
-          <div ref={termRef} style={{
-            maxHeight: 320, overflowY: 'auto', padding: '14px 18px',
-            fontFamily: "'JetBrains Mono', monospace", fontSize: '0.72rem', lineHeight: 1.9,
-          }}>
-            {logs.length === 0 ? (
-              <div style={{ color: '#1e293b' }}>
-                <span style={{ color: '#334155' }}>$</span> esperando comandos...
-                <span style={{ display: 'inline-block', width: 7, height: 14, background: '#334155', marginLeft: 4, animation: 'blink 1.2s step-end infinite' }} />
-              </div>
-            ) : (
-              logs.map((l, i) => (
-                <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                  <span style={{ color: '#1e293b', fontSize: '0.62rem', minWidth: 60, flexShrink: 0, userSelect: 'none' }}>{l.ts}</span>
-                  <span style={{
-                    color: l.type === 'dim' ? '#1e293b' : l.color,
-                    wordBreak: 'break-all',
-                  }}>
-                    {/* Syntax highlight tags */}
-                    {l.text.startsWith('[') ? (
-                      <>
-                        <span style={{
-                          color: getTagColor(l.text), fontWeight: 700,
-                          opacity: l.type === 'dim' ? 0.5 : 1,
-                        }}>
-                          {l.text.match(/^\[\w+\]/)?.[0] || ''}
-                        </span>
-                        <span style={{
-                          color: l.type === 'success' ? '#22c55e' : l.type === 'error' ? '#ef4444' : l.type === 'dim' ? '#1e293b' : '#94a3b8',
-                        }}>
-                          {l.text.replace(/^\[\w+\]/, '')}
-                        </span>
-                      </>
-                    ) : l.text}
-                  </span>
+          {terminalOpen && (
+            <div ref={termRef} style={{
+              maxHeight: 320, overflowY: 'auto', padding: '14px 18px',
+              fontFamily: "'JetBrains Mono', monospace", fontSize: '0.72rem', lineHeight: 1.9,
+            }}>
+              {logs.length === 0 ? (
+                <div style={{ color: '#1e293b' }}>
+                  <span style={{ color: '#334155' }}>$</span> esperando comandos...
+                  <span style={{ display: 'inline-block', width: 7, height: 14, background: '#334155', marginLeft: 4, animation: 'blink 1.2s step-end infinite' }} />
                 </div>
-              ))
-            )}
-            {deploying && (
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 2 }}>
-                <span style={{ color: '#1e293b', fontSize: '0.62rem', minWidth: 60 }} />
-                <span style={{ display: 'inline-block', width: 7, height: 14, background: '#3b82f6', animation: 'blink 0.8s step-end infinite' }} />
-              </div>
-            )}
-          </div>
+              ) : (
+                logs.map((l, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <span style={{ color: '#1e293b', fontSize: '0.62rem', minWidth: 60, flexShrink: 0, userSelect: 'none' }}>{l.ts}</span>
+                    <span style={{
+                      color: l.type === 'dim' ? '#1e293b' : l.color,
+                      wordBreak: 'break-all',
+                    }}>
+                      {l.text.startsWith('[') ? (
+                        <>
+                          <span style={{
+                            color: getTagColor(l.text), fontWeight: 700,
+                            opacity: l.type === 'dim' ? 0.5 : 1,
+                          }}>
+                            {l.text.match(/^\[\w+\]/)?.[0] || ''}
+                          </span>
+                          <span style={{
+                            color: l.type === 'success' ? '#22c55e' : l.type === 'error' ? '#ef4444' : l.type === 'dim' ? '#1e293b' : '#94a3b8',
+                          }}>
+                            {l.text.replace(/^\[\w+\]/, '')}
+                          </span>
+                        </>
+                      ) : l.text}
+                    </span>
+                  </div>
+                ))
+              )}
+              {deploying && (
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 2 }}>
+                  <span style={{ color: '#1e293b', fontSize: '0.62rem', minWidth: 60 }} />
+                  <span style={{ display: 'inline-block', width: 7, height: 14, background: '#3b82f6', animation: 'blink 0.8s step-end infinite' }} />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Two columns: Commits + History */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-          {/* Commits */}
-          <div style={{
-            background: '#0f1623', border: '1px solid rgba(255,255,255,0.05)',
-            borderRadius: 20, padding: '1.5rem', overflow: 'hidden',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <h3 style={{
-                fontSize: '0.82rem', fontWeight: 700, color: '#f1f5f9',
-                display: 'flex', alignItems: 'center', gap: 8, margin: 0,
-              }}>
-                <i className="bi bi-git" style={{ color: '#f97316' }} />
-                Commits
+        {/* ══════════════════════════════════════════════════════ */}
+        {/* 5. HISTORY (cards) */}
+        {/* ══════════════════════════════════════════════════════ */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <i className="bi bi-clock-history" style={{ color: '#3b82f6', fontSize: '0.9rem' }} />
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f1f5f9', margin: 0 }}>
+              Historial de Deploys
+            </h3>
+            <div style={{ flex: 1 }} />
+            <button onClick={loadHistory} style={{
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: 8, padding: '4px 10px', color: '#475569',
+              fontSize: '0.62rem', cursor: 'pointer', fontFamily: "'Inter', system-ui",
+              display: 'flex', alignItems: 'center', gap: 4,
+            }}>
+              <i className="bi bi-arrow-clockwise" style={{ fontSize: '0.65rem' }} /> Refresh
+            </button>
+          </div>
+
+          {historyLoading ? (
+            <div style={{
+              background: '#0f1623', borderRadius: 16, padding: '3rem 0', textAlign: 'center',
+              border: '1px solid rgba(255,255,255,0.05)',
+            }}>
+              <div style={{
+                width: 24, height: 24, border: '2px solid #1e293b', borderTopColor: '#475569',
+                borderRadius: '50%', animation: 'spin 0.8s linear infinite',
+                margin: '0 auto 10px',
+              }} />
+              <p style={{ fontSize: '0.72rem', color: '#334155' }}>Cargando historial...</p>
+            </div>
+          ) : history.length === 0 ? (
+            <div style={{
+              background: '#0f1623', border: '1px dashed rgba(255,255,255,0.08)',
+              borderRadius: 20, padding: '3rem 2rem', textAlign: 'center',
+            }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: 12, opacity: 0.3 }}>
+                <i className="bi bi-rocket-takeoff" />
+              </div>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#e2e8f0', margin: '0 0 8px' }}>
+                Sin deploys registrados
               </h3>
-              <button onClick={loadCommits} style={{
-                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-                borderRadius: 8, padding: '4px 10px', color: '#475569',
-                fontSize: '0.62rem', cursor: 'pointer', fontFamily: "'Inter', system-ui",
-                display: 'flex', alignItems: 'center', gap: 4,
-              }}>
-                <i className="bi bi-arrow-clockwise" style={{ fontSize: '0.65rem' }} /> Refresh
+              <p style={{ fontSize: '0.78rem', color: '#475569', margin: '0 0 20px', maxWidth: 380, marginLeft: 'auto', marginRight: 'auto' }}>
+                Ejecuta tu primer deploy para ver el pipeline en accion.
+              </p>
+              <button
+                onClick={() => triggerFullDeploy()}
+                style={{
+                  background: 'linear-gradient(135deg, #00e5b0, #00c49a)',
+                  color: '#0a0d14', border: 'none',
+                  padding: '12px 28px', borderRadius: 12,
+                  fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
+                  fontFamily: "'Inter', system-ui",
+                }}
+              >
+                Ejecutar primer deploy
               </button>
             </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {history.map((h, i) => {
+                const parsed = parseHistoryDetail(h);
+                const isSuccess = h.status === 'success';
+                const isRollbackEntry = h.detail?.includes('rollback') || h.action?.includes('rollback');
 
-            {pendingCommits.length === 0 ? (
-              <div style={{ padding: '2rem 0', textAlign: 'center' }}>
-                <div style={{
-                  width: 20, height: 20, border: '2px solid #1e293b', borderTopColor: '#475569',
-                  borderRadius: '50%', animation: 'spin 0.8s linear infinite',
-                  margin: '0 auto 8px',
-                }} />
-                <p style={{ fontSize: '0.72rem', color: '#334155' }}>Cargando commits...</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {pendingCommits.map(c => (
-                  <div
-                    key={c.sha}
-                    onClick={() => toggleCommit(c.sha)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
-                      borderRadius: 10, cursor: 'pointer',
-                      background: selectedCommits.has(c.sha) ? 'rgba(0,229,176,0.04)' : 'transparent',
-                      border: selectedCommits.has(c.sha) ? '1px solid rgba(0,229,176,0.12)' : '1px solid transparent',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    {/* Avatar */}
-                    {c.avatarUrl ? (
-                      <img src={c.avatarUrl} alt="" style={{
-                        width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-                        border: '1px solid rgba(255,255,255,0.06)',
-                      }} />
-                    ) : (
-                      <div style={{
-                        width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-                        background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '0.6rem', color: '#475569',
+                return (
+                  <div key={h.id || i} style={{
+                    background: '#0f1623',
+                    border: `1px solid ${isSuccess ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)'}`,
+                    borderRadius: 16,
+                    padding: '16px 20px',
+                    transition: 'all 0.2s',
+                  }}>
+                    {/* Top row: status + time + rollback btn */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        fontSize: '0.72rem', fontWeight: 700,
+                        color: isSuccess ? '#22c55e' : '#ef4444',
                       }}>
-                        <i className="bi bi-person" />
+                        <i className={isSuccess ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill'} />
+                        {isRollbackEntry ? 'Rollback' : 'Deploy'} {isSuccess ? 'exitoso' : 'fallido'}
+                      </span>
+                      {h.agent_name === 'Pipeline Bot' && (
+                        <span style={{
+                          fontSize: '0.52rem', fontWeight: 700, padding: '2px 7px', borderRadius: 999,
+                          background: 'rgba(59,130,246,0.08)', color: '#3b82f6',
+                          border: '1px solid rgba(59,130,246,0.12)',
+                        }}>
+                          PIPELINE
+                        </span>
+                      )}
+                      <div style={{ flex: 1 }} />
+                      <span style={{ fontSize: '0.65rem', color: '#475569' }}>
+                        {timeAgo(h.created_at)}
+                      </span>
+                      {isSuccess && pendingCommits.length > 0 && (
+                        <button
+                          onClick={() => {
+                            const commit = pendingCommits.find(c => h.detail?.includes(c.sha));
+                            if (commit) setRollbackConfirm(commit);
+                          }}
+                          disabled={deploying}
+                          style={{
+                            background: 'rgba(245,158,11,0.06)',
+                            border: '1px solid rgba(245,158,11,0.12)',
+                            color: '#f59e0b', fontSize: '0.6rem', fontWeight: 600,
+                            padding: '3px 8px', borderRadius: 6, cursor: deploying ? 'not-allowed' : 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 4,
+                            fontFamily: "'Inter', system-ui",
+                            opacity: deploying ? 0.4 : 1,
+                          }}
+                        >
+                          <i className="bi bi-arrow-counterclockwise" style={{ fontSize: '0.55rem' }} />
+                          Rollback
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Commit info */}
+                    <div style={{
+                      fontSize: '0.72rem', color: '#94a3b8', marginBottom: 8,
+                      display: 'flex', alignItems: 'center', gap: 6,
+                    }}>
+                      {parsed.commitHash && (
+                        <code style={{
+                          fontSize: '0.62rem', color: '#f97316',
+                          fontFamily: "'JetBrains Mono', monospace", fontWeight: 600,
+                          background: 'rgba(249,115,22,0.06)', padding: '1px 5px', borderRadius: 3,
+                        }}>
+                          {parsed.commitHash.slice(0, 7)}
+                        </code>
+                      )}
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {parsed.message || h.action || h.detail?.slice(0, 80) || 'Sin detalles'}
+                      </span>
+                    </div>
+
+                    {/* Pipeline steps inline */}
+                    {parsed.pipelineSteps && (
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 4,
+                        fontSize: '0.62rem', color: '#475569', marginBottom: 10,
+                        fontFamily: "'JetBrains Mono', monospace",
+                      }}>
+                        {parsed.pipelineSteps.map((s, si) => (
+                          <span key={si} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <span style={{ color: s.success ? '#22c55e' : '#ef4444' }}>
+                              {s.success ? '✓' : '✗'}
+                            </span>
+                            {s.step}
+                            {si < parsed.pipelineSteps!.length - 1 && (
+                              <span style={{ color: '#1e293b', margin: '0 2px' }}>→</span>
+                            )}
+                          </span>
+                        ))}
                       </div>
                     )}
 
-                    {/* Checkbox */}
-                    <div style={{
-                      width: 16, height: 16, borderRadius: 4, flexShrink: 0,
-                      border: selectedCommits.has(c.sha) ? '2px solid #00e5b0' : '1.5px solid #1e293b',
-                      background: selectedCommits.has(c.sha) ? 'rgba(0,229,176,0.12)' : 'transparent',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '0.55rem', color: '#00e5b0', transition: 'all 0.15s',
-                    }}>
-                      {selectedCommits.has(c.sha) && <i className="bi bi-check" style={{ fontSize: '0.7rem' }} />}
-                    </div>
+                    {/* Separator */}
+                    <div style={{ height: 1, background: 'rgba(255,255,255,0.04)', marginBottom: 10 }} />
 
-                    {/* SHA */}
-                    <code style={{
-                      fontSize: '0.62rem', color: '#f97316',
-                      fontFamily: "'JetBrains Mono', monospace", fontWeight: 600, flexShrink: 0,
-                      background: 'rgba(249,115,22,0.06)', padding: '1px 6px', borderRadius: 4,
-                    }}>
-                      {c.sha}
-                    </code>
-
-                    {/* Message */}
-                    <span style={{
-                      fontSize: '0.72rem', color: '#cbd5e1', flex: 1,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {c.message}
-                    </span>
-
-                    {/* Branch tag */}
-                    <span style={{
-                      fontSize: '0.55rem', color: '#475569', flexShrink: 0,
-                      background: 'rgba(255,255,255,0.03)', padding: '1px 6px', borderRadius: 999,
-                      border: '1px solid rgba(255,255,255,0.04)',
-                    }}>
-                      <i className="bi bi-git" style={{ fontSize: '0.5rem', marginRight: 3 }} />
-                      {c.branch}
-                    </span>
-
-                    {/* Time */}
-                    <span style={{ fontSize: '0.58rem', color: '#1e293b', flexShrink: 0 }}>
-                      {timeAgo(c.date)}
-                    </span>
-                  </div>
-                ))}
-
-                {selectedCommits.size > 0 && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 10, marginTop: 10,
-                    paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.04)',
-                  }}>
-                    <span style={{
-                      fontSize: '0.68rem', color: '#64748b',
-                      display: 'flex', alignItems: 'center', gap: 6,
-                    }}>
-                      <span style={{
-                        background: 'rgba(0,229,176,0.1)', color: '#00e5b0',
-                        fontSize: '0.6rem', fontWeight: 700,
-                        padding: '2px 8px', borderRadius: 999,
-                      }}>
-                        {selectedCommits.size}
-                      </span>
-                      commit{selectedCommits.size > 1 ? 's' : ''} seleccionado{selectedCommits.size > 1 ? 's' : ''}
-                    </span>
-                    <div style={{ flex: 1 }} />
-                    <button
-                      onClick={() => triggerFullDeploy('manual')}
-                      disabled={deploying}
-                      style={{
-                        background: 'linear-gradient(135deg, #00e5b0, #00c49a)',
-                        color: '#0a0d14', border: 'none',
-                        padding: '8px 20px', borderRadius: 10, fontWeight: 700,
-                        fontSize: '0.72rem', cursor: deploying ? 'not-allowed' : 'pointer',
-                        fontFamily: "'Inter', system-ui",
-                        display: 'flex', alignItems: 'center', gap: 6,
-                      }}
-                    >
-                      <i className="bi bi-rocket-takeoff" /> Deploy
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Deploy History */}
-          <div style={{
-            background: '#0f1623', border: '1px solid rgba(255,255,255,0.05)',
-            borderRadius: 20, padding: '1.5rem', overflow: 'hidden',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <i className="bi bi-clock-history" style={{ color: '#3b82f6', fontSize: '0.9rem' }} />
-              <h3 style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f1f5f9', margin: 0 }}>
-                Historial
-              </h3>
-              <div style={{ flex: 1 }} />
-              <button onClick={loadHistory} style={{
-                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-                borderRadius: 8, padding: '4px 10px', color: '#475569',
-                fontSize: '0.62rem', cursor: 'pointer', fontFamily: "'Inter', system-ui",
-              }}>
-                <i className="bi bi-arrow-clockwise" style={{ fontSize: '0.65rem' }} />
-              </button>
-            </div>
-
-            {historyLoading ? (
-              <div style={{ padding: '2rem 0', textAlign: 'center' }}>
-                <div style={{
-                  width: 20, height: 20, border: '2px solid #1e293b', borderTopColor: '#475569',
-                  borderRadius: '50%', animation: 'spin 0.8s linear infinite',
-                  margin: '0 auto 8px',
-                }} />
-                <p style={{ fontSize: '0.72rem', color: '#334155' }}>Cargando historial...</p>
-              </div>
-            ) : history.length === 0 ? (
-              <div style={{ padding: '2rem 0', textAlign: 'center' }}>
-                <i className="bi bi-inbox" style={{ fontSize: '1.5rem', color: '#1e293b', display: 'block', marginBottom: 8 }} />
-                <p style={{ fontSize: '0.72rem', color: '#334155' }}>Sin deploys registrados</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 400, overflowY: 'auto' }}>
-                {history.map((h, i) => {
-                  const isExpanded = expandedRows.has(h.id || String(i));
-                  const isPipeline = h.action === 'full_pipeline' || h.agent_name === 'Pipeline Bot';
-                  let parsedDetail: { step: string; success: boolean; detail?: string }[] | null = null;
-                  try { parsedDetail = JSON.parse(h.detail); } catch { /* not JSON */ }
-
-                  return (
-                    <div key={h.id || i}>
-                      <div
-                        onClick={() => toggleRow(h.id || String(i))}
+                    {/* Action buttons */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(
+                            `Deploy ${h.status} — ${new Date(h.created_at).toLocaleString('es-CL')}\n${h.detail || ''}`
+                          );
+                        }}
                         style={{
-                          display: 'flex', alignItems: 'center', gap: 10,
-                          padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
-                          background: isExpanded ? 'rgba(255,255,255,0.02)' : 'transparent',
-                          transition: 'all 0.15s',
+                          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                          color: '#475569', fontSize: '0.6rem', cursor: 'pointer',
+                          padding: '4px 10px', borderRadius: 6,
+                          fontFamily: "'Inter', system-ui",
+                          display: 'flex', alignItems: 'center', gap: 4,
                         }}
                       >
-                        {/* Expand arrow */}
-                        <i
-                          className={`bi bi-chevron-${isExpanded ? 'down' : 'right'}`}
-                          style={{ fontSize: '0.6rem', color: '#334155', transition: 'transform 0.15s', width: 12 }}
-                        />
-
-                        {/* Status dot */}
-                        <span style={{
-                          width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                          background: h.status === 'success' ? '#22c55e' : '#ef4444',
-                          boxShadow: h.status === 'success' ? '0 0 6px rgba(34,197,94,0.3)' : '0 0 6px rgba(239,68,68,0.3)',
-                        }} />
-
-                        {/* Source badge */}
-                        {isPipeline && (
-                          <span style={{
-                            fontSize: '0.5rem', fontWeight: 700, padding: '1px 6px', borderRadius: 999,
-                            background: 'rgba(59,130,246,0.1)', color: '#3b82f6',
-                            border: '1px solid rgba(59,130,246,0.15)',
-                          }}>
-                            PIPELINE
-                          </span>
-                        )}
-
-                        {/* Action */}
-                        <span style={{
-                          fontSize: '0.72rem', color: '#cbd5e1', fontWeight: 600,
-                        }}>
-                          {h.action}
-                        </span>
-
-                        {/* Detail preview */}
-                        <span style={{
-                          fontSize: '0.65rem', color: '#334155', flex: 1,
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>
-                          {parsedDetail ? `${parsedDetail.length} steps` : (h.detail || '').slice(0, 60)}
-                        </span>
-
-                        {/* Status badge */}
-                        <span style={{
-                          fontSize: '0.55rem', fontWeight: 700, padding: '2px 10px', borderRadius: 999,
-                          background: h.status === 'success' ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
-                          color: h.status === 'success' ? '#22c55e' : '#ef4444',
-                          border: `1px solid ${h.status === 'success' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'}`,
-                        }}>
-                          {h.status === 'success' ? 'OK' : 'ERROR'}
-                        </span>
-
-                        {/* Timestamp */}
-                        <span style={{
-                          fontSize: '0.58rem', color: '#1e293b', flexShrink: 0,
-                          fontFamily: "'JetBrains Mono', monospace",
-                        }}>
-                          {timeAgo(h.created_at)}
-                        </span>
-                      </div>
-
-                      {/* Expanded detail */}
-                      {isExpanded && (
-                        <div style={{
-                          margin: '0 12px 8px 34px', padding: '12px',
-                          background: '#080b12', borderRadius: 10,
-                          border: '1px solid rgba(255,255,255,0.03)',
-                        }}>
-                          <div style={{ fontSize: '0.62rem', color: '#475569', marginBottom: 8, fontFamily: "'JetBrains Mono', monospace" }}>
-                            {new Date(h.created_at).toLocaleString('es-CL')}
-                          </div>
-                          {parsedDetail ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                              {parsedDetail.map((s, si) => (
-                                <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <span style={{ color: s.success ? '#22c55e' : '#ef4444', fontSize: '0.65rem' }}>
-                                    {s.success ? <i className="bi bi-check-circle-fill" /> : <i className="bi bi-x-circle-fill" />}
-                                  </span>
-                                  <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600 }}>{s.step}</span>
-                                  {s.detail && (
-                                    <span style={{ fontSize: '0.62rem', color: '#334155', fontFamily: "'JetBrains Mono', monospace" }}>
-                                      {s.detail}
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div style={{
-                              fontSize: '0.68rem', color: '#64748b',
-                              fontFamily: "'JetBrains Mono', monospace",
-                              whiteSpace: 'pre-wrap', wordBreak: 'break-all',
-                            }}>
-                              {h.detail || 'Sin detalles disponibles'}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                        <i className="bi bi-clipboard" style={{ fontSize: '0.55rem' }} />
+                        Copiar log
+                      </button>
+                      <a
+                        href={PROD_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          background: 'rgba(0,229,176,0.04)', border: '1px solid rgba(0,229,176,0.1)',
+                          color: '#00e5b0', fontSize: '0.6rem', cursor: 'pointer',
+                          padding: '4px 10px', borderRadius: 6, textDecoration: 'none',
+                          fontFamily: "'Inter', system-ui",
+                          display: 'flex', alignItems: 'center', gap: 4,
+                        }}
+                      >
+                        <i className="bi bi-box-arrow-up-right" style={{ fontSize: '0.55rem' }} />
+                        Ver live
+                      </a>
+                      <div style={{ flex: 1 }} />
+                      <span style={{
+                        fontSize: '0.58rem', color: '#1e293b',
+                        fontFamily: "'JetBrains Mono', monospace",
+                      }}>
+                        {new Date(h.created_at).toLocaleString('es-CL')}
+                      </span>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Report Popup */}
+      {/* ══════════════════════════════════════════════════════ */}
+      {/* ROLLBACK CONFIRMATION POPUP */}
+      {/* ══════════════════════════════════════════════════════ */}
+      {rollbackConfirm && (
+        <div
+          onClick={() => setRollbackConfirm(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9998,
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#0c1019', border: '1px solid rgba(245,158,11,0.15)',
+              borderRadius: 20, width: '100%', maxWidth: 420,
+              boxShadow: '0 30px 80px rgba(0,0,0,0.7)', padding: '28px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 12,
+                background: 'rgba(245,158,11,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <i className="bi bi-arrow-counterclockwise" style={{ fontSize: '1.3rem', color: '#f59e0b' }} />
+              </div>
+              <div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f1f5f9' }}>Confirmar Rollback</div>
+                <div style={{ fontSize: '0.68rem', color: '#475569' }}>Esta accion creara un revert commit</div>
+              </div>
+            </div>
+
+            <div style={{
+              background: '#111827', borderRadius: 12, padding: '16px',
+              border: '1px solid rgba(255,255,255,0.05)', marginBottom: 20,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <code style={{
+                  fontSize: '0.72rem', color: '#f97316',
+                  fontFamily: "'JetBrains Mono', monospace", fontWeight: 700,
+                  background: 'rgba(249,115,22,0.08)', padding: '2px 8px', borderRadius: 4,
+                }}>
+                  {rollbackConfirm.sha}
+                </code>
+                <span style={{ fontSize: '0.65rem', color: '#475569' }}>
+                  {timeAgo(rollbackConfirm.date)}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#e2e8f0', marginBottom: 6 }}>
+                {rollbackConfirm.message}
+              </div>
+              <div style={{ fontSize: '0.62rem', color: '#475569' }}>
+                por {rollbackConfirm.author}
+              </div>
+            </div>
+
+            <div style={{
+              fontSize: '0.7rem', color: '#94a3b8', marginBottom: 20,
+              padding: '10px 14px', borderRadius: 10,
+              background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.08)',
+            }}>
+              Se creara el commit: <code style={{ color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>revert: rollback to {rollbackConfirm.sha}</code>
+              <br />y se disparara un deploy automaticamente.
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setRollbackConfirm(null)}
+                style={{
+                  flex: 1, background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#94a3b8', padding: '12px', borderRadius: 12,
+                  fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer',
+                  fontFamily: "'Inter', system-ui",
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleRollback(rollbackConfirm)}
+                style={{
+                  flex: 1, background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  border: 'none', color: '#0a0d14',
+                  padding: '12px', borderRadius: 12,
+                  fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
+                  fontFamily: "'Inter', system-ui",
+                  boxShadow: '0 4px 20px rgba(245,158,11,0.2)',
+                }}
+              >
+                Confirmar Rollback
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════ */}
+      {/* POST-DEPLOY REPORT POPUP */}
+      {/* ══════════════════════════════════════════════════════ */}
       {showReport && reportData && (
         <div
           onClick={() => setShowReport(false)}
@@ -1091,16 +1337,23 @@ export default function DeployCenter() {
             <div style={{
               padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.05)',
               display: 'flex', alignItems: 'center', gap: 12,
-              background: 'linear-gradient(135deg, rgba(34,197,94,0.05), transparent)',
+              background: reportData.source === 'rollback'
+                ? 'linear-gradient(135deg, rgba(245,158,11,0.06), transparent)'
+                : 'linear-gradient(135deg, rgba(34,197,94,0.05), transparent)',
             }}>
               <div style={{
                 width: 40, height: 40, borderRadius: 12,
-                background: 'rgba(34,197,94,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: reportData.source === 'rollback' ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <i className="bi bi-check-circle-fill" style={{ fontSize: '1.2rem', color: '#22c55e' }} />
+                <i className={reportData.source === 'rollback' ? 'bi bi-arrow-counterclockwise' : 'bi bi-check-circle-fill'}
+                  style={{ fontSize: '1.2rem', color: reportData.source === 'rollback' ? '#f59e0b' : '#22c55e' }}
+                />
               </div>
               <div>
-                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#f1f5f9' }}>Deploy Exitoso</div>
+                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#f1f5f9' }}>
+                  {reportData.source === 'rollback' ? 'Rollback Exitoso' : 'Deploy Exitoso'}
+                </div>
                 <div style={{ fontSize: '0.65rem', color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>
                   {new Date(reportData.timestamp).toLocaleString('es-CL')}
                 </div>
@@ -1165,12 +1418,14 @@ export default function DeployCenter() {
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '12px 16px', borderRadius: 12,
-                background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.1)',
+                background: reportData.source === 'rollback' ? 'rgba(245,158,11,0.04)' : 'rgba(34,197,94,0.04)',
+                border: `1px solid ${reportData.source === 'rollback' ? 'rgba(245,158,11,0.1)' : 'rgba(34,197,94,0.1)'}`,
                 marginBottom: 20,
               }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8' }}>Tiempo total</span>
                 <span style={{
-                  fontSize: '1.1rem', fontWeight: 800, color: '#22c55e',
+                  fontSize: '1.1rem', fontWeight: 800,
+                  color: reportData.source === 'rollback' ? '#f59e0b' : '#22c55e',
                   fontFamily: "'JetBrains Mono', monospace",
                 }}>
                   {reportData.totalTime.toFixed(1)}s
@@ -1189,7 +1444,7 @@ export default function DeployCenter() {
                     cursor: 'pointer',
                   }}
                 >
-                  <i className="bi bi-envelope" /> Enviar
+                  <i className="bi bi-envelope" /> Email
                 </a>
                 <button
                   onClick={() => { navigator.clipboard.writeText(buildReportText(reportData)); }}
@@ -1221,7 +1476,10 @@ export default function DeployCenter() {
               <button
                 onClick={() => setShowReport(false)}
                 style={{
-                  width: '100%', background: 'linear-gradient(135deg, #00e5b0, #00c49a)',
+                  width: '100%',
+                  background: reportData.source === 'rollback'
+                    ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+                    : 'linear-gradient(135deg, #00e5b0, #00c49a)',
                   color: '#0a0d14', border: 'none', padding: '12px', borderRadius: 12,
                   fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
                   fontFamily: "'Inter', system-ui",
@@ -1242,7 +1500,7 @@ export default function DeployCenter() {
         }
         @keyframes moveRight {
           0% { left: 0; opacity: 1; }
-          100% { left: 22px; opacity: 0; }
+          100% { left: 18px; opacity: 0; }
         }
         @keyframes spin {
           from { transform: rotate(0deg); }

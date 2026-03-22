@@ -372,6 +372,23 @@ export default function UXAgent() {
     setFilterEstado(map[estado] || 'Todas');
   };
 
+  // ── CSV export ──
+  const exportCSV = () => {
+    const headers = ['titulo', 'descripcion', 'categoria', 'impacto', 'estado', 'agente', 'ciclo', 'fecha'];
+    const escape = (v: string) => `"${String(v).replace(/"/g, '""')}"`;
+    const rows = insights.map(i => [
+      escape(i.titulo), escape(i.descripcion), escape(i.categoria),
+      escape(i.impacto), escape(i.estado), escape(i.agente),
+      String(i.ciclo), escape(i.created_at),
+    ].join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `ux-insights-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
   // ── Last updated display ──
   const lastUpdatedText = lastUpdated ? timeAgo(lastUpdated.toISOString()) : '';
 
@@ -515,6 +532,48 @@ export default function UXAgent() {
           })}
         </div>
 
+        {/* ── Quick Action Bar ── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.75rem',
+          padding: '8px 14px', background: 'rgba(255,255,255,0.02)', borderRadius: 10,
+          border: '1px solid rgba(255,255,255,0.04)',
+        }}>
+          <a href="/dashboard/agents" style={{
+            background: 'rgba(0,229,176,0.08)', border: '1px solid rgba(0,229,176,0.2)',
+            color: '#00e5b0', padding: '6px 14px', borderRadius: 8,
+            fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer',
+            fontFamily: "'Inter', system-ui", textDecoration: 'none',
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            transition: 'all 0.2s ease',
+          }}>
+            Analisis con Hoku
+          </a>
+          <button onClick={exportCSV} style={{
+            background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)',
+            color: '#8b5cf6', padding: '6px 14px', borderRadius: 8,
+            fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer',
+            fontFamily: "'Inter', system-ui", display: 'inline-flex', alignItems: 'center', gap: 5,
+            transition: 'all 0.2s ease',
+          }}>
+            Exportar CSV
+          </button>
+          <button onClick={() => loadInsights(true)} disabled={refreshing} style={{
+            background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
+            color: refreshing ? '#334155' : '#3b82f6', padding: '6px 14px', borderRadius: 8,
+            fontSize: '0.7rem', fontWeight: 700, cursor: refreshing ? 'default' : 'pointer',
+            fontFamily: "'Inter', system-ui", display: 'inline-flex', alignItems: 'center', gap: 5,
+            transition: 'all 0.2s ease',
+          }}>
+            <span style={{ display: 'inline-block', animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }}>{'\u21BB'}</span>
+            Refresh
+          </button>
+          {lastUpdatedText && (
+            <span style={{ fontSize: '0.65rem', color: '#475569', marginLeft: 'auto', fontWeight: 500 }}>
+              Ultima actualizacion: {lastUpdatedText}
+            </span>
+          )}
+        </div>
+
         {/* ── Filters ── */}
         <div style={{
           display: 'flex', gap: 5, marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center',
@@ -573,9 +632,9 @@ export default function UXAgent() {
                   onMouseEnter={() => setHoveredCard(insight.id)}
                   onMouseLeave={() => setHoveredCard(null)}
                   style={{
-                    background: isHovered ? '#111827' : '#0d1117',
-                    border: `1px solid ${isHovered ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)'}`,
-                    borderLeft: `3px solid ${borderColor}`,
+                    background: isHovered ? '#111827' : (insight.estado === 'implementado' ? 'rgba(34,197,94,0.03)' : '#0d1117'),
+                    border: `1px solid ${isHovered ? 'rgba(255,255,255,0.08)' : (insight.estado === 'implementado' ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.04)')}`,
+                    borderLeft: `3px solid ${insight.estado === 'implementado' ? '#22c55e' : borderColor}`,
                     borderRadius: 12, padding: '1rem 1.25rem',
                     cursor: 'pointer', transition: 'all 0.2s ease',
                     transform: isHovered ? 'translateX(2px)' : 'none',
@@ -604,6 +663,14 @@ export default function UXAgent() {
                           fontSize: '0.58rem', fontWeight: 600, padding: '2px 8px', borderRadius: 6,
                           background: ec.bg, color: ec.text, border: `1px solid ${ec.border}`,
                         }}>{insight.estado.replace('_', ' ')}</span>
+                        {insight.estado === 'implementado' && (
+                          <span style={{
+                            fontSize: '0.58rem', fontWeight: 700, padding: '2px 8px', borderRadius: 6,
+                            background: 'rgba(34,197,94,0.12)', color: '#22c55e',
+                            border: '1px solid rgba(34,197,94,0.25)',
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                          }}>Deployado</span>
+                        )}
                       </div>
                       {/* Title */}
                       <div style={{
@@ -734,9 +801,58 @@ export default function UXAgent() {
               })}
             </div>
 
+            {/* Timeline */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 16, marginBottom: '1.25rem',
+              padding: '10px 14px', background: 'rgba(0,0,0,0.2)', borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.03)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ fontSize: '0.55rem', color: '#475569', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Creado</span>
+                <span style={{ fontSize: '0.62rem', color: '#94a3b8', fontWeight: 600 }}>{timeAgo(detailInsight.created_at)}</span>
+              </div>
+              <span style={{ width: 16, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ fontSize: '0.55rem', color: '#475569', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Estado</span>
+                <span style={{ fontSize: '0.62rem', color: estadoColors[detailInsight.estado]?.text || '#94a3b8', fontWeight: 600 }}>
+                  {detailInsight.estado.replace('_', ' ')}
+                </span>
+              </div>
+              {detailInsight.estado === 'implementado' && (
+                <>
+                  <span style={{ width: 16, height: 1, background: 'rgba(34,197,94,0.2)' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ fontSize: '0.55rem', color: '#22c55e', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Deployado</span>
+                    <a href="https://main.d2qrwhv3smj3x4.amplifyapp.com" target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize: '0.58rem', color: '#22c55e', textDecoration: 'none', fontWeight: 600 }}>
+                      Ver en produccion {'\u2197'}
+                    </a>
+                  </div>
+                </>
+              )}
+            </div>
+
             {/* Action buttons row */}
             <div style={{ display: 'flex', gap: 8, marginBottom: '0.75rem' }}>
-              {/* Pipeline button */}
+              {/* Agent analysis button */}
+              <button
+                onClick={() => runAgentOnInsight(detailInsight)}
+                disabled={agentRunning}
+                style={{
+                  flex: 1,
+                  background: agentRunning ? '#111827' : 'rgba(245,158,11,0.1)',
+                  color: agentRunning ? '#64748b' : '#f59e0b',
+                  border: `1px solid ${agentRunning ? 'rgba(255,255,255,0.04)' : 'rgba(245,158,11,0.2)'}`,
+                  padding: '10px', borderRadius: 10, fontWeight: 700, fontSize: '0.78rem',
+                  cursor: agentRunning ? 'not-allowed' : 'pointer',
+                  fontFamily: "'Inter', system-ui", display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', gap: 6,
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {agentRunning ? (<>Analizando<AnimatedDots /></>) : (<>{'\u25B6'} Ejecutar agente</>)}
+              </button>
+              {/* Pipeline button - only for non-implemented */}
               {detailInsight.estado !== 'implementado' && (
                 <button
                   onClick={() => {
@@ -757,27 +873,9 @@ export default function UXAgent() {
                     transition: 'all 0.2s ease',
                   }}
                 >
-                  {'\u25B6'} Ejecutar pipeline
+                  Pipeline
                 </button>
               )}
-              {/* Agent analysis button */}
-              <button
-                onClick={() => runAgentOnInsight(detailInsight)}
-                disabled={agentRunning}
-                style={{
-                  flex: 1,
-                  background: agentRunning ? '#111827' : 'rgba(245,158,11,0.1)',
-                  color: agentRunning ? '#64748b' : '#f59e0b',
-                  border: `1px solid ${agentRunning ? 'rgba(255,255,255,0.04)' : 'rgba(245,158,11,0.2)'}`,
-                  padding: '10px', borderRadius: 10, fontWeight: 700, fontSize: '0.78rem',
-                  cursor: agentRunning ? 'not-allowed' : 'pointer',
-                  fontFamily: "'Inter', system-ui", display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', gap: 6,
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                {agentRunning ? (<>Analizando<AnimatedDots /></>) : 'Analizar con IA'}
-              </button>
             </div>
 
             {/* Agent output */}
@@ -878,30 +976,43 @@ export default function UXAgent() {
             {pipelineDone && (
               <div style={{
                 background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)',
-                borderRadius: 10, padding: '1rem', marginBottom: '1rem', textAlign: 'center',
+                borderRadius: 10, padding: '1.25rem', marginBottom: '1rem', textAlign: 'center',
               }}>
-                <div style={{ fontSize: '1.5rem', marginBottom: 6 }}>{'\u2713'}</div>
-                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#22c55e', marginBottom: 4 }}>
-                  Pipeline completado
+                <div style={{ fontSize: '2rem', marginBottom: 8 }}>{'\u2713'}</div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#22c55e', marginBottom: 6 }}>
+                  Implementado
                 </div>
-                <div style={{ fontSize: '0.68rem', color: '#64748b', marginBottom: '1rem' }}>
-                  Insight marcado como implementado
+                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+                  El insight fue deployado exitosamente a produccion
                 </div>
-                <a
-                  href="https://main.d2qrwhv3smj3x4.amplifyapp.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 6,
-                    background: 'linear-gradient(135deg, #22c55e, #16a34a)',
-                    color: '#fff', padding: '8px 18px', borderRadius: 8,
-                    fontWeight: 700, fontSize: '0.75rem', textDecoration: 'none',
-                    fontFamily: "'Inter', system-ui",
-                    boxShadow: '0 4px 16px rgba(34,197,94,0.25)',
-                  }}
-                >
-                  Ver en produccion {'\u2197'}
-                </a>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                  <a
+                    href="https://main.d2qrwhv3smj3x4.amplifyapp.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                      color: '#fff', padding: '9px 20px', borderRadius: 8,
+                      fontWeight: 700, fontSize: '0.75rem', textDecoration: 'none',
+                      fontFamily: "'Inter', system-ui",
+                      boxShadow: '0 4px 16px rgba(34,197,94,0.25)',
+                    }}
+                  >
+                    Ver en produccion {'\u2197'}
+                  </a>
+                  <button
+                    onClick={() => { setPipelineInsight(null); loadInsights(true); }}
+                    style={{
+                      background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)',
+                      color: '#e2e8f0', padding: '9px 20px', borderRadius: 8,
+                      fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer',
+                      fontFamily: "'Inter', system-ui",
+                    }}
+                  >
+                    Cerrar
+                  </button>
+                </div>
               </div>
             )}
 
@@ -944,22 +1055,6 @@ export default function UXAgent() {
               }}>
                 Pipeline en ejecucion<AnimatedDots />
               </div>
-            )}
-
-            {/* Close after done */}
-            {pipelineDone && (
-              <button
-                onClick={() => { setPipelineInsight(null); loadInsights(true); }}
-                style={{
-                  width: '100%', background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.06)',
-                  color: '#94a3b8', padding: '10px', borderRadius: 10,
-                  fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer',
-                  fontFamily: "'Inter', system-ui", marginTop: 8,
-                }}
-              >
-                Cerrar
-              </button>
             )}
           </div>
         </Overlay>
