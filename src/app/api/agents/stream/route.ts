@@ -1,6 +1,7 @@
 import { getSession } from '@/lib/auth';
 import { routeTask } from '@/lib/agents/hoku-router';
 import { PROMPTS } from '@/lib/agents/prompts';
+import { supabaseQuery, supabaseInsert } from '@/lib/supabase';
 
 const GROQ_KEY = process.env.GROQ_API_KEY;
 
@@ -183,6 +184,33 @@ export async function POST(request: Request) {
 
   // ═══ HOKU: parallel execution + synthesis ═══
   if (agentId === 'hoku') {
+    // ML: Search knowledge base for relevant context
+    let knowledgeContext = '';
+    try {
+      const words = prompt.split(/\s+/).filter((w: string) => w.length > 2).slice(0, 5);
+      if (words.length > 0) {
+        const tsQuery = words.join(' | ');
+        const knowledge = await supabaseQuery<Record<string, unknown>>('hoku_knowledge', 'GET', {
+          filter: `search_vector=fts.${encodeURIComponent(tsQuery)}`,
+          order: 'quality_score.desc',
+          limit: 5,
+        }).catch(() => []);
+        if (knowledge.length > 0) {
+          knowledgeContext = '\n\nCONOCIMIENTO APRENDIDO (referencia prioritaria):\n' +
+            knowledge.map(k => `[${k.topic}](score:${(k.quality_score as number)?.toFixed(2)}): ${(k.content as string).slice(0, 500)}`).join('\n') + '\n';
+          // Increment use_count
+          for (const k of knowledge) {
+            supabaseQuery('hoku_knowledge', 'PATCH', {
+              filter: `id=eq.${k.id}`,
+              body: { use_count: ((k.use_count as number) || 0) + 1 },
+            }).catch(() => {});
+          }
+        }
+      }
+    } catch { /* knowledge search optional */ }
+
+    const enrichedPrompt = prompt + knowledgeContext;
+
     const stream = new ReadableStream({
       async start(controller) {
         const send = (content: string) => { try { controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`)); } catch {} };
@@ -225,39 +253,36 @@ export async function POST(request: Request) {
         const subMaxTokens = chatMode ? 500 : 1500;
 
         // Build agent list dynamically based on available keys
+        const ep = enrichedPrompt; // use knowledge-enriched prompt for all agents
         const agentList: { name: string; fn: () => Promise<string> }[] = [
-          { name: 'Groq', fn: () => groqNonStream(prompt, `Eres un asistente técnico ultra rápido. ${codeSys}`) },
-          { name: 'Claude', fn: () => callClaude(prompt, `Eres un experto en desarrollo de software. ${codeSys}`) },
+          { name: 'Groq', fn: () => groqNonStream(ep, `Eres un asistente técnico ultra rápido. ${codeSys}`) },
+          { name: 'Claude', fn: () => callClaude(ep, `Eres un experto en desarrollo de software. ${codeSys}`) },
         ];
 
         const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
-        if (grokKey) agentList.push({ name: 'Grok', fn: () => callOpenAI('https://api.x.ai/v1/chat/completions', grokKey, 'grok-3-mini', prompt, `Eres un analista de mercado. ${codeSys}`, 'Grok') });
+        if (grokKey) agentList.push({ name: 'Grok', fn: () => callOpenAI('https://api.x.ai/v1/chat/completions', grokKey, 'grok-3-mini', ep, `Eres un analista de mercado. ${codeSys}`, 'Grok') });
 
         const deepseekKey = process.env.DEEPSEEK_API_KEY;
-        if (deepseekKey) agentList.push({ name: 'DeepSeek', fn: () => callOpenAI('https://api.deepseek.com/v1/chat/completions', deepseekKey, 'deepseek-chat', prompt, `Eres un programador experto. ${codeSys}`, 'DeepSeek') });
+        if (deepseekKey) agentList.push({ name: 'DeepSeek', fn: () => callOpenAI('https://api.deepseek.com/v1/chat/completions', deepseekKey, 'deepseek-chat', ep, `Eres un programador experto. ${codeSys}`, 'DeepSeek') });
 
         const mistralKey = process.env.MISTRAL_API_KEY;
-        if (mistralKey) agentList.push({ name: 'Mistral', fn: () => callOpenAI('https://api.mistral.ai/v1/chat/completions', mistralKey, 'mistral-small-latest', prompt, `Eres un ingeniero de software. ${codeSys}`, 'Mistral') });
+        if (mistralKey) agentList.push({ name: 'Mistral', fn: () => callOpenAI('https://api.mistral.ai/v1/chat/completions', mistralKey, 'mistral-small-latest', ep, `Eres un ingeniero de software. ${codeSys}`, 'Mistral') });
 
         const openaiKey = process.env.OPENAI_API_KEY;
-        if (openaiKey) agentList.push({ name: 'OpenAI', fn: () => callOpenAI('https://api.openai.com/v1/chat/completions', openaiKey, 'gpt-4o-mini', prompt, `Eres un desarrollador full-stack. ${codeSys}`, 'OpenAI') });
+        if (openaiKey) agentList.push({ name: 'OpenAI', fn: () => callOpenAI('https://api.openai.com/v1/chat/completions', openaiKey, 'gpt-4o-mini', ep, `Eres un desarrollador full-stack. ${codeSys}`, 'OpenAI') });
 
         const cohereKey = process.env.COHERE_API_KEY;
-        if (cohereKey) agentList.push({ name: 'Cohere', fn: () => callOpenAI('https://api.cohere.com/v2/chat', cohereKey, 'command-a-03-2025', prompt, `Eres un experto en NLP y datos. ${codeSys}`, 'Cohere') });
+        if (cohereKey) agentList.push({ name: 'Cohere', fn: () => callOpenAI('https://api.cohere.com/v2/chat', cohereKey, 'command-a-03-2025', ep, `Eres un experto en NLP y datos. ${codeSys}`, 'Cohere') });
 
         const openrouterKey = process.env.OPENROUTER_API_KEY;
-        if (openrouterKey) agentList.push({ name: 'OpenRouter', fn: () => callOpenAI('https://openrouter.ai/api/v1/chat/completions', openrouterKey, 'meta-llama/llama-3.3-70b-instruct', prompt, `Eres un asistente técnico avanzado. ${codeSys}`, 'OpenRouter') });
+        if (openrouterKey) agentList.push({ name: 'OpenRouter', fn: () => callOpenAI('https://openrouter.ai/api/v1/chat/completions', openrouterKey, 'meta-llama/llama-3.3-70b-instruct', ep, `Eres un asistente técnico avanzado. ${codeSys}`, 'OpenRouter') });
 
-        // Bedrock uses AWS credentials from the Amplify runtime environment (no API key needed)
         agentList.push({ name: 'Bedrock', fn: async () => {
           try {
-            // In Amplify, AWS credentials are injected automatically
-            // Use the Bedrock converse API via fetch with AWS Sig V4 is complex
-            // Simpler: call our own API endpoint that uses the runtime credentials
             const r = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://intranet.smconnection.cl'}/api/bedrock`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ prompt: prompt, system: `Eres un experto cloud AWS. ${codeSys}` }),
+              body: JSON.stringify({ prompt: ep, system: `Eres un experto cloud AWS. ${codeSys}` }),
             });
             if (!r.ok) return `(Bedrock error ${r.status})`;
             const d = await r.json();
@@ -265,6 +290,9 @@ export async function POST(request: Request) {
           } catch (e) { return `(Bedrock: ${String(e).slice(0, 80)})`; }
         } });
 
+        if (knowledgeContext) {
+          send(`🧠 ${knowledgeContext.split('\n').filter(l => l.includes('[') && l.includes(']')).length} conocimientos previos encontrados\n`);
+        }
         send(`🐾 HOKU — Ejecutando ${agentList.length} agentes en paralelo...\n\n`);
 
         const results: { name: string; result: string }[] = [];
@@ -358,6 +386,27 @@ IMPORTANTE: Cuando generes código, usa este formato:
               if (content) send(content);
             } catch {}
           }
+        }
+
+        // ML: Learn from this execution (fire-and-forget)
+        if (results.length > 0) {
+          const topic = prompt.slice(0, 150).replace(/[^\w\sáéíóúñ]/gi, '').trim();
+          const bestResults = results.filter(r => !r.result.startsWith('(')).slice(0, 3);
+          const learnContent = bestResults.map(r => `[${r.name}]: ${r.result.slice(0, 600)}`).join('\n');
+          supabaseInsert('hoku_knowledge', {
+            topic,
+            content: learnContent.slice(0, 3000),
+            source: `fusion_${results.length}_agents`,
+            quality_score: 0.5,
+          }).catch(() => {});
+          // Log execution
+          supabaseInsert('agent_logs', {
+            agent_id: 'hoku',
+            agent_name: 'Hoku Fusion',
+            action: 'fusion_execute',
+            detail: `${results.length} agentes · ${topic.slice(0, 100)}`,
+            status: 'success',
+          }).catch(() => {});
         }
 
         } catch (err) {

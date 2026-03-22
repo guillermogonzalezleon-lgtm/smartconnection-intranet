@@ -87,7 +87,26 @@ export async function runAgentsParallel(
   const configMap = new Map(configs.map(c => [c.agent_id, c]));
 
   const contextStr = context ? `\n\nContexto: ${JSON.stringify(context)}` : '';
-  const fullTask = task + contextStr;
+
+  // ML: Search knowledge base for relevant context
+  let knowledgeStr = '';
+  try {
+    const words = task.split(/\s+/).filter(w => w.length > 2).slice(0, 5);
+    if (words.length > 0) {
+      const tsQuery = words.join(' | ');
+      const knowledge = await supabaseQuery<Record<string, unknown>>('hoku_knowledge', 'GET', {
+        filter: `search_vector=fts.${encodeURIComponent(tsQuery)}`,
+        order: 'quality_score.desc',
+        limit: 3,
+      }).catch(() => []);
+      if (knowledge.length > 0) {
+        knowledgeStr = '\n\nCONOCIMIENTO PREVIO:\n' +
+          knowledge.map(k => `[${k.topic}]: ${(k.content as string).slice(0, 400)}`).join('\n');
+      }
+    }
+  } catch { /* optional */ }
+
+  const fullTask = task + contextStr + knowledgeStr;
 
   const promises = agentIds.map(agentId => {
     const cfg = configMap.get(agentId);
@@ -119,6 +138,19 @@ export async function runAgentsParallel(
       action: 'parallel_execute',
       detail: r.result.substring(0, 500),
       status: r.status,
+    }).catch(() => {});
+  }
+
+  // ML: Learn from successful results
+  const successful = results.filter(r => r.status === 'success' && r.result.length > 50);
+  if (successful.length > 0) {
+    const topic = task.slice(0, 150).replace(/[^\w\sáéíóúñ]/gi, '').trim();
+    const content = successful.map(r => `[${r.agent}]: ${r.result.slice(0, 500)}`).join('\n');
+    supabaseInsert('hoku_knowledge', {
+      topic,
+      content: content.slice(0, 3000),
+      source: `orchestrator_${successful.length}_agents`,
+      quality_score: 0.5,
     }).catch(() => {});
   }
 
