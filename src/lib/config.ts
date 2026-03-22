@@ -22,9 +22,16 @@ export const CONFIG = {
     region: 'sa-east-1',
   },
   agents: {
-    hoku: { id: 'hoku', name: 'Hoku', model: 'fusión 3 agentes', color: '#ff6b6b' },
+    hoku: { id: 'hoku', name: 'Hoku', model: 'fusión 9 agentes', color: '#ff6b6b' },
     groq: { id: 'groq', name: 'Groq', model: 'llama-3.3-70b', color: '#f59e0b' },
-    claude: { id: 'claude', name: 'Claude', model: 'claude-sonnet-4-5', color: '#00e5b0' },
+    claude: { id: 'claude', name: 'Claude', model: 'claude-haiku-4.5', color: '#00e5b0' },
+    grok: { id: 'grok', name: 'Grok', model: 'grok-3-mini', color: '#8b5cf6' },
+    deepseek: { id: 'deepseek', name: 'DeepSeek', model: 'deepseek-chat', color: '#0ea5e9' },
+    mistral: { id: 'mistral', name: 'Mistral', model: 'mistral-small', color: '#f97316' },
+    openai: { id: 'openai', name: 'OpenAI', model: 'gpt-4o-mini', color: '#10b981' },
+    cohere: { id: 'cohere', name: 'Cohere', model: 'command-a', color: '#1e3a5f' },
+    openrouter: { id: 'openrouter', name: 'OpenRouter', model: 'llama-3.3-70b', color: '#6366f1' },
+    bedrock: { id: 'bedrock', name: 'Bedrock', model: 'claude-3.5-haiku', color: '#f97316' },
     gemini: { id: 'gemini', name: 'Gemini', model: 'gemini-2.0-flash', color: '#22c55e' },
   },
   colors: {

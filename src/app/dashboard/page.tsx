@@ -52,7 +52,7 @@ export default function Dashboard() {
           setLastDeploy(`${timeStr} · ${status}`);
         }
       }).catch(() => {});
-    Promise.all(['claude','groq','grok','gemini','deployer'].map(id => api({ action: 'logs', agentId: id })))
+    Promise.all(['hoku','groq','claude','grok','deepseek','mistral','openai','cohere','openrouter','bedrock','gemini','deployer'].map(id => api({ action: 'logs', agentId: id })))
       .then(results => {
         const all = results.flatMap(r => r.logs || []).sort((a: Record<string, unknown>, b: Record<string, unknown>) => new Date(b.created_at as string).getTime() - new Date(a.created_at as string).getTime());
         setLogs(all.slice(0, 15));
@@ -71,9 +71,16 @@ export default function Dashboard() {
   const tasks = agents.reduce((s, a) => s + ((a.tasks_count as number) || 0), 0);
 
   const agentMeta: Record<string, { color: string; icon: string }> = {
-    claude: { color: '#00e5b0', icon: 'bi-robot' },
+    hoku: { color: '#ff6b6b', icon: 'bi-stars' },
     groq: { color: '#f59e0b', icon: 'bi-cpu' },
+    claude: { color: '#00e5b0', icon: 'bi-robot' },
     grok: { color: '#8b5cf6', icon: 'bi-lightning-charge' },
+    deepseek: { color: '#0ea5e9', icon: 'bi-code-slash' },
+    mistral: { color: '#f97316', icon: 'bi-translate' },
+    openai: { color: '#10b981', icon: 'bi-braces' },
+    cohere: { color: '#1e3a5f', icon: 'bi-file-text' },
+    openrouter: { color: '#6366f1', icon: 'bi-shuffle' },
+    bedrock: { color: '#f97316', icon: 'bi-cloud' },
     gemini: { color: '#22c55e', icon: 'bi-gem' },
     deployer: { color: '#3b82f6', icon: 'bi-gear-wide-connected' },
   };
@@ -84,7 +91,7 @@ export default function Dashboard() {
     { icon: 'bi-people', value: leads, label: 'Leads', color: '#3b82f6', onClick: () => setModal({ title: `Leads (${leads})`, content: leadsData.slice(0, 10) }) },
     { icon: 'bi-calendar-check', value: meetings, label: 'Reuniones', color: '#f59e0b', onClick: () => setModal({ title: `Reuniones (${meetings})`, content: meetingsData.slice(0, 10) }) },
     { icon: 'bi-rocket-takeoff', value: lastDeploy, label: 'Último Deploy', color: '#22c55e', small: true, onClick: () => setModal({ title: 'Deploy Info', content: 'Deploy automático cada push a main.\n\nAWS Amplify: intranet.smconnection.cl\nAWS S3+CloudFront: www.smconnection.cl' }) },
-    { icon: 'bi-coin', value: tokensToday.toLocaleString(), label: 'Tokens IA', color: '#f97316', onClick: () => setModal({ title: 'Tokens IA', content: 'Uso de tokens por agente:\n\nClaude: sin créditos\nGroq: gratis (Llama 3.3)\nGemini: rate limited\nGrok: sin API key' }) },
+    { icon: 'bi-coin', value: tokensToday.toLocaleString(), label: 'Tokens IA', color: '#f97316', onClick: () => setModal({ title: 'Tokens IA', content: `Uso total: ${tokensToday.toLocaleString()} tokens\n\n10 agentes configurados:\nHoku (fusión 9 agentes)\nGroq: llama-3.3-70b (gratis)\nClaude: claude-haiku-4.5\nGrok: grok-3-mini\nDeepSeek: deepseek-chat\nMistral: mistral-small\nOpenAI: gpt-4o-mini\nCohere: command-a\nOpenRouter: llama-3.3-70b\nBedrock: claude-3.5-haiku` }) },
     { icon: 'bi-cloud-check', value: 'Live', label: 'AWS Status', color: '#f97316', onClick: () => router.push('/dashboard/aws') },
   ];
 
