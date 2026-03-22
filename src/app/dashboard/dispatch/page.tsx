@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { api, AGENT_COLORS, CONFIG } from '@/lib/config';
 
+/* ── Types ── */
 interface ChatMsg {
   id: string;
   role: 'user' | 'assistant';
@@ -10,115 +11,147 @@ interface ChatMsg {
   agent?: string;
   model?: string;
   tokens?: number;
+  cost?: number;
   duration?: number;
   ts: string;
-  files?: { name: string; lang: string; content: string }[];
+  pipeline?: number; // 0-4 progress dots
 }
 
-interface Conversation {
+interface LogEntry {
   id: string;
-  title: string;
-  lastMsg: string;
   ts: string;
-  agent: string;
+  tag: string;
+  color: string;
+  text: string;
 }
 
-const AGENTS = [
-  { id: 'hoku', name: 'Hoku 🐾', model: 'Fusión 9in1', desc: 'Rebelde · ejecuta directo', color: '#e2e8f0' },
-  { id: 'panchita', name: 'Panchita 🐕', model: 'Fusión cuidadosa', desc: 'Metódica · pregunta antes', color: '#d4a574' },
-  { id: 'groq', name: 'Groq ⚡', model: 'llama-3.3-70b', desc: 'Ultra rápido · gratis', color: '#f59e0b' },
-  { id: 'claude', name: 'Claude 🤖', model: 'haiku-4.5', desc: 'Código premium', color: '#00e5b0' },
-  { id: 'grok', name: 'Grok 🔮', model: 'grok-3-mini', desc: 'Análisis · xAI', color: '#8b5cf6' },
-  { id: 'deepseek', name: 'DeepSeek 💎', model: 'deepseek-chat', desc: 'Programación', color: '#0ea5e9' },
+type VoiceState = 'idle' | 'listening' | 'processing' | 'speaking';
+type ChatMode = 'voice' | 'chat' | 'quick';
+type RightTab = 'intranet' | 'resultado' | 'aws';
+
+/* ── Constants ── */
+const GRID_AGENTS = [
+  { id: 'groq', name: 'Groq', model: 'llama-3.3-70b', emoji: '⚡' },
+  { id: 'claude', name: 'Claude', model: 'haiku-4.5', emoji: '🤖' },
+  { id: 'openai', name: 'OpenAI', model: 'gpt-4o-mini', emoji: '🧠' },
+  { id: 'deepseek', name: 'DeepSeek', model: 'deepseek-chat', emoji: '💎' },
+  { id: 'grok', name: 'Grok', model: 'grok-3-mini', emoji: '🔮' },
+  { id: 'bedrock', name: 'Bedrock', model: 'claude-3.5-haiku', emoji: '☁️' },
 ];
 
-const TOOLS = [
-  { id: 'ux', icon: '🔍', label: 'Análisis UX', prompt: 'Analiza la UX de smconnection.cl. Da 3 mejoras concretas con código implementable.' },
-  { id: 'deploy', icon: '🚀', label: 'Deploy', prompt: 'Ejecuta verificación pre-deploy: health check endpoints, CDN, S3, Amplify status.' },
-  { id: 'leads', icon: '👥', label: 'CRM', prompt: '¿Cuántos leads tenemos? Resumen del estado del CRM con pipeline de conversión.' },
-  { id: 'sap', icon: '💼', label: 'SAP', prompt: 'Genera propuesta SAP BTP para cliente retail Chile. Scope, timeline, pricing en UF.' },
-  { id: 'code', icon: '⌨️', label: 'Código', prompt: 'Genera un componente React con TypeScript para ' },
-  { id: 'docs', icon: '📄', label: 'Docs', prompt: 'Genera documentación técnica para ' },
+const QUICK_CHIPS = [
+  { label: 'UX', prompt: 'Analiza la UX de smconnection.cl. Da 3 mejoras concretas con codigo implementable.' },
+  { label: 'Deploy', prompt: 'Ejecuta verificacion pre-deploy: health check endpoints, CDN, S3, Amplify status.' },
+  { label: 'Leads', prompt: 'Cuantos leads tenemos? Resumen del estado del CRM con pipeline de conversion.' },
+  { label: 'SAP', prompt: 'Genera propuesta SAP BTP para cliente retail Chile. Scope, timeline, pricing en UF.' },
+  { label: 'Codigo', prompt: 'Genera un componente React con TypeScript optimizado para dashboard.' },
 ];
 
-const now = () => new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+const now = () => new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const uid = () => `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
-function extractCodeBlocks(text: string): { name: string; lang: string; content: string }[] {
-  const regex = /```(\w+)?(?:\s+(?:filename=)?["']?([^"'\n]+)["']?)?\n([\s\S]*?)```/g;
-  const files: { name: string; lang: string; content: string }[] = [];
-  let m;
-  while ((m = regex.exec(text)) !== null) {
-    if (m[3].trim().length > 20) files.push({ lang: m[1] || 'txt', name: m[2] || `file.${m[1] || 'txt'}`, content: m[3].trim() });
-  }
-  return files;
-}
-
+/* ── Component ── */
 export default function DispatchPage() {
-  const [selectedAgent, setSelectedAgent] = useState('hoku');
+  // State - Col 1
+  const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const [chatMode, setChatMode] = useState<ChatMode>('chat');
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeConv, setActiveConv] = useState<string>('new');
-  const [listening, setListening] = useState(false);
-  const [speaking, setSpeaking] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
-  const [showAgentPicker, setShowAgentPicker] = useState(false);
-  const [showTools, setShowTools] = useState(false);
-  const [preview, setPreview] = useState<{ title: string; html: string } | null>(null);
+  const [clock, setClock] = useState(now());
 
+  // State - Col 2
+  const [activeAgents, setActiveAgents] = useState<Record<string, number>>({});
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [kpis, setKpis] = useState({ tokens: 0, tasks: 0, cost: 0, avgTime: 0 });
+  const [taskTimes, setTaskTimes] = useState<number[]>([]);
+
+  // State - Col 3
+  const [rightTab, setRightTab] = useState<RightTab>('intranet');
+  const [liveFeed, setLiveFeed] = useState<{ id: string; ts: string; text: string }[]>([]);
+  const [lastResult, setLastResult] = useState('');
+  const [intranetKpis, setIntranetKpis] = useState({ agents: 0, leads: 0, deploys: 0 });
+
+  // Refs
   const chatRef = useRef<HTMLDivElement>(null);
+  const termRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
 
-  const agent = AGENTS.find(a => a.id === selectedAgent) || AGENTS[0];
-
-  // Auto-scroll
-  useEffect(() => { chatRef.current && (chatRef.current.scrollTop = chatRef.current.scrollHeight); }, [messages]);
-
-  // Load conversations from Supabase
+  // Clock
   useEffect(() => {
-    api({ action: 'query', table: 'hoku_chat', order: 'created_at.desc', limit: 50 })
+    const t = setInterval(() => setClock(now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Auto-scroll chat & terminal
+  useEffect(() => { chatRef.current && (chatRef.current.scrollTop = chatRef.current.scrollHeight); }, [messages]);
+  useEffect(() => { termRef.current && (termRef.current.scrollTop = termRef.current.scrollHeight); }, [logs]);
+
+  // Load intranet KPIs
+  useEffect(() => {
+    api({ action: 'query', table: 'agent_logs', order: 'created_at.desc', limit: 100 })
       .then(d => {
         if (!d.data) return;
-        const convMap: Record<string, Conversation> = {};
-        for (const msg of d.data) {
-          const sid = msg.session_id;
-          if (!convMap[sid]) {
-            convMap[sid] = { id: sid, title: (msg.content || '').slice(0, 40), lastMsg: (msg.content || '').slice(0, 60), ts: msg.created_at, agent: 'hoku' };
-          }
-        }
-        setConversations(Object.values(convMap).slice(0, 20));
+        const agents = new Set(d.data.map((r: any) => r.agent_id)).size;
+        const deploys = d.data.filter((r: any) => r.action?.includes('deploy')).length;
+        setIntranetKpis({ agents, leads: d.data.length, deploys });
       }).catch(() => {});
   }, []);
 
-  // Voice
-  const startListening = () => {
+  // Add log
+  const addLog = useCallback((tag: string, color: string, text: string) => {
+    setLogs(p => [...p.slice(-80), { id: uid(), ts: now(), tag, color, text }]);
+  }, []);
+
+  // Activate agent visually
+  const activateAgent = useCallback((agentId: string) => {
+    setActiveAgents(p => ({ ...p, [agentId]: 0 }));
+    const iv = setInterval(() => {
+      setActiveAgents(p => {
+        const v = (p[agentId] ?? 0) + Math.random() * 15 + 5;
+        if (v >= 100) { clearInterval(iv); const next = { ...p }; delete next[agentId]; return next; }
+        return { ...p, [agentId]: Math.min(v, 95) };
+      });
+    }, 200);
+    return () => clearInterval(iv);
+  }, []);
+
+  // Voice - start listening
+  const startListening = useCallback(() => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
+    if (!SR) { addLog('VOICE', '#ef4444', 'SpeechRecognition no soportado'); return; }
     const rec = new SR();
-    rec.lang = 'es-CL'; rec.interimResults = false;
-    rec.onresult = (e: any) => { setListening(false); const t = e.results[0][0].transcript; setInput(t); setTimeout(() => sendMessage(t), 100); };
-    rec.onerror = () => setListening(false);
-    rec.onend = () => setListening(false);
+    rec.lang = 'es-CL';
+    rec.interimResults = false;
+    rec.onresult = (e: any) => {
+      const t = e.results[0][0].transcript;
+      setVoiceState('processing');
+      setInput(t);
+      addLog('VOICE', '#00e5b0', `Reconocido: "${t}"`);
+      setTimeout(() => sendMessage(t), 200);
+    };
+    rec.onerror = () => { setVoiceState('idle'); addLog('VOICE', '#ef4444', 'Error de reconocimiento'); };
+    rec.onend = () => { if (voiceState === 'listening') setVoiceState('idle'); };
     recognitionRef.current = rec;
     rec.start();
-    setListening(true);
-  };
+    setVoiceState('listening');
+    addLog('VOICE', '#f59e0b', 'Escuchando...');
+  }, [voiceState]);
 
-  const speak = (text: string) => {
-    if (!voiceEnabled || !window.speechSynthesis) return;
+  // Voice - speak response
+  const speak = useCallback((text: string) => {
+    if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
-    const clean = text.replace(/```[\s\S]*?```/g, '').replace(/[#*_`→✓●]/g, '').replace(/https?:\/\/\S+/g, '').slice(0, 600);
+    const clean = text.replace(/```[\s\S]*?```/g, '').replace(/[#*_`]/g, '').replace(/https?:\/\/\S+/g, '').slice(0, 600);
     const u = new SpeechSynthesisUtterance(clean);
     u.lang = 'es-CL'; u.rate = 1.1;
-    const v = window.speechSynthesis.getVoices().find(v => v.lang.startsWith('es'));
+    const v = window.speechSynthesis.getVoices().find((v: any) => v.lang.startsWith('es'));
     if (v) u.voice = v;
-    u.onstart = () => setSpeaking(true);
-    u.onend = () => setSpeaking(false);
+    u.onstart = () => setVoiceState('speaking');
+    u.onend = () => setVoiceState('idle');
     window.speechSynthesis.speak(u);
-  };
+  }, []);
 
   // Send message
   const sendMessage = async (overrideText?: string) => {
@@ -126,49 +159,58 @@ export default function DispatchPage() {
     if (!text || streaming) return;
     setInput('');
     setStreaming(true);
-    setShowTools(false);
+    if (voiceState !== 'processing') setVoiceState('idle');
 
     const userMsg: ChatMsg = { id: `u${Date.now()}`, role: 'user', text, ts: now() };
     setMessages(p => [...p, userMsg]);
+    addLog('USER', '#3b82f6', text.slice(0, 80));
 
     // Save to Supabase
-    const sessionId = activeConv === 'new' ? `dispatch_${Date.now()}` : activeConv;
-    if (activeConv === 'new') setActiveConv(sessionId);
+    const sessionId = `dispatch_${Date.now()}`;
     fetch('/api/agents', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'insert_chat', session_id: sessionId, role: 'user', content: text }) }).catch(() => {});
 
-    // Determine system hint based on agent
-    const hints: Record<string, string> = {
-      hoku: 'Eres HOKU, agente REBELDE y DIRECTO. Ejecutas sin preguntar, vas al grano. Responde en español.',
-      panchita: 'Eres PANCHITA, agente CUIDADOSA. SIEMPRE pregunta antes de ejecutar. Valida, ofrece opciones, pide confirmación. Responde en español.',
-    };
-    const systemHint = hints[selectedAgent] || '';
+    // Activate random agents visually
+    const shuffled = [...GRID_AGENTS].sort(() => Math.random() - 0.5);
+    const toActivate = shuffled.slice(0, Math.floor(Math.random() * 3) + 2);
+    const cleanups = toActivate.map(a => {
+      addLog('AGENT', AGENT_COLORS[a.id] || '#64748b', `${a.name} activado`);
+      return activateAgent(a.id);
+    });
 
-    // Add placeholder
+    // Placeholder
     const assistantId = `a${Date.now()}`;
-    setMessages(p => [...p, { id: assistantId, role: 'assistant', text: '', ts: now(), agent: agent.name, model: agent.model }]);
+    setMessages(p => [...p, { id: assistantId, role: 'assistant', text: '', ts: now(), agent: 'Hoku', model: 'Fusion 9in1', pipeline: 0 }]);
 
     const start = Date.now();
     let fullText = '';
     let tokenCount = 0;
 
+    // Pipeline progress
+    const pipelineIv = setInterval(() => {
+      setMessages(p => p.map(m => m.id === assistantId ? { ...m, pipeline: Math.min((m.pipeline || 0) + 1, 3) } : m));
+    }, 1500);
+
     try {
+      addLog('STREAM', '#00e5b0', 'Conectando a /api/agents/stream...');
       const res = await fetch('/api/agents/stream', {
         method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: systemHint ? `${systemHint}\n\n${text}` : text,
+          prompt: `Eres HOKU, agente REBELDE y DIRECTO. Ejecutas sin preguntar.\n\n${text}`,
           taskType: 'general',
-          agentId: ['hoku', 'panchita'].includes(selectedAgent) ? 'hoku' : selectedAgent,
+          agentId: 'hoku',
           chatMode: true,
         }),
       });
 
       if (!res.ok || !res.body) {
-        setMessages(p => p.map(m => m.id === assistantId ? { ...m, text: `Error (${res.status})` } : m));
-        setStreaming(false); return;
+        addLog('ERROR', '#ef4444', `HTTP ${res.status}`);
+        setMessages(p => p.map(m => m.id === assistantId ? { ...m, text: `Error (${res.status})`, pipeline: 4 } : m));
+        setStreaming(false); clearInterval(pipelineIv); return;
       }
 
+      addLog('STREAM', '#22c55e', 'Streaming iniciado');
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
@@ -194,280 +236,430 @@ export default function DispatchPage() {
         }
       }
     } catch (err) {
-      setMessages(p => p.map(m => m.id === assistantId ? { ...m, text: `Error: ${String(err).slice(0, 100)}` } : m));
+      addLog('ERROR', '#ef4444', String(err).slice(0, 80));
+      setMessages(p => p.map(m => m.id === assistantId ? { ...m, text: `Error: ${String(err).slice(0, 100)}`, pipeline: 4 } : m));
     }
 
+    clearInterval(pipelineIv);
     const duration = Math.round((Date.now() - start) / 1000);
-    const files = extractCodeBlocks(fullText);
+    const cost = +(tokenCount * 0.00002).toFixed(4);
+    cleanups.forEach(c => c());
 
     // Final update
-    setMessages(p => p.map(m => m.id === assistantId ? { ...m, tokens: tokenCount, duration, files: files.length > 0 ? files : undefined } : m));
+    setMessages(p => p.map(m => m.id === assistantId ? { ...m, tokens: tokenCount, duration, cost, pipeline: 4 } : m));
+    setLastResult(fullText);
+
+    // Update KPIs
+    setTaskTimes(p => {
+      const next = [...p, duration];
+      const avg = Math.round(next.reduce((a, b) => a + b, 0) / next.length);
+      setKpis(k => ({ tokens: k.tokens + tokenCount, tasks: k.tasks + 1, cost: +(k.cost + cost).toFixed(4), avgTime: avg }));
+      return next;
+    });
+
+    // Live feed
+    setLiveFeed(p => [{ id: uid(), ts: now(), text: `Hoku: "${text.slice(0, 50)}..." (${duration}s)` }, ...p].slice(0, 20));
+    addLog('DONE', '#22c55e', `Completado en ${duration}s, ${tokenCount} tokens`);
 
     // Save to Supabase
     if (fullText) {
       fetch('/api/agents', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'insert_chat', session_id: sessionId, role: 'hoku', content: fullText.slice(0, 5000) }) }).catch(() => {});
-      // ML learn
       fetch('/api/agents', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'hoku_learn', topic: text.slice(0, 150), content: fullText.slice(0, 2000), source: 'dispatch' }) }).catch(() => {});
     }
 
-    if (fullText) speak(fullText);
+    // Voice speak
+    if (chatMode === 'voice' && fullText) speak(fullText);
     setStreaming(false);
-
-    // Update conversations
-    setConversations(p => {
-      const existing = p.find(c => c.id === sessionId);
-      if (existing) return p.map(c => c.id === sessionId ? { ...c, lastMsg: text.slice(0, 60), ts: new Date().toISOString() } : c);
-      return [{ id: sessionId, title: text.slice(0, 40), lastMsg: text.slice(0, 60), ts: new Date().toISOString(), agent: selectedAgent }, ...p];
-    });
+    if (voiceState === 'processing') setVoiceState('idle');
   };
 
-  const newChat = () => {
-    setMessages([]);
-    setActiveConv('new');
-  };
-
-  const handlePreview = (file: { name: string; lang: string; content: string }) => {
-    if (['html', 'htm'].includes(file.lang)) {
-      setPreview({ title: file.name, html: file.content });
-    } else {
-      setPreview({ title: file.name, html: `<!DOCTYPE html><html><head><style>body{background:#0a0d14;color:#e2e8f0;font-family:'JetBrains Mono',monospace;font-size:13px;padding:24px;white-space:pre-wrap;line-height:1.6}</style></head><body>${file.content.replace(/</g, '&lt;')}</body></html>` });
+  // Orb click handler
+  const handleOrbClick = () => {
+    if (voiceState === 'listening') {
+      recognitionRef.current?.stop();
+      setVoiceState('idle');
+    } else if (voiceState === 'speaking') {
+      window.speechSynthesis?.cancel();
+      setVoiceState('idle');
+    } else if (voiceState === 'idle') {
+      startListening();
     }
   };
 
-  const handleDownload = (file: { name: string; content: string }) => {
-    const blob = new Blob([file.content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = file.name; a.click();
-    URL.revokeObjectURL(url);
+  // Orb styles based on state
+  const orbStyles: Record<VoiceState, { bg: string; shadow: string; emoji: string; anim: string }> = {
+    idle: { bg: 'linear-gradient(135deg, #0d9488 0%, #00e5b0 50%, #0ea5e9 100%)', shadow: '0 0 30px rgba(0,229,176,0.3)', emoji: '🎤', anim: '' },
+    listening: { bg: 'linear-gradient(135deg, #ef4444 0%, #f97316 100%)', shadow: '0 0 40px rgba(239,68,68,0.5)', emoji: '🔴', anim: 'ringpulse 1s infinite' },
+    processing: { bg: 'conic-gradient(#00e5b0, #3b82f6, #8b5cf6, #f59e0b, #ef4444, #00e5b0)', shadow: '0 0 40px rgba(139,92,246,0.4)', emoji: '⚙️', anim: 'spin 1s linear infinite' },
+    speaking: { bg: 'linear-gradient(135deg, #22c55e 0%, #00e5b0 100%)', shadow: '0 0 40px rgba(34,197,94,0.5)', emoji: '🔊', anim: 'breathe 1s infinite' },
+  };
+  const orb = orbStyles[voiceState];
+
+  // Pipeline dots
+  const PipelineDots = ({ stage }: { stage: number }) => {
+    const labels = ['IA', 'DB', 'Deploy', 'Live'];
+    return (
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6 }}>
+        {labels.map((l, i) => (
+          <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <div style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: i <= stage ? '#00e5b0' : '#1e293b',
+              boxShadow: i <= stage ? '0 0 6px rgba(0,229,176,0.5)' : 'none',
+              transition: 'all 0.3s',
+            }} />
+            <span style={{ fontSize: '0.5rem', color: i <= stage ? '#00e5b0' : '#334155' }}>{l}</span>
+            {i < labels.length - 1 && <div style={{ width: 12, height: 1, background: i < stage ? '#00e5b040' : '#1e293b' }} />}
+          </div>
+        ))}
+      </div>
+    );
   };
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 34px)', overflow: 'hidden', background: '#0a0d14' }}>
-      {/* Preview popup */}
-      {preview && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }} onClick={() => setPreview(null)}>
-          <div style={{ background: '#111827', border: '1px solid rgba(0,229,176,0.2)', borderRadius: 16, width: '90vw', maxWidth: 1000, height: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f1f5f9' }}>Preview — {preview.title}</span>
-              <button onClick={() => setPreview(null)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
-            </div>
-            <iframe srcDoc={preview.html} style={{ flex: 1, border: 'none', background: '#fff' }} sandbox="allow-scripts" />
-          </div>
-        </div>
-      )}
-
-      {/* SIDEBAR */}
-      {sidebarOpen && (
-        <div style={{ width: 260, flexShrink: 0, background: '#0f1219', borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column' }}>
-          {/* New chat */}
-          <div style={{ padding: '12px' }}>
-            <button onClick={newChat} style={{ width: '100%', padding: '10px', borderRadius: 10, background: 'rgba(0,229,176,0.08)', border: '1px solid rgba(0,229,176,0.15)', color: '#00e5b0', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              + Nuevo chat
-            </button>
-          </div>
-
-          {/* Agent selector */}
-          <div style={{ padding: '0 12px 10px' }}>
-            <div style={{ fontSize: '0.58rem', color: '#475569', fontWeight: 700, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Agente</div>
-            {AGENTS.slice(0, 2).map(a => (
-              <button key={a.id} onClick={() => setSelectedAgent(a.id)} style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', marginBottom: 3,
-                borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s',
-                background: selectedAgent === a.id ? `${a.color}10` : 'transparent',
-                border: `1px solid ${selectedAgent === a.id ? `${a.color}30` : 'transparent'}`,
-                color: selectedAgent === a.id ? a.color : '#94a3b8',
-              }}>
-                <span style={{ fontSize: '0.9rem' }}>{a.name.split(' ')[1]}</span>
-                <div style={{ flex: 1, textAlign: 'left' }}>
-                  <div style={{ fontSize: '0.7rem', fontWeight: 600 }}>{a.name.split(' ')[0]}</div>
-                  <div style={{ fontSize: '0.52rem', color: '#475569' }}>{a.desc}</div>
-                </div>
-              </button>
-            ))}
-            <button onClick={() => setShowAgentPicker(!showAgentPicker)} style={{ fontSize: '0.6rem', color: '#475569', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 10px' }}>
-              {showAgentPicker ? '▲ Menos' : '▼ Más modelos'}
-            </button>
-            {showAgentPicker && AGENTS.slice(2).map(a => (
-              <button key={a.id} onClick={() => { setSelectedAgent(a.id); setShowAgentPicker(false); }} style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', marginBottom: 2,
-                borderRadius: 6, cursor: 'pointer', background: selectedAgent === a.id ? 'rgba(255,255,255,0.04)' : 'transparent',
-                border: 'none', color: '#94a3b8',
-              }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: a.color }} />
-                <span style={{ fontSize: '0.65rem' }}>{a.name.split(' ')[0]}</span>
-                <span style={{ fontSize: '0.52rem', color: '#475569' }}>{a.model}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* History */}
-          <div style={{ flex: 1, overflow: 'auto', padding: '0 12px' }}>
-            <div style={{ fontSize: '0.58rem', color: '#475569', fontWeight: 700, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Historial</div>
-            {conversations.map(c => (
-              <button key={c.id} onClick={() => { setActiveConv(c.id); /* load conv */ }} style={{
-                width: '100%', textAlign: 'left', padding: '8px 10px', marginBottom: 2,
-                borderRadius: 6, cursor: 'pointer', fontSize: '0.65rem',
-                background: activeConv === c.id ? 'rgba(255,255,255,0.04)' : 'transparent',
-                border: 'none', color: activeConv === c.id ? '#e2e8f0' : '#64748b',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
-                {c.title || 'Chat sin título'}
-              </button>
-            ))}
-          </div>
-
-          {/* Voice toggle */}
-          <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-            <button onClick={() => setVoiceEnabled(!voiceEnabled)} style={{
-              width: '100%', padding: '6px', borderRadius: 6, fontSize: '0.6rem', cursor: 'pointer',
-              background: voiceEnabled ? 'rgba(0,229,176,0.08)' : 'rgba(255,255,255,0.02)',
-              color: voiceEnabled ? '#00e5b0' : '#475569',
-              border: `1px solid ${voiceEnabled ? 'rgba(0,229,176,0.15)' : 'rgba(255,255,255,0.04)'}`,
-            }}>{voiceEnabled ? '🔊 Voz activada' : '🔇 Voz desactivada'}</button>
-          </div>
-        </div>
-      )}
-
-      {/* MAIN CHAT */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+    <div style={{ display: 'flex', height: 'calc(100vh - 34px)', overflow: 'hidden', background: '#060a13', fontFamily: "'DM Sans', system-ui, sans-serif", color: '#e2e8f0' }}>
+      {/* ── COL 1: Dispatch (340px) ── */}
+      <div style={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid rgba(255,255,255,0.06)', overflow: 'auto' }}>
         {/* Header */}
-        <div style={{ height: 50, flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10 }}>
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1rem' }}>☰</button>
-          <span style={{ fontSize: '0.9rem', fontWeight: 700, color: agent.color }}>{agent.name}</span>
-          <span style={{ fontSize: '0.6rem', color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>{agent.model}</span>
-          <div style={{ flex: 1 }} />
-          {speaking && <span style={{ fontSize: '0.6rem', color: '#00e5b0', animation: 'breathe 1s infinite' }}>🔊 Hablando...</span>}
-          {speaking && <button onClick={() => { window.speechSynthesis.cancel(); setSpeaking(false); }} style={{ fontSize: '0.55rem', padding: '2px 8px', borderRadius: 5, background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', cursor: 'pointer' }}>⏹</button>}
-          <a href="/dashboard" style={{ fontSize: '0.6rem', color: '#475569', textDecoration: 'none' }}>Dashboard →</a>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#f1f5f9' }}>Hoku Dispatch · 9in1</div>
+            <div style={{ fontSize: '0.6rem', color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>{clock}</div>
+          </div>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: streaming ? '#f59e0b' : '#22c55e', boxShadow: `0 0 8px ${streaming ? '#f59e0b50' : '#22c55e50'}` }} />
         </div>
 
-        {/* Messages */}
-        <div ref={chatRef} style={{ flex: 1, overflow: 'auto', padding: '20px 0' }}>
+        {/* Voice Orb */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0 16px' }}>
+          <button onClick={handleOrbClick} style={{
+            width: 100, height: 100, borderRadius: '50%', border: 'none', cursor: 'pointer',
+            background: orb.bg, boxShadow: orb.shadow,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '2rem', animation: orb.anim, transition: 'all 0.3s',
+            position: 'relative',
+          }}>
+            {orb.emoji}
+            {voiceState === 'listening' && (
+              <div style={{ position: 'absolute', inset: -6, borderRadius: '50%', border: '2px solid rgba(239,68,68,0.3)', animation: 'ringpulse 1.5s infinite' }} />
+            )}
+          </button>
+        </div>
+        <div style={{ textAlign: 'center', fontSize: '0.55rem', color: '#475569', marginBottom: 12 }}>
+          {voiceState === 'idle' ? 'Click para hablar' : voiceState === 'listening' ? 'Escuchando...' : voiceState === 'processing' ? 'Procesando...' : 'Hoku habla...'}
+        </div>
+
+        {/* Mode tabs */}
+        <div style={{ display: 'flex', gap: 4, padding: '0 16px', marginBottom: 12 }}>
+          {([['voice', '🎤 Voz'], ['chat', '💬 Chat'], ['quick', '⚡ Rapido']] as [ChatMode, string][]).map(([m, l]) => (
+            <button key={m} onClick={() => setChatMode(m)} style={{
+              flex: 1, padding: '6px 0', borderRadius: 8, fontSize: '0.62rem', fontWeight: 600, cursor: 'pointer',
+              background: chatMode === m ? 'rgba(0,229,176,0.1)' : 'rgba(255,255,255,0.02)',
+              border: `1px solid ${chatMode === m ? 'rgba(0,229,176,0.2)' : 'rgba(255,255,255,0.04)'}`,
+              color: chatMode === m ? '#00e5b0' : '#64748b',
+            }}>{l}</button>
+          ))}
+        </div>
+
+        {/* Quick chips */}
+        <div style={{ display: 'flex', gap: 4, padding: '0 16px', marginBottom: 12, flexWrap: 'wrap' }}>
+          {QUICK_CHIPS.map(c => (
+            <button key={c.label} onClick={() => sendMessage(c.prompt)} style={{
+              padding: '4px 10px', borderRadius: 20, fontSize: '0.58rem', cursor: 'pointer',
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: '#94a3b8',
+            }}>{c.label}</button>
+          ))}
+        </div>
+
+        {/* Chat feed */}
+        <div ref={chatRef} style={{ flex: 1, overflow: 'auto', padding: '0 12px' }}>
           {messages.length === 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 16, padding: '0 20px' }}>
-              <div style={{ fontSize: '3rem' }}>{agent.name.includes('Hoku') ? '🐾' : agent.name.includes('Panchita') ? '🐕' : '🤖'}</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#f1f5f9' }}>{agent.name.split(' ')[0]}</div>
-              <div style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', maxWidth: 400 }}>{agent.desc}</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', marginTop: 8 }}>
-                {TOOLS.map(t => (
-                  <button key={t.id} onClick={() => sendMessage(t.prompt)} style={{
-                    padding: '8px 14px', borderRadius: 10, fontSize: '0.7rem', cursor: 'pointer',
-                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-                    color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.15s',
-                  }}>{t.icon} {t.label}</button>
-                ))}
-              </div>
+            <div style={{ textAlign: 'center', padding: '40px 10px', color: '#334155', fontSize: '0.7rem' }}>
+              <div style={{ fontSize: '2rem', marginBottom: 8 }}>🐾</div>
+              Habla o escribe para comenzar
             </div>
           )}
-
           {messages.map(msg => (
-            <div key={msg.id} style={{ padding: '8px 0', display: 'flex', justifyContent: 'center' }}>
-              <div style={{ maxWidth: 720, width: '100%', padding: '0 20px' }}>
-                {msg.role === 'user' ? (
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(59,130,246,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', color: '#3b82f6', fontWeight: 700, flexShrink: 0 }}>G</div>
-                    <div style={{ fontSize: '0.8rem', color: '#f1f5f9', lineHeight: 1.7, paddingTop: 4 }}>{msg.text}</div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: 8, background: `${agent.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', flexShrink: 0 }}>
-                      {agent.name.includes('Hoku') ? '🐾' : agent.name.includes('Panchita') ? '🐕' : '🤖'}
+            <div key={msg.id} style={{ marginBottom: 10 }}>
+              {msg.role === 'user' ? (
+                <div style={{
+                  background: 'rgba(0,229,176,0.08)', border: '1px solid rgba(0,229,176,0.12)',
+                  borderRadius: '14px 14px 4px 14px', padding: '8px 12px', marginLeft: 30,
+                  fontSize: '0.72rem', color: '#d1fae5', lineHeight: 1.5,
+                }}>{msg.text}</div>
+              ) : (
+                <div>
+                  <div style={{
+                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)',
+                    borderRadius: '4px 14px 14px 14px', padding: '10px 12px', marginRight: 10,
+                  }}>
+                    {/* Agent/model header */}
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: '0.58rem', fontWeight: 700, color: '#00e5b0' }}>{msg.agent || 'Hoku'}</span>
+                      <span style={{ fontSize: '0.5rem', color: '#334155' }}>·</span>
+                      <span style={{ fontSize: '0.5rem', color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>{msg.model || 'Fusion'}</span>
+                      {msg.cost != null && msg.cost > 0 && <span style={{ fontSize: '0.5rem', color: '#f59e0b' }}>${msg.cost}</span>}
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      {/* Streaming cursor */}
-                      <div style={{ fontSize: '0.8rem', color: '#d1d5db', lineHeight: 1.8, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                        {msg.text || ''}
-                        {streaming && msg.id === messages[messages.length - 1]?.id && <span style={{ color: agent.color, animation: 'breathe 0.8s infinite' }}>▊</span>}
-                      </div>
-                      {/* Code files */}
-                      {msg.files && msg.files.map((f, i) => (
-                        <div key={i} style={{ marginTop: 8, background: '#111827', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                            <span style={{ fontSize: '0.62rem', color: '#94a3b8', fontFamily: "'JetBrains Mono', monospace" }}>{f.name}</span>
-                            <div style={{ display: 'flex', gap: 4 }}>
-                              <button onClick={() => handlePreview(f)} style={{ fontSize: '0.55rem', padding: '2px 8px', borderRadius: 5, background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Preview</button>
-                              <button onClick={() => handleDownload(f)} style={{ fontSize: '0.55rem', padding: '2px 8px', borderRadius: 5, background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Descargar</button>
-                              <button onClick={() => navigator.clipboard.writeText(f.content)} style={{ fontSize: '0.55rem', padding: '2px 8px', borderRadius: 5, background: 'rgba(255,255,255,0.04)', color: '#64748b', border: 'none', cursor: 'pointer' }}>Copiar</button>
-                            </div>
-                          </div>
-                          <pre style={{ margin: 0, padding: '8px 10px', fontSize: '0.62rem', color: '#94a3b8', overflow: 'auto', maxHeight: 200, lineHeight: 1.5, fontFamily: "'JetBrains Mono', monospace" }}>{f.content.slice(0, 1000)}</pre>
-                        </div>
-                      ))}
-                      {/* Metadata */}
-                      {msg.tokens && (
-                        <div style={{ display: 'flex', gap: 8, marginTop: 6, fontSize: '0.55rem', color: '#475569' }}>
-                          <span>{msg.agent}</span>
-                          <span>·</span>
-                          <span>{msg.model}</span>
-                          <span>·</span>
-                          <span>{msg.duration}s</span>
-                          <span>·</span>
-                          <span>{msg.tokens} tokens</span>
-                        </div>
-                      )}
+                    <div style={{ fontSize: '0.72rem', color: '#cbd5e1', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                      {msg.text || ''}
+                      {streaming && msg.id === messages[messages.length - 1]?.id && <span style={{ color: '#00e5b0', animation: 'breathe 0.8s infinite' }}>▊</span>}
                     </div>
+                    {/* Pipeline */}
+                    {msg.pipeline != null && <PipelineDots stage={msg.pipeline} />}
                   </div>
-                )}
-              </div>
+                  {msg.tokens && (
+                    <div style={{ display: 'flex', gap: 6, marginTop: 3, paddingLeft: 4, fontSize: '0.5rem', color: '#334155' }}>
+                      <span>{msg.duration}s</span><span>·</span><span>{msg.tokens} tok</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
 
-        {/* Input area */}
-        <div style={{ flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.06)', padding: '12px 20px 16px' }}>
-          <div style={{ maxWidth: 720, margin: '0 auto' }}>
-            {/* Tools bar */}
-            {showTools && (
-              <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
-                {TOOLS.map(t => (
-                  <button key={t.id} onClick={() => { setInput(t.prompt); setShowTools(false); inputRef.current?.focus(); }}
-                    style={{ padding: '5px 10px', borderRadius: 6, fontSize: '0.62rem', cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: '#94a3b8' }}>
-                    {t.icon} {t.label}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', background: '#111827', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', padding: '8px 12px' }}>
-              {/* Tools toggle */}
-              <button onClick={() => setShowTools(!showTools)} style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.8rem', flexShrink: 0 }}>⚡</button>
-              {/* Mic */}
-              <button onClick={listening ? () => { recognitionRef.current?.stop(); setListening(false); } : startListening}
-                disabled={streaming}
-                style={{
-                  width: 30, height: 30, borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '0.8rem', flexShrink: 0,
-                  background: listening ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.04)',
-                  color: listening ? '#ef4444' : '#64748b',
-                  animation: listening ? 'breathe 0.8s infinite' : 'none',
-                }}>🎤</button>
-              {/* Input */}
-              <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                placeholder={listening ? '🎤 Escuchando...' : `Mensaje para ${agent.name.split(' ')[0]}...`}
-                disabled={streaming}
-                rows={1}
-                style={{
-                  flex: 1, background: 'transparent', border: 'none', color: '#f1f5f9', fontSize: '0.8rem',
-                  outline: 'none', resize: 'none', fontFamily: "'DM Sans', system-ui", lineHeight: 1.5,
-                  maxHeight: 120, minHeight: 30,
-                }} />
-              {/* Send */}
-              <button onClick={() => sendMessage()} disabled={streaming || !input.trim()}
-                style={{
-                  width: 30, height: 30, borderRadius: 8, border: 'none', cursor: streaming ? 'default' : 'pointer',
-                  background: streaming || !input.trim() ? 'rgba(255,255,255,0.04)' : '#00e5b0',
-                  color: streaming || !input.trim() ? '#475569' : '#0a0d14',
-                  fontSize: '0.85rem', fontWeight: 700, flexShrink: 0,
-                }}>↑</button>
-            </div>
-            <div style={{ fontSize: '0.52rem', color: '#2e4060', textAlign: 'center', marginTop: 6 }}>
-              {agent.name} · {agent.model} · Shift+Enter para nueva línea
-            </div>
+        {/* Input */}
+        <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', background: '#0f1219', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', padding: '8px 10px' }}>
+            <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+              placeholder={streaming ? 'Procesando...' : 'Mensaje para Hoku...'}
+              disabled={streaming} rows={1}
+              style={{
+                flex: 1, background: 'transparent', border: 'none', color: '#f1f5f9', fontSize: '0.75rem',
+                outline: 'none', resize: 'none', fontFamily: "'DM Sans', system-ui", lineHeight: 1.5,
+                maxHeight: 80, minHeight: 28,
+              }} />
+            <button onClick={() => sendMessage()} disabled={streaming || !input.trim()} style={{
+              width: 28, height: 28, borderRadius: 8, border: 'none', cursor: streaming ? 'default' : 'pointer',
+              background: streaming || !input.trim() ? 'rgba(255,255,255,0.04)' : '#00e5b0',
+              color: streaming || !input.trim() ? '#475569' : '#060a13',
+              fontSize: '0.8rem', fontWeight: 700, flexShrink: 0,
+            }}>↑</button>
           </div>
         </div>
       </div>
 
+      {/* ── COL 2: Agentes + Terminal (flex) ── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto', minWidth: 0 }}>
+        {/* Agent Grid 3x2 */}
+        <div style={{ padding: '14px 16px 10px' }}>
+          <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Agentes Activos</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+            {GRID_AGENTS.map(a => {
+              const isActive = a.id in activeAgents;
+              const progress = activeAgents[a.id] ?? 0;
+              const color = AGENT_COLORS[a.id] || '#64748b';
+              return (
+                <div key={a.id} style={{
+                  background: isActive ? `${color}08` : 'rgba(255,255,255,0.02)',
+                  border: `1px solid ${isActive ? `${color}25` : 'rgba(255,255,255,0.04)'}`,
+                  borderRadius: 10, padding: '10px', position: 'relative', overflow: 'hidden',
+                  transition: 'all 0.3s',
+                }}>
+                  {/* Shimmer sweep */}
+                  {isActive && (
+                    <div style={{
+                      position: 'absolute', inset: 0,
+                      background: `linear-gradient(90deg, transparent 0%, ${color}10 50%, transparent 100%)`,
+                      animation: 'sweep 1.5s infinite',
+                    }} />
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, position: 'relative' }}>
+                    <span style={{ fontSize: '0.9rem' }}>{a.emoji}</span>
+                    <div>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 700, color: isActive ? color : '#94a3b8' }}>{a.name}</div>
+                      <div style={{ fontSize: '0.5rem', color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>{a.model}</div>
+                    </div>
+                  </div>
+                  {/* Status badge */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6, position: 'relative' }}>
+                    <div style={{ width: 5, height: 5, borderRadius: '50%', background: isActive ? color : '#334155' }} />
+                    <span style={{ fontSize: '0.5rem', color: isActive ? color : '#334155' }}>{isActive ? 'Ejecutando' : 'Standby'}</span>
+                  </div>
+                  {/* Progress bar */}
+                  <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.04)', overflow: 'hidden', position: 'relative' }}>
+                    <div style={{
+                      height: '100%', borderRadius: 2,
+                      background: isActive ? `linear-gradient(90deg, ${color}, ${color}80)` : 'transparent',
+                      width: `${progress}%`, transition: 'width 0.2s',
+                    }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* KPIs */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, padding: '0 16px 10px' }}>
+          {[
+            { label: 'Tokens', value: kpis.tokens.toLocaleString(), color: '#00e5b0' },
+            { label: 'Tareas', value: kpis.tasks, color: '#3b82f6' },
+            { label: 'Costo', value: `$${kpis.cost.toFixed(3)}`, color: '#f59e0b' },
+            { label: 'Avg Time', value: `${kpis.avgTime}s`, color: '#8b5cf6' },
+          ].map(k => (
+            <div key={k.label} style={{
+              background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)',
+              borderRadius: 8, padding: '8px 10px', textAlign: 'center',
+            }}>
+              <div style={{ fontSize: '1rem', fontWeight: 800, color: k.color, fontFamily: "'JetBrains Mono', monospace" }}>{k.value}</div>
+              <div style={{ fontSize: '0.5rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{k.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Terminal */}
+        <div style={{ flex: 1, margin: '0 16px 14px', borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.04)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '6px 12px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444' }} />
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#f59e0b' }} />
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e' }} />
+            </div>
+            <span style={{ fontSize: '0.55rem', color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>hoku-terminal</span>
+          </div>
+          <div ref={termRef} style={{
+            flex: 1, background: '#060a13', padding: '8px 12px', overflow: 'auto',
+            fontFamily: "'JetBrains Mono', monospace", fontSize: '0.6rem', lineHeight: 1.7,
+          }}>
+            {logs.length === 0 && <div style={{ color: '#1e293b' }}>$ esperando comandos...</div>}
+            {logs.map(l => (
+              <div key={l.id}>
+                <span style={{ color: '#334155' }}>{l.ts}</span>
+                {' '}
+                <span style={{ color: l.color, fontWeight: 700, fontSize: '0.55rem', padding: '0 4px', background: `${l.color}10`, borderRadius: 3 }}>{l.tag}</span>
+                {' '}
+                <span style={{ color: '#94a3b8' }}>{l.text}</span>
+              </div>
+            ))}
+            {streaming && <div style={{ color: '#00e5b0', animation: 'breathe 0.8s infinite' }}>▊ streaming...</div>}
+          </div>
+        </div>
+      </div>
+
+      {/* ── COL 3: Intranet Panel (380px) ── */}
+      <div style={{ width: 380, flexShrink: 0, display: 'flex', flexDirection: 'column', borderLeft: '1px solid rgba(255,255,255,0.06)', overflow: 'auto' }}>
+        {/* Tabs */}
+        <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          {([['intranet', 'Intranet'], ['resultado', 'Resultado'], ['aws', 'AWS']] as [RightTab, string][]).map(([t, l]) => (
+            <button key={t} onClick={() => setRightTab(t)} style={{
+              flex: 1, padding: '10px 0', fontSize: '0.65rem', fontWeight: 600, cursor: 'pointer',
+              background: rightTab === t ? 'rgba(255,255,255,0.03)' : 'transparent',
+              borderBottom: rightTab === t ? '2px solid #00e5b0' : '2px solid transparent',
+              border: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none',
+              color: rightTab === t ? '#00e5b0' : '#475569',
+            }}>{l}</button>
+          ))}
+        </div>
+
+        <div style={{ flex: 1, overflow: 'auto', padding: '14px' }}>
+          {/* Tab: Intranet */}
+          {rightTab === 'intranet' && (
+            <div>
+              {/* KPIs */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
+                {[
+                  { label: 'Agentes', value: intranetKpis.agents, color: '#00e5b0' },
+                  { label: 'Logs', value: intranetKpis.leads, color: '#3b82f6' },
+                  { label: 'Deploys', value: intranetKpis.deploys, color: '#f59e0b' },
+                ].map(k => (
+                  <div key={k.label} style={{
+                    background: `${k.color}08`, border: `1px solid ${k.color}15`, borderRadius: 8, padding: '10px', textAlign: 'center',
+                  }}>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: k.color }}>{k.value}</div>
+                    <div style={{ fontSize: '0.5rem', color: '#475569' }}>{k.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Agent table */}
+              <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: 8 }}>Agentes</div>
+              <div style={{ borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)', overflow: 'hidden', marginBottom: 16 }}>
+                {GRID_AGENTS.map((a, i) => (
+                  <div key={a.id} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '8px 10px', background: i % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent',
+                    borderBottom: i < GRID_AGENTS.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: '0.75rem' }}>{a.emoji}</span>
+                      <span style={{ fontSize: '0.62rem', color: '#cbd5e1' }}>{a.name}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontSize: '0.5rem', color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>{a.model}</span>
+                      <div style={{
+                        width: 6, height: 6, borderRadius: '50%',
+                        background: a.id in activeAgents ? AGENT_COLORS[a.id] : '#22c55e',
+                      }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Live feed */}
+              <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: 8 }}>Live Feed</div>
+              {liveFeed.length === 0 && <div style={{ fontSize: '0.6rem', color: '#1e293b' }}>Sin actividad reciente</div>}
+              {liveFeed.map(f => (
+                <div key={f.id} style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.58rem' }}>
+                  <span style={{ color: '#334155', fontFamily: "'JetBrains Mono', monospace" }}>{f.ts}</span>
+                  {' '}
+                  <span style={{ color: '#94a3b8' }}>{f.text}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Tab: Resultado */}
+          {rightTab === 'resultado' && (
+            <div>
+              <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: 10 }}>Ultimo Output</div>
+              {lastResult ? (
+                <div style={{
+                  background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)',
+                  borderRadius: 8, padding: '12px', fontSize: '0.68rem', color: '#cbd5e1',
+                  lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}>{lastResult}</div>
+              ) : (
+                <div style={{ color: '#1e293b', fontSize: '0.65rem', textAlign: 'center', padding: '40px 0' }}>
+                  Sin resultado aun. Envia un mensaje a Hoku.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab: AWS */}
+          {rightTab === 'aws' && (
+            <div>
+              {[
+                { label: 'S3 Bucket', value: CONFIG.aws.s3Bucket, status: 'Active', color: '#22c55e' },
+                { label: 'CloudFront', value: CONFIG.aws.cloudfrontDomain, status: 'Deployed', color: '#22c55e' },
+                { label: 'Amplify App', value: CONFIG.aws.amplifyAppId, status: 'Running', color: '#22c55e' },
+                { label: 'Region', value: CONFIG.aws.s3Region, status: 'sa-east-1', color: '#3b82f6' },
+                { label: 'Domain', value: CONFIG.aws.intranetDomain, status: 'DNS OK', color: '#22c55e' },
+              ].map(item => (
+                <div key={item.label} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.04)',
+                }}>
+                  <div>
+                    <div style={{ fontSize: '0.62rem', fontWeight: 600, color: '#cbd5e1' }}>{item.label}</div>
+                    <div style={{ fontSize: '0.52rem', color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>{item.value}</div>
+                  </div>
+                  <div style={{
+                    padding: '3px 8px', borderRadius: 20, fontSize: '0.5rem', fontWeight: 600,
+                    background: `${item.color}15`, color: item.color,
+                  }}>{item.status}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Styles ── */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -475,7 +667,10 @@ export default function DispatchPage() {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 99px; }
         @keyframes breathe { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-        textarea::placeholder, input::placeholder { color: #2e4060; }
+        @keyframes sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+        @keyframes ringpulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.4); opacity: 0; } }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        textarea::placeholder { color: #2e4060; }
       `}</style>
     </div>
   );
