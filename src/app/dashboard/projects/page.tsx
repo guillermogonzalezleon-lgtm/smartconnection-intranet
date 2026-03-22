@@ -67,7 +67,8 @@ export default function ProjectsPage() {
   const [editMode, setEditMode] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: '', description: '', priority: 'medium', category: '', owner: 'Guillermo', tags: '', due_date: '', status: 'backlog' });
+  const [form, setForm] = useState({ name: '', description: '', priority: 'medium', category: '', owner: 'Guillermo', tags: '', due_date: '', status: 'backlog', lead_id: '' });
+  const [availableLeads, setAvailableLeads] = useState<Record<string, unknown>[]>([]);
 
   useEffect(() => {
     fetch('/api/agents', {
@@ -79,6 +80,15 @@ export default function ProjectsPage() {
       .then(d => { if (d.data) setProjects(d.data); })
       .catch(() => {})
       .finally(() => setLoading(false));
+    // Cargar leads disponibles
+    fetch('/api/agents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'query', table: 'leads', order: 'created_at.desc', limit: 200 }),
+    })
+      .then(r => r.json())
+      .then(d => { if (d.data) setAvailableLeads(d.data); })
+      .catch(() => {});
   }, []);
 
   const categories = Array.from(new Set(projects.map(p => p.category).filter(Boolean)));
@@ -109,7 +119,7 @@ export default function ProjectsPage() {
   const api = (payload: Record<string, unknown>) =>
     fetch('/api/agents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json());
 
-  const resetForm = () => setForm({ name: '', description: '', priority: 'medium', category: '', owner: 'Guillermo', tags: '', due_date: '', status: 'backlog' });
+  const resetForm = () => setForm({ name: '', description: '', priority: 'medium', category: '', owner: 'Guillermo', tags: '', due_date: '', status: 'backlog', lead_id: '' });
 
   const createProject = async () => {
     if (!form.name.trim()) return;
@@ -117,7 +127,7 @@ export default function ProjectsPage() {
     try {
       const res = await api({
         action: 'create_project',
-        project: { ...form, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean), members: [form.owner] },
+        project: { ...form, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean), members: [form.owner], lead_id: form.lead_id || null },
       });
       if (res.success && res.data?.[0]) setProjects(prev => [res.data[0], ...prev]);
       setShowCreate(false);
@@ -133,7 +143,7 @@ export default function ProjectsPage() {
       await api({
         action: 'edit_project',
         projectId: selectedProject.id,
-        updates: { name: form.name, description: form.description, priority: form.priority, category: form.category, owner: form.owner, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean), due_date: form.due_date || null },
+        updates: { name: form.name, description: form.description, priority: form.priority, category: form.category, owner: form.owner, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean), due_date: form.due_date || null, lead_id: form.lead_id || null },
       });
       setProjects(prev => prev.map(p => p.id === selectedProject.id ? { ...p, name: form.name, description: form.description, priority: form.priority, category: form.category, owner: form.owner, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean), due_date: form.due_date } : p));
       setEditMode(false);
@@ -159,6 +169,7 @@ export default function ProjectsPage() {
       priority: selectedProject.priority, category: selectedProject.category,
       owner: selectedProject.owner, tags: (selectedProject.tags || []).join(', '),
       due_date: selectedProject.due_date?.split('T')[0] || '', status: selectedProject.status,
+      lead_id: (selectedProject as unknown as Record<string, unknown>).lead_id as string || '',
     });
     setEditMode(true);
   };
@@ -588,6 +599,17 @@ export default function ProjectsPage() {
               <div>
                 <label style={labelStyle}>Tags (separados por coma)</label>
                 <input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} placeholder="SAP, BTP, Next.js" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Lead asociado</label>
+                <select value={form.lead_id} onChange={e => setForm(f => ({ ...f, lead_id: e.target.value }))} style={inputStyle}>
+                  <option value="">Sin lead asociado</option>
+                  {availableLeads.map((lead) => (
+                    <option key={lead.id as string} value={lead.id as string}>
+                      {(lead.name as string) || (lead.email as string) || (lead.company as string) || (lead.id as string)}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                 <button onClick={() => { setShowCreate(false); setEditMode(false); }} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#94a3b8', padding: '10px 20px', borderRadius: 10, fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>

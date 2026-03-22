@@ -93,11 +93,14 @@ export default function HokuChat() {
   // Fetch live intranet data for Hoku superagent context
   const fetchIntranetContext = async (): Promise<string> => {
     try {
-      const [agentsRes, leadsRes, projectsRes, logsRes] = await Promise.allSettled([
+      const [agentsRes, leadsRes, projectsRes, logsRes, insightsRes, knowledgeRes, deployRes] = await Promise.allSettled([
         apiCall({ action: 'list' }),
         apiCall({ action: 'query', table: 'leads', order: 'created_at.desc', limit: 5 }),
         apiCall({ action: 'query', table: 'projects', limit: 5 }),
         apiCall({ action: 'query', table: 'agent_logs', order: 'created_at.desc', limit: 5 }),
+        apiCall({ action: 'query', table: 'ux_insights', order: 'created_at.desc', limit: 5 }),
+        apiCall({ action: 'query', table: 'hoku_knowledge', order: 'quality_score.desc', limit: 1 }),
+        apiCall({ action: 'query', table: 'agent_logs', filter: 'agent_id=eq.deployer', order: 'created_at.desc', limit: 20 }),
       ]);
 
       const parts: string[] = ['DATOS EN TIEMPO REAL DE LA INTRANET SMARTCONNECTION:'];
@@ -121,6 +124,24 @@ export default function HokuChat() {
       if (logsRes.status === 'fulfilled' && logsRes.value.data) {
         const logs = logsRes.value.data;
         parts.push(`ACTIVIDAD RECIENTE: ${logs.map((l: Record<string, unknown>) => `${l.agent_id}:${l.action}[${l.status}]`).join(', ')}`);
+      }
+
+      if (insightsRes.status === 'fulfilled' && insightsRes.value.data) {
+        const insights = insightsRes.value.data;
+        parts.push(`MEJORAS UX: ${insights.map((i: Record<string, unknown>) => `${i.titulo}[${i.estado}]`).join(', ')}`);
+      }
+
+      if (knowledgeRes.status === 'fulfilled' && knowledgeRes.value.data) {
+        const count = knowledgeRes.value.total || knowledgeRes.value.data.length;
+        parts.push(`KNOWLEDGE BASE: ${count} conocimientos almacenados`);
+      }
+
+      if (deployRes.status === 'fulfilled' && deployRes.value.data) {
+        const deploys = deployRes.value.data;
+        const total = deploys.length;
+        const successCount = deploys.filter((d: Record<string, unknown>) => d.status === 'success').length;
+        const rate = total > 0 ? Math.round((successCount / total) * 100) : 0;
+        parts.push(`DEPLOY RATE: ${successCount}/${total} exitosos (${rate}%)`);
       }
 
       return '\n\n' + parts.join('\n') + '\n\nUsa estos datos reales para responder con información actualizada. Eres un SUPERAGENTE con acceso total a la intranet.\n';

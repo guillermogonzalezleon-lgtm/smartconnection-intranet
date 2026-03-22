@@ -199,13 +199,23 @@ export async function POST(request: Request) {
         steps.push({ step: 'deploy', success: true, detail: 'Auto-deploy triggered via push to main' });
       }
 
+      const pipelineSuccess = steps.every(s => s.success);
       await supabaseInsert('agent_logs', {
         agent_id: 'deployer', agent_name: 'Pipeline Bot',
         action: 'full_pipeline', detail: JSON.stringify(steps),
-        status: steps.every(s => s.success) ? 'success' : 'error',
+        status: pipelineSuccess ? 'success' : 'error',
       }).catch(() => {});
 
-      return NextResponse.json({ success: steps.every(s => s.success), steps });
+      // Register deploy event in analytics for cross-section tracking
+      await supabaseInsert('analytics', {
+        source: 'deploy_pipeline',
+        page: '/dashboard/deploy',
+        event: pipelineSuccess ? 'deploy_success' : 'deploy_error',
+        detail: `${steps.length} steps · ${targetRepo}`,
+        created_at: new Date().toISOString(),
+      }).catch(() => {});
+
+      return NextResponse.json({ success: pipelineSuccess, steps });
     }
 
     // ── List repos ──

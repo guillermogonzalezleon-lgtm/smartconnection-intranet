@@ -427,11 +427,27 @@ export default function LabsPage() {
       const resultText = res.result || res.error || '';
       const isSuccess = !res.error;
 
-      // Persist flow execution to Supabase
+      // Persist flow execution to Supabase (chat + improvement)
       fetch('/api/agents', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'insert_chat', session_id: `labs_${flow.id}`, role: 'hoku', content: `[Flow: ${flow.id}] ${resultText.slice(0, 3000)}` }),
       }).catch(() => {});
+      // Auto-create improvement from flow result
+      if (isSuccess && resultText.length > 50) {
+        fetch('/api/deploy', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'save_improvement',
+            titulo: `Labs: ${flow.name || flow.id}`,
+            descripcion: resultText.slice(0, 2000),
+            categoria: flow.id.includes('sap') ? 'SAP' : flow.id.includes('ux') ? 'UX' : flow.id.includes('deploy') ? 'Deploy' : 'General',
+            impacto: 'Por evaluar',
+            agente: 'hoku',
+            ciclo: 1,
+          }),
+        }).catch(() => {});
+      }
 
       // Update exec counts locally with result
       setFlowExecs(prev => ({

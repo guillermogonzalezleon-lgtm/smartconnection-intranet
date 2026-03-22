@@ -507,6 +507,18 @@ export default function DeployCenter() {
         addLog(`[live] ${PROD_URL} → verificación no-cors completada`, undefined, 'live');
       }
       addLog(`[live] Pipeline: 7 pasos · 12 agentes · stress test passed`, undefined, 'live');
+      // Auto-update improvements: contar cuántos se actualizarán
+      try {
+        const insightsRes = await api({ action: 'query', table: 'ux_insights', filter: 'estado=eq.en_progreso', limit: 50 });
+        const count = insightsRes?.data?.length || 0;
+        if (count > 0) {
+          addLog(`[live] Improvements: ${count} en_progreso → implementado (commit ${commitHash.slice(0, 7)})`, 'success', 'live');
+        } else {
+          addLog(`[live] Improvements: sin cambios pendientes`, undefined, 'live');
+        }
+      } catch {
+        addLog(`[live] Improvements: no se pudo verificar estado`, undefined, 'live');
+      }
       addLog(`[success] ${source === 'rollback' ? 'Rollback' : 'Deploy'} completado — Abriendo preview...`, 'success', 'live');
       addLog(`[system] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'dim');
       // Auto-open live preview
@@ -547,6 +559,19 @@ export default function DeployCenter() {
     setReportData(report);
     if (success) setShowReport(true);
     await saveDeployReport(report, logs);
+
+    // Auto-update improvements status after successful deploy
+    if (success) {
+      api({ action: 'query', table: 'ux_insights', filter: 'estado=eq.en_progreso', limit: 50 })
+        .then(d => {
+          if (d.data) {
+            for (const insight of d.data) {
+              api({ action: 'update_insight', insightId: insight.id, estado: 'implementado' }).catch(() => {});
+            }
+          }
+        }).catch(() => {});
+    }
+
     setDeploying(false);
     setIsRollback(false);
     loadHistory();
