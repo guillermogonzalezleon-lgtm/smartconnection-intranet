@@ -47,7 +47,6 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
   };
 
   const navItems = [
-    { href: '/dashboard/dispatch', icon: 'bi-broadcast', label: 'Dispatch', shortcut: '⌘0' },
     { href: '/dashboard', icon: 'bi-grid-1x2', label: 'Dashboard', shortcut: '⌘1' },
     { href: '/dashboard/agents', icon: 'bi-robot', label: 'Agentes IA', shortcut: '⌘2' },
     { href: '/dashboard/leads', icon: 'bi-people', label: 'Leads & CRM', shortcut: '⌘3' },

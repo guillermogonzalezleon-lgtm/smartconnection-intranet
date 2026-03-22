@@ -1,21 +1,22 @@
-/* SmartConnection Intranet Design System */
+/* SmartConnection Intranet Design System — NeoBrowser Edition */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  /* Backgrounds */
-  --bg-base: #0a0d14;
-  --bg-surface: #111827;
-  --bg-elevated: #1a2235;
-  --bg-overlay: #243044;
+  /* Backgrounds — deeper, richer */
+  --bg-base: #06080f;
+  --bg-surface: #0d1117;
+  --bg-elevated: #161b28;
+  --bg-overlay: #1e2536;
+  --bg-glass: rgba(13,17,23,0.75);
 
-  /* Borders */
-  --border-subtle: rgba(255,255,255,0.06);
-  --border-default: rgba(255,255,255,0.10);
-  --border-strong: rgba(255,255,255,0.18);
+  /* Borders — slightly more visible for contrast */
+  --border-subtle: rgba(255,255,255,0.07);
+  --border-default: rgba(255,255,255,0.12);
+  --border-strong: rgba(255,255,255,0.20);
 
   /* Brand */
   --teal: #00e5b0;
-  --teal-dim: rgba(0,229,176,0.12);
+  --teal-dim: rgba(0,229,176,0.10);
   --teal-glow: rgba(0,229,176,0.25);
   --blue: #3b82f6;
   --blue-dim: rgba(59,130,246,0.12);
@@ -362,6 +363,76 @@ button:disabled, button[disabled] {
   cursor: not-allowed !important;
   opacity: 0.5;
 }
+
+/* ═══ NEOBROWSER PREMIUM UPGRADES ═══ */
+
+/* Glassmorphism cards */
+.card, .kpi-card, .agent-card {
+  backdrop-filter: blur(8px);
+  background: rgba(13,17,23,0.85) !important;
+}
+
+/* Better text contrast */
+.kpi-card .kpi-value { font-size: 1.9rem; }
+.kpi-card .kpi-label { font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); }
+.section-title { font-size: 0.95rem; }
+
+/* Hover glow on interactive cards */
+.kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 20px rgba(0,229,176,0.06);
+}
+.agent-card:hover {
+  box-shadow: 0 12px 40px rgba(0,0,0,0.4), 0 0 24px rgba(0,229,176,0.06);
+}
+
+/* Button hover effects */
+.btn { transition: all 0.2s ease; }
+.btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+.btn:active { transform: translateY(0); }
+
+/* Tooltips */
+[title] { position: relative; }
+[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.6rem;
+  white-space: nowrap;
+  z-index: 999;
+  border: 1px solid var(--border-default);
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+/* Improved scrollbars */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
+
+/* Global transitions for smooth feel */
+div, span, button, a, input, textarea {
+  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
+}
+
+/* Focus states */
+input:focus, textarea:focus {
+  outline: none;
+  border-color: rgba(0,229,176,0.4) !important;
+  box-shadow: 0 0 0 3px rgba(0,229,176,0.08);
+}
+
+/* Improved table rows */
+.data-table tr { transition: background 0.15s; }
+.data-table tr:hover td { background: rgba(0,229,176,0.04); }
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
