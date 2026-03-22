@@ -17,6 +17,23 @@ const PLACEHOLDERS: Record<string, string> = {
 
 type PipelineStep = 'idle' | 'confirm' | 'pushing' | 'deploying' | 'done' | 'error';
 
+// Extract code blocks with file paths from output
+function extractCodeFiles(text: string): { path: string; content: string; lang: string }[] {
+  const codeBlockRegex = /```(\w+)?(?:\s+(?:filename=)?["']?([^"'\n]+)["']?)?\n([\s\S]*?)```/g;
+  const files: { path: string; content: string; lang: string }[] = [];
+  let match;
+  while ((match = codeBlockRegex.exec(text)) !== null) {
+    const lang = match[1] || 'txt';
+    const explicitPath = match[2];
+    const content = match[3].trim();
+    if (content.length > 50) {
+      const path = explicitPath || `src/improvements/${Date.now()}-${lang}.${lang === 'tsx' || lang === 'typescript' ? 'tsx' : lang === 'css' ? 'css' : lang === 'json' ? 'json' : 'txt'}`;
+      files.push({ path, content, lang });
+    }
+  }
+  return files;
+}
+
 export default function AgentsWorkspace() {
   const [selectedAgent, setSelectedAgent] = useState('hoku');
   const [task, setTask] = useState('');
@@ -27,6 +44,9 @@ export default function AgentsWorkspace() {
   const [pipeline, setPipeline] = useState<PipelineStep>('idle');
   const [pipelineLog, setPipelineLog] = useState<string[]>([]);
   const [targetRepo, setTargetRepo] = useState('smartconnection-intranet');
+  const [committedFiles, setCommittedFiles] = useState<string[]>([]);
+  const [commitUrl, setCommitUrl] = useState('');
+  const [detectedFiles, setDetectedFiles] = useState<{ path: string; content: string; lang: string }[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const outputRef = useRef<HTMLDivElement>(null);
 
@@ -53,7 +73,8 @@ export default function AgentsWorkspace() {
     window.dispatchEvent(new CustomEvent('exec-agent', { detail: { agent: selectedAgent, prompt: task, taskType: 'general' } }));
     let tokenCount = 0;
     try {
-      const res = await fetch('/api/agents/stream', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: task, taskType: 'general', agentId: selectedAgent }) });
+      const codeSystemPrompt = `\n\nIMPORTANTE: Cuando generes código, SIEMPRE usa este formato:\n\n\`\`\`tsx filename="src/components/NombreComponente.tsx"\n// código aquí\n\`\`\`\n\nIncluye el path completo del archivo en el atributo filename. Solo genera código que se pueda commitear directamente. NO generes markdown de documentación — genera archivos .tsx, .css, .ts reales.`;
+      const res = await fetch('/api/agents/stream', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: task + codeSystemPrompt, taskType: 'general', agentId: selectedAgent }) });
       if (!res.ok || !res.body) { setOutput(`Error: ${res.status}`); setRunning(false); return; }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -76,7 +97,14 @@ export default function AgentsWorkspace() {
     setRunning(false);
   }, [task, selectedAgent, running]);
 
-  const startPipeline = () => { setPipeline('confirm'); setPipelineLog([]); };
+  const startPipeline = () => {
+    const files = extractCodeFiles(output);
+    setDetectedFiles(files);
+    setCommittedFiles([]);
+    setCommitUrl('');
+    setPipeline('confirm');
+    setPipelineLog([]);
+  };
 
   const [stepTimes, setStepTimes] = useState<Record<string, number>>({});
   const amplifyApi = (p: Record<string, unknown>) => fetch('/api/amplify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }).then(r => r.json());
@@ -101,31 +129,29 @@ export default function AgentsWorkspace() {
       setPipelineLog(prev => [...prev, `✅ Insight guardado (${t1}s)`]);
     } catch (err) { setPipelineLog(prev => [...prev, `⚠️ ${String(err)}`]); }
 
-    // Step 2: Extract code blocks + commit to GitHub (real)
+    // Step 2: Commit code files to GitHub (real)
     setPipeline('deploying');
     const s2 = Date.now();
-    setPipelineLog(prev => [...prev, '', `🔗 Analizando output para código...`]);
+    const codeFiles = detectedFiles;
 
-    // Extract code blocks with file paths from output
-    // Format: ```tsx filename="src/components/X.tsx" or ```css or just ```
-    const codeBlockRegex = /```(\w+)?(?:\s+(?:filename=)?["']?([^"'\n]+)["']?)?\n([\s\S]*?)```/g;
-    const codeFiles: { path: string; content: string; lang: string }[] = [];
-    let match;
-    while ((match = codeBlockRegex.exec(output)) !== null) {
-      const lang = match[1] || 'txt';
-      const explicitPath = match[2];
-      const content = match[3].trim();
-      if (content.length > 50) { // Only meaningful code blocks
-        const path = explicitPath || `src/improvements/${Date.now()}-${lang}.${lang === 'tsx' || lang === 'typescript' ? 'tsx' : lang === 'css' ? 'css' : lang === 'json' ? 'json' : 'txt'}`;
-        codeFiles.push({ path, content, lang });
+    // DIFF PREVIEW
+    setPipelineLog(prev => [...prev, '', '━━━ DIFF PREVIEW ━━━']);
+    if (codeFiles.length > 0) {
+      for (const file of codeFiles) {
+        const preview = file.content.split('\n').slice(0, 5).join('\n');
+        setPipelineLog(prev => [...prev, `📄 ${file.path} (${file.lang})`, ...preview.split('\n').map(l => `  ${l}`), '']);
       }
+    } else {
+      setPipelineLog(prev => [...prev, '⚠️ No se detectaron bloques de código con filename']);
     }
+    setPipelineLog(prev => [...prev, '━━━━━━━━━━━━━━━━━━━']);
 
     const date = new Date().toISOString().split('T')[0];
+    const committed: string[] = [];
+    let lastCommitUrl = '';
     try {
       if (codeFiles.length > 0) {
-        // Commit real code files
-        setPipelineLog(prev => [...prev, `📁 ${codeFiles.length} archivo(s) de código detectados`]);
+        setPipelineLog(prev => [...prev, '', `📁 Commiteando ${codeFiles.length} archivo(s) de código...`]);
         for (const file of codeFiles) {
           setPipelineLog(prev => [...prev, `  📄 ${file.path} (${file.lang})`]);
           const r = await deployApi({
@@ -136,29 +162,38 @@ export default function AgentsWorkspace() {
           if (!r.success) {
             setPipelineLog(prev => [...prev, `  ⚠️ Error: ${r.error}`]);
           } else {
-            setPipelineLog(prev => [...prev, `  ✅ Committed`]);
+            committed.push(file.path);
+            if (r.commit_url) lastCommitUrl = r.commit_url;
+            else if (r.sha) lastCommitUrl = `https://github.com/${target.repo}/commit/${r.sha}`;
+            setPipelineLog(prev => [...prev, `  ✅ Committed → ${file.path}`]);
           }
         }
       }
 
-      // Always commit the improvement doc too
+      // Also commit improvement doc as reference
       const r = await deployApi({
         action: 'commit_file', repo: target.repo,
         path: `docs/improvements/${date}-${selectedAgent}-${Date.now()}.md`,
-        content: `# Mejora — ${date}\n\n**Agente:** ${selectedAgent}\n**Tarea:** ${task}\n\n${output}\n`,
+        content: `# Mejora — ${date}\n\n**Agente:** ${selectedAgent}\n**Tarea:** ${task}\n\n## Archivos generados\n${committed.map(f => `- \`${f}\``).join('\n')}\n\n${output}\n`,
         message: `feat(ux): mejora via ${selectedAgent} — ${task.slice(0, 50)}`,
       });
 
       const t2 = ((Date.now() - s2) / 1000).toFixed(1);
       setStepTimes(prev => ({ ...prev, commit: Date.now() - s2 }));
       if (r.success) {
-        setPipelineLog(prev => [...prev, `✅ ${codeFiles.length + 1} archivos committed (${t2}s)`]);
+        if (r.commit_url) lastCommitUrl = r.commit_url;
+        else if (r.sha) lastCommitUrl = `https://github.com/${target.repo}/commit/${r.sha}`;
+        committed.push(`docs/improvements/${date}-${selectedAgent}-....md`);
+        setPipelineLog(prev => [...prev, `✅ ${committed.length} archivos committed (${t2}s)`]);
       } else {
         setPipelineLog(prev => [...prev, `❌ Error commit: ${r.error}`]);
         setPipeline('error');
         return;
       }
     } catch (err) { setPipelineLog(prev => [...prev, `❌ ${String(err)}`]); setPipeline('error'); return; }
+
+    setCommittedFiles(committed);
+    setCommitUrl(lastCommitUrl);
 
     // Step 3: Wait for Amplify build (real polling)
     const s3 = Date.now();
@@ -228,7 +263,14 @@ export default function AgentsWorkspace() {
     const totalTime = ((Date.now() - pipelineStart) / 1000).toFixed(1);
     setStepTimes(prev => ({ ...prev, total: Date.now() - pipelineStart }));
     setPipeline('done');
-    setPipelineLog(prev => [...prev, '', `🎯 Pipeline completo — Total: ${totalTime}s`]);
+    setPipelineLog(prev => [
+      ...prev, '',
+      `🎯 Pipeline completo — Total: ${totalTime}s`,
+      '',
+      `📦 Archivos committed:`,
+      ...committed.map(f => `  → ${f}`),
+      ...(lastCommitUrl ? [``, `🔗 ${lastCommitUrl}`] : []),
+    ]);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -351,17 +393,34 @@ export default function AgentsWorkspace() {
             <div style={{ padding: '20px' }}>
               {pipeline === 'confirm' && (
                 <>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', lineHeight: 1.7, marginBottom: 16 }}>
-                    <span style={{ color: '#f59e0b' }}>1.</span> Guardar mejora en Supabase<br/>
-                    <span style={{ color: '#3b82f6' }}>2.</span> Commit a GitHub<br/>
-                    <span style={{ color: '#22c55e' }}>3.</span> Auto-deploy
+                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', lineHeight: 1.7, marginBottom: 12 }}>
+                    Se van a commitear <strong style={{ color: '#f1f5f9' }}>{detectedFiles.length + 1} archivos</strong> de codigo:
+                  </div>
+                  {detectedFiles.length > 0 ? (
+                    <div style={{ background: '#0a0d14', borderRadius: 8, padding: '10px 12px', marginBottom: 12, border: '1px solid rgba(255,255,255,0.04)', maxHeight: 120, overflow: 'auto' }}>
+                      {detectedFiles.map((f, i) => (
+                        <div key={i} style={{ fontSize: '0.65rem', fontFamily: "'JetBrains Mono', monospace", color: '#22c55e', lineHeight: 1.8 }}>
+                          {f.path} <span style={{ color: '#475569' }}>({f.lang})</span>
+                        </div>
+                      ))}
+                      <div style={{ fontSize: '0.65rem', fontFamily: "'JetBrains Mono', monospace", color: '#64748b', lineHeight: 1.8 }}>
+                        docs/improvements/...md <span style={{ color: '#475569' }}>(referencia)</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ background: 'rgba(245,158,11,0.08)', borderRadius: 8, padding: '10px 12px', marginBottom: 12, border: '1px solid rgba(245,158,11,0.2)', fontSize: '0.7rem', color: '#f59e0b' }}>
+                      No se detectaron bloques de codigo con filename. Solo se commiteara el doc .md de referencia.
+                    </div>
+                  )}
+                  <div style={{ background: 'rgba(239,68,68,0.06)', borderRadius: 8, padding: '8px 12px', marginBottom: 14, border: '1px solid rgba(239,68,68,0.15)', fontSize: '0.7rem', color: '#f87171', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: '0.9rem' }}>&#9888;&#65039;</span> Esto modificara codigo real del proyecto
                   </div>
                   <select value={targetRepo} onChange={e => setTargetRepo(e.target.value)} style={{ width: '100%', background: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', color: '#e2e8f0', fontSize: '0.75rem', fontFamily: "'Inter', system-ui", outline: 'none', marginBottom: 12 }}>
                     {repos.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
                   </select>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => setPipeline('idle')} style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#94a3b8', padding: '10px', borderRadius: 10, fontWeight: 600, fontSize: '0.75rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>Cancelar</button>
-                    <button onClick={runPipeline} style={{ flex: 2, background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: '#fff', border: 'none', padding: '10px', borderRadius: 10, fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>✅ Confirmar</button>
+                    <button onClick={runPipeline} style={{ flex: 2, background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: '#fff', border: 'none', padding: '10px', borderRadius: 10, fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>Confirmar Deploy</button>
                   </div>
                 </>
               )}
@@ -399,7 +458,25 @@ export default function AgentsWorkspace() {
                       {(pipeline === 'pushing' || pipeline === 'deploying') && <span style={{ display: 'inline-block', width: 6, height: 13, background: '#3b82f6', animation: 'blink 1s step-end infinite' }}></span>}
                     </div>
                   </div>
-                  {pipeline === 'done' && <button onClick={() => setPipeline('idle')} style={{ width: '100%', marginTop: 12, background: 'linear-gradient(135deg, #00e5b0, #00c49a)', color: '#0a0d14', border: 'none', padding: '10px', borderRadius: 10, fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>Listo</button>}
+                  {pipeline === 'done' && (
+                    <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {committedFiles.length > 0 && (
+                        <div style={{ background: 'rgba(34,197,94,0.06)', borderRadius: 8, padding: '10px 12px', border: '1px solid rgba(34,197,94,0.15)' }}>
+                          <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#22c55e', marginBottom: 6 }}>Archivos committed:</div>
+                          {committedFiles.map((f, i) => (
+                            <div key={i} style={{ fontSize: '0.6rem', fontFamily: "'JetBrains Mono', monospace", color: '#94a3b8', lineHeight: 1.6 }}>{f}</div>
+                          ))}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <a href="/dashboard/improvements" style={{ flex: 1, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', color: '#3b82f6', padding: '10px', borderRadius: 10, fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer', fontFamily: "'Inter', system-ui", textAlign: 'center', textDecoration: 'none', display: 'block' }}>Ver en Improvements</a>
+                        {commitUrl && (
+                          <a href={commitUrl} target="_blank" rel="noopener noreferrer" style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#94a3b8', padding: '10px', borderRadius: 10, fontWeight: 600, fontSize: '0.7rem', cursor: 'pointer', fontFamily: "'Inter', system-ui", textAlign: 'center', textDecoration: 'none', display: 'block' }}>Ver commit en GitHub</a>
+                        )}
+                      </div>
+                      <button onClick={() => setPipeline('idle')} style={{ width: '100%', background: 'linear-gradient(135deg, #00e5b0, #00c49a)', color: '#0a0d14', border: 'none', padding: '10px', borderRadius: 10, fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>Cerrar</button>
+                    </div>
+                  )}
                   {pipeline === 'error' && <div style={{ display: 'flex', gap: 8, marginTop: 12 }}><button onClick={() => setPipeline('idle')} style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#94a3b8', padding: '10px', borderRadius: 10, cursor: 'pointer', fontFamily: "'Inter', system-ui", fontSize: '0.75rem' }}>Cerrar</button><button onClick={runPipeline} style={{ flex: 1, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: '#3b82f6', padding: '10px', borderRadius: 10, cursor: 'pointer', fontFamily: "'Inter', system-ui", fontSize: '0.75rem' }}>Reintentar</button></div>}
                 </>
               )}

@@ -34,6 +34,7 @@ export default function CommandBar() {
     { id: 'nav-projects', icon: '📋', label: 'Proyectos', group: 'Navegar', action: () => { setOpen(false); router.push('/dashboard/projects'); }, shortcut: '⌘5' },
     { id: 'nav-ux', icon: '⚡', label: 'Agente UX', group: 'Navegar', action: () => { setOpen(false); router.push('/dashboard/ux-agent'); }, shortcut: '⌘6' },
     { id: 'nav-labs', icon: '🧪', label: 'Labs', group: 'Navegar', action: () => { setOpen(false); router.push('/dashboard/labs'); }, shortcut: '⌘7' },
+    { id: 'nav-improvements', icon: '⭐', label: 'Improvements', group: 'Navegar', action: () => { setOpen(false); router.push('/dashboard/improvements'); }, shortcut: '⌘8' },
     { id: 'nav-aws', icon: '☁', label: 'AWS Panel', group: 'Navegar', action: () => { setOpen(false); router.push('/dashboard/aws'); } },
     // Agents
     { id: 'agent-hoku', icon: '🐾', label: 'Hoku — Fusión de 4 agentes', group: 'Agentes', action: () => { setOpen(false); router.push('/dashboard/ux-agent?tab=workspace'); }, color: '#ff6b6b' },
