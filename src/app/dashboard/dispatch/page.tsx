@@ -42,6 +42,9 @@ export default function DispatchPage() {
   const [showModels, setShowModels] = useState(false);
   const [voiceOn, setVoiceOn] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [voiceState, setVoiceState] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
+  const [voiceTranscript, setVoiceTranscript] = useState('');
   const chatRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -86,7 +89,103 @@ export default function DispatchPage() {
     }
   }, [voiceOn]);
 
-  // STT
+  // STT — voice conversation
+  const startVoiceConversation = useCallback(() => {
+    setVoiceMode(true);
+    setVoiceState('listening');
+    setVoiceTranscript('');
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) { setVoiceState('idle'); return; }
+    const rec = new SR();
+    rec.lang = 'es-CL';
+    rec.interimResults = true;
+    rec.continuous = false;
+    rec.onresult = (e: any) => {
+      const transcript = Array.from(e.results).map((r: any) => r[0].transcript).join('');
+      setVoiceTranscript(transcript);
+      if (e.results[0].isFinal) {
+        setVoiceState('thinking');
+        voiceSend(transcript);
+      }
+    };
+    rec.onerror = () => setVoiceState('idle');
+    rec.onend = () => { if (voiceState === 'listening') setVoiceState('idle'); };
+    rec.start();
+  }, []);
+
+  const voiceSend = async (text: string) => {
+    if (!text.trim()) { setVoiceState('idle'); return; }
+    const hint = HINTS[model] || '';
+    let full = '';
+    try {
+      const res = await fetch('/api/agents/stream', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: hint ? `${hint}\n\n${text}` : text, taskType: 'general', agentId: ['hoku', 'panchita'].includes(model) ? 'hoku' : model, chatMode: true }),
+      });
+      if (!res.ok || !res.body) { setVoiceState('idle'); return; }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split('\n'); buf = lines.pop() || '';
+        for (const l of lines) {
+          const t = l.trim();
+          if (!t.startsWith('data: ')) continue;
+          const d = t.slice(6);
+          if (d === '[DONE]') continue;
+          try { const p = JSON.parse(d); if (p.content) full += p.content; } catch {}
+        }
+      }
+    } catch {}
+
+    if (!full) { setVoiceState('idle'); return; }
+
+    // Speak response
+    setVoiceState('speaking');
+    try {
+      const res = await fetch('/api/tts', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: full, voice: 'nova' }) });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        audio.onended = () => {
+          URL.revokeObjectURL(url);
+          // Auto-listen again for continuous conversation
+          setTimeout(() => startVoiceConversation(), 500);
+        };
+        audio.play();
+      } else {
+        // Fallback browser TTS
+        if (window.speechSynthesis) {
+          const u = new SpeechSynthesisUtterance(full.replace(/```[\s\S]*?```/g, '').replace(/[#*_`]/g, '').slice(0, 500));
+          u.lang = 'es-CL'; u.rate = 1.05;
+          u.onend = () => setTimeout(() => startVoiceConversation(), 500);
+          window.speechSynthesis.speak(u);
+        } else setVoiceState('idle');
+      }
+    } catch { setVoiceState('idle'); }
+
+    // Also save to chat
+    const sid = `voice_${Date.now()}`;
+    fetch('/api/agents', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'insert_chat', session_id: sid, role: 'user', content: text }) }).catch(() => {});
+    fetch('/api/agents', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'insert_chat', session_id: sid, role: 'hoku', content: full.slice(0, 5000) }) }).catch(() => {});
+  };
+
+  const exitVoiceMode = () => {
+    audioRef.current?.pause();
+    window.speechSynthesis?.cancel();
+    setVoiceMode(false);
+    setVoiceState('idle');
+    setSpeaking(false);
+  };
+
+  // Legacy startVoice for text mode
   const startVoice = () => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) return;
@@ -164,6 +263,61 @@ export default function DispatchPage() {
 
   const newChat = () => { setMsgs([]); setActiveConv('new'); };
   const stopAudio = () => { audioRef.current?.pause(); window.speechSynthesis?.cancel(); setSpeaking(false); };
+
+  // Voice mode colors
+  const orbColors: Record<string, { bg: string; shadow: string }> = {
+    idle: { bg: 'linear-gradient(135deg, #00e5b0, #0af)', shadow: '0 0 60px rgba(0,229,176,0.3)' },
+    listening: { bg: 'linear-gradient(135deg, #ef4444, #f97316)', shadow: '0 0 80px rgba(239,68,68,0.4)' },
+    thinking: { bg: 'conic-gradient(#00e5b0, #4f8ef7, #b794ff, #00e5b0)', shadow: '0 0 60px rgba(139,92,246,0.3)' },
+    speaking: { bg: 'linear-gradient(135deg, #22c55e, #00e5b0)', shadow: '0 0 80px rgba(34,197,94,0.4)' },
+  };
+  const orbC = orbColors[voiceState] || orbColors.idle;
+
+  if (voiceMode) {
+    return (
+      <div style={{ height: 'calc(100vh - 34px)', background: 'radial-gradient(ellipse at center, #0d1428 0%, #05070e 70%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24, position: 'relative', overflow: 'hidden' }}>
+        {/* Exit button */}
+        <button onClick={exitVoiceMode} style={{ position: 'absolute', top: 16, right: 20, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 14px', color: '#94a3b8', fontSize: 12, cursor: 'pointer' }}>✕ Salir</button>
+
+        {/* Agent name */}
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#94a3b8', letterSpacing: 1 }}>{m.label}</div>
+
+        {/* Orb */}
+        <div onClick={() => { if (voiceState === 'idle') startVoiceConversation(); else if (voiceState === 'speaking') exitVoiceMode(); }}
+          style={{
+            width: 160, height: 160, borderRadius: '50%', cursor: 'pointer',
+            background: orbC.bg, boxShadow: orbC.shadow,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 48, transition: 'all 0.4s',
+            animation: voiceState === 'listening' ? 'orbPulse 1.2s infinite' : voiceState === 'thinking' ? 'orbSpin 1.5s linear infinite' : voiceState === 'speaking' ? 'orbPulse 2s infinite' : 'none',
+          }}>
+          {voiceState === 'idle' ? '🎤' : voiceState === 'listening' ? '⏹' : voiceState === 'thinking' ? '🐾' : '🔊'}
+        </div>
+
+        {/* State label */}
+        <div style={{ fontSize: 18, fontWeight: 700, color: voiceState === 'listening' ? '#ef4444' : voiceState === 'thinking' ? '#b794ff' : voiceState === 'speaking' ? '#22c55e' : '#00e5b0' }}>
+          {voiceState === 'idle' ? 'Toca para hablar' : voiceState === 'listening' ? 'Escuchando...' : voiceState === 'thinking' ? 'Hoku pensando...' : 'Hoku respondiendo...'}
+        </div>
+
+        {/* Transcript */}
+        {voiceTranscript && (
+          <div style={{ fontSize: 15, color: '#d1d5db', maxWidth: 500, textAlign: 'center', lineHeight: 1.6, padding: '0 20px' }}>
+            "{voiceTranscript}"
+          </div>
+        )}
+
+        {/* Hint */}
+        <div style={{ fontSize: 12, color: '#2e4060', position: 'absolute', bottom: 24 }}>
+          {voiceState === 'idle' ? 'Habla y Hoku responde con voz natural' : voiceState === 'speaking' ? 'Toca el orb para parar' : ''}
+        </div>
+
+        <style>{`
+          @keyframes orbPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+          @keyframes orbSpin { to { transform: rotate(360deg); } }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 34px)', background: '#0a0d14', overflow: 'hidden' }}>
@@ -288,7 +442,7 @@ export default function DispatchPage() {
         <div style={{ flexShrink: 0, padding: '12px 20px 20px' }}>
           <div style={{ maxWidth: 700, margin: '0 auto' }}>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, background: '#111827', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', padding: '10px 14px' }}>
-              <button onClick={startVoice} style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 16, flexShrink: 0 }}>🎤</button>
+              <button onClick={startVoiceConversation} style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 16, flexShrink: 0 }} title="Modo voz">🎤</button>
               <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
                 placeholder={`Mensaje para ${m.label.replace(/[🐾🐕]/g, '').trim()}...`}
