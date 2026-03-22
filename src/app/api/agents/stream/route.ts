@@ -12,14 +12,14 @@ const SYSTEM_PROMPTS: Record<string, string> = {
   general: 'Eres un desarrollador full-stack de Smart Connection. SIEMPRE genera código funcional completo. Para cada archivo usa: ```tsx filename="src/ruta/archivo.tsx"\n código completo \n```. Si no es código, genera HTML con estilos inline. Responde en español.',
 };
 
-async function groqStream(prompt: string, systemPrompt: string): Promise<Response> {
+async function groqStream(prompt: string, systemPrompt: string, maxTokens = 2048): Promise<Response> {
   return fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${GROQ_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: prompt }],
-      stream: true, max_tokens: 2048, temperature: 0.7,
+      stream: true, max_tokens: maxTokens, temperature: 0.7,
     }),
   });
 }
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session.valid) return new Response('No autorizado', { status: 401 });
 
-  const { prompt, taskType, agentId } = await request.json();
+  const { prompt, taskType, agentId, chatMode } = await request.json();
   if (!prompt) return new Response('Prompt requerido', { status: 400 });
   if (!GROQ_KEY) return new Response('GROQ_API_KEY no configurada', { status: 500 });
 
@@ -195,7 +195,7 @@ export async function POST(request: Request) {
             const r = await fetch(url, {
               method: 'POST',
               headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ model, messages: [{ role: 'system', content: sys }, { role: 'user', content: p }], max_tokens: 1500, temperature: 0.7 }),
+              body: JSON.stringify({ model, messages: [{ role: 'system', content: sys }, { role: 'user', content: p }], max_tokens: subMaxTokens, temperature: 0.7 }),
             });
             if (!r.ok) return `(${name} error ${r.status})`;
             const d = await r.json();
@@ -211,7 +211,7 @@ export async function POST(request: Request) {
             const r = await fetch('https://api.anthropic.com/v1/messages', {
               method: 'POST',
               headers: { 'x-api-key': k, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-              body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1500, system: sys, messages: [{ role: 'user', content: p }] }),
+              body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: subMaxTokens, system: sys, messages: [{ role: 'user', content: p }] }),
             });
             if (!r.ok) return `(Claude error ${r.status})`;
             const d = await r.json();
@@ -219,7 +219,10 @@ export async function POST(request: Request) {
           } catch (e) { return `(Claude error: ${String(e).slice(0, 80)})`; }
         };
 
-        const codeSys = 'SIEMPRE genera código funcional completo. Usa formato: ```tsx filename="src/ruta/archivo.tsx"\n código \n```. Responde en español.';
+        const codeSys = chatMode
+          ? 'Responde de forma concisa y directa en español. Máximo 3-4 párrafos cortos. No generes código a menos que te lo pidan explícitamente.'
+          : 'SIEMPRE genera código funcional completo. Usa formato: ```tsx filename="src/ruta/archivo.tsx"\n código \n```. Responde en español.';
+        const subMaxTokens = chatMode ? 500 : 1500;
 
         // Build agent list dynamically based on available keys
         const agentList: { name: string; fn: () => Promise<string> }[] = [
@@ -293,11 +296,20 @@ export async function POST(request: Request) {
         await new Promise(r => setTimeout(r, 2000));
 
         // Synthesize via streaming
-        const synthPrompt = `Eres HOKU, un agente de síntesis de Smart Connection. Combina las respuestas de ${results.length} agentes en UNA respuesta final coherente y estructurada.
+        const maxSlice = chatMode ? 400 : 1500;
+        const synthPrompt = chatMode
+          ? `Eres HOKU 🐾, asistente conversacional de Smart Connection. Responde de forma CONCISA y amigable.
+
+PREGUNTA: ${prompt}
+
+${results.map(r => `── ${r.name} ──\n${r.result.slice(0, maxSlice)}`).join('\n\n')}
+
+Sintetiza en MÁXIMO 4-5 oraciones. Sé directo, usa bullets solo si es necesario. No generes código. Indica (Agente) solo en los puntos clave.`
+          : `Eres HOKU, un agente de síntesis de Smart Connection. Combina las respuestas de ${results.length} agentes en UNA respuesta final coherente y estructurada.
 
 TAREA: ${prompt}
 
-${results.map(r => `── ${r.name.toUpperCase()} ──\n${r.result.slice(0, 1500)}`).join('\n\n')}
+${results.map(r => `── ${r.name.toUpperCase()} ──\n${r.result.slice(0, maxSlice)}`).join('\n\n')}
 
 Genera una síntesis que integre lo mejor de cada agente. Indica entre paréntesis (Agente) quién aportó cada punto clave. Responde en español, estructurado con headers y bullets.
 IMPORTANTE: La síntesis debe incluir código funcional. Si los agentes generaron código, combina el mejor código en bloques con filename=.
@@ -307,13 +319,14 @@ IMPORTANTE: Cuando generes código, usa este formato:
 // código aquí
 \`\`\``;
 
+        const synthTokens = chatMode ? 512 : 2048;
+        const synthSys = chatMode ? 'Eres HOKU 🐾, asistente conversacional conciso. Responde en español en máximo 4-5 oraciones.' : 'Eres HOKU, sintetizador de múltiples agentes IA. Responde en español.';
         let synthRes: Response;
         try {
-          synthRes = await groqStream(synthPrompt, 'Eres HOKU, sintetizador de múltiples agentes IA. Responde en español.');
+          synthRes = await groqStream(synthPrompt, synthSys, synthTokens);
         } catch {
-          // Retry after 3s if rate limited
           await new Promise(r => setTimeout(r, 3000));
-          synthRes = await groqStream(synthPrompt, 'Eres HOKU, sintetizador de múltiples agentes IA. Responde en español.');
+          synthRes = await groqStream(synthPrompt, synthSys, synthTokens);
         }
         if (!synthRes.ok || !synthRes.body) {
           // Fallback: concatenate results directly

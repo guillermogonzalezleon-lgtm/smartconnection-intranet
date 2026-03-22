@@ -44,7 +44,7 @@ export default function HokuChat() {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: text, taskType: 'general', agentId: 'hoku' }),
+        body: JSON.stringify({ prompt: text, taskType: 'general', agentId: 'hoku', chatMode: true }),
       });
 
       if (!res.ok || !res.body) {
