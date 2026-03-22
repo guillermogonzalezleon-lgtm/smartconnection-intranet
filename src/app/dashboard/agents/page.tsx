@@ -30,7 +30,7 @@ const PLACEHOLDERS: Record<string, string> = {
   bedrock: 'Diseña arquitectura cloud AWS...',
 };
 
-type PipelineStep = 'idle' | 'confirm' | 'pushing' | 'deploying' | 'done' | 'error';
+type PipelineStep = 'idle' | 'confirm' | 'preview' | 'pushing' | 'deploying' | 'done' | 'error';
 
 // Extract code blocks with file paths from output
 function extractCodeFiles(text: string): { path: string; content: string; lang: string }[] {
@@ -118,8 +118,12 @@ export default function AgentsWorkspace() {
     setDetectedFiles(files);
     setCommittedFiles([]);
     setCommitUrl('');
-    setPipeline('confirm');
+    setPipeline('preview');
     setPipelineLog([]);
+  };
+
+  const approvePipeline = () => {
+    setPipeline('confirm');
   };
 
   const [stepTimes, setStepTimes] = useState<Record<string, number>>({});
@@ -414,11 +418,66 @@ export default function AgentsWorkspace() {
             <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: '1rem' }}>🚀</span>
               <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f1f5f9' }}>
-                {pipeline === 'confirm' ? 'Confirmar deploy' : pipeline === 'done' ? 'Deploy completado' : pipeline === 'error' ? 'Error' : 'Ejecutando...'}
+                {pipeline === 'preview' ? '👁 Preview — POC Demo' : pipeline === 'confirm' ? 'Confirmar deploy' : pipeline === 'done' ? 'Deploy completado' : pipeline === 'error' ? 'Error' : 'Ejecutando...'}
               </span>
-              {(pipeline === 'done' || pipeline === 'error') && <button onClick={() => setPipeline('idle')} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.06)', border: 'none', color: '#94a3b8', width: 28, height: 28, borderRadius: 6, cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>}
+              {(pipeline === 'done' || pipeline === 'error' || pipeline === 'preview') && <button onClick={() => setPipeline('idle')} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.06)', border: 'none', color: '#94a3b8', width: 28, height: 28, borderRadius: 6, cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>}
             </div>
             <div style={{ padding: '20px' }}>
+              {/* PREVIEW STEP — Sandbox before deploy */}
+              {pipeline === 'preview' && (
+                <>
+                  <div style={{ fontSize: '0.72rem', color: '#94a3b8', lineHeight: 1.6, marginBottom: 12 }}>
+                    Revisa la demo antes de deployar. {detectedFiles.length > 0 ? `${detectedFiles.length} archivo(s) generado(s).` : 'Solo documentación generada.'}
+                  </div>
+                  {/* Sandbox iframe for HTML/TSX preview */}
+                  {detectedFiles.some(f => ['html', 'htm', 'tsx', 'jsx', 'css'].includes(f.lang)) ? (
+                    <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(139,92,246,0.2)', marginBottom: 14 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', background: 'rgba(139,92,246,0.04)', borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+                        <div style={{ display: 'flex', gap: 3 }}>
+                          <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444' }} />
+                          <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#f59e0b' }} />
+                          <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e' }} />
+                        </div>
+                        <span style={{ fontSize: '0.62rem', color: '#a78bfa', fontWeight: 700 }}>Preview — POC Demo</span>
+                        <span style={{ fontSize: '0.55rem', color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>{detectedFiles[0]?.path || 'preview'}</span>
+                      </div>
+                      <iframe
+                        srcDoc={(() => {
+                          const htmlFile = detectedFiles.find(f => ['html', 'htm'].includes(f.lang));
+                          if (htmlFile) return htmlFile.content;
+                          const tsxFile = detectedFiles.find(f => ['tsx', 'jsx', 'css'].includes(f.lang));
+                          if (tsxFile) return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{background:#0a0d14;color:#e2e8f0;font-family:'JetBrains Mono',monospace;font-size:13px;padding:24px;margin:0;line-height:1.7;white-space:pre-wrap}</style></head><body>${tsxFile.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</body></html>`;
+                          return '<html><body style="background:#0a0d14;color:#64748b;font-family:sans-serif;padding:40px;text-align:center"><h2>Sin preview disponible</h2></body></html>';
+                        })()}
+                        style={{ width: '100%', height: 350, border: 'none', background: '#fff' }}
+                        sandbox="allow-scripts"
+                        title="POC Preview"
+                      />
+                    </div>
+                  ) : (
+                    <div style={{ background: '#0a0d14', borderRadius: 10, padding: '16px', marginBottom: 14, border: '1px solid rgba(255,255,255,0.06)', maxHeight: 250, overflow: 'auto' }}>
+                      <div style={{ fontSize: '0.65rem', color: '#64748b', marginBottom: 8, fontWeight: 700 }}>OUTPUT DEL AGENTE</div>
+                      <pre style={{ fontSize: '0.68rem', color: '#d1d5db', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap', fontFamily: "'JetBrains Mono', monospace" }}>{output.slice(0, 2000)}</pre>
+                    </div>
+                  )}
+                  {/* Files detected */}
+                  {detectedFiles.length > 0 && (
+                    <div style={{ background: '#0a0d14', borderRadius: 8, padding: '8px 12px', marginBottom: 14, border: '1px solid rgba(255,255,255,0.04)' }}>
+                      <div style={{ fontSize: '0.58rem', color: '#475569', fontWeight: 700, marginBottom: 4 }}>ARCHIVOS ({detectedFiles.length})</div>
+                      {detectedFiles.map((f, i) => (
+                        <div key={i} style={{ fontSize: '0.62rem', fontFamily: "'JetBrains Mono', monospace", color: '#22c55e', lineHeight: 1.8 }}>
+                          {f.path} <span style={{ color: '#475569' }}>({f.lang}, {Math.round(f.content.length / 1024 * 10) / 10}KB)</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => setPipeline('idle')} style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#94a3b8', padding: '10px', borderRadius: 10, fontWeight: 600, fontSize: '0.75rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>Descartar</button>
+                    <button onClick={approvePipeline} style={{ flex: 2, background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', color: '#fff', border: 'none', padding: '10px', borderRadius: 10, fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>✓ Aprobar → Deploy</button>
+                  </div>
+                </>
+              )}
+
               {pipeline === 'confirm' && (
                 <>
                   <div style={{ fontSize: '0.75rem', color: '#94a3b8', lineHeight: 1.7, marginBottom: 12 }}>
