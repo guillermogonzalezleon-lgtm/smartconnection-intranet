@@ -89,6 +89,9 @@ export async function POST(request: Request) {
 
         send('\n📊 Sintetizando respuestas...\n\n');
 
+        // Wait 2s to avoid Groq rate limit (3 parallel calls just finished)
+        await new Promise(r => setTimeout(r, 2000));
+
         // Synthesize via streaming
         const synthPrompt = `Eres HOKU, un agente de síntesis de Smart Connection. Combina las respuestas de ${results.length} agentes en UNA respuesta final coherente y estructurada.
 
@@ -96,11 +99,27 @@ TAREA: ${prompt}
 
 ${results.map(r => `── ${r.name.toUpperCase()} ──\n${r.result.slice(0, 1500)}`).join('\n\n')}
 
-Genera una síntesis que integre lo mejor de cada agente. Indica entre paréntesis (Agente) quién aportó cada punto clave. Responde en español, estructurado con headers y bullets.`;
+Genera una síntesis que integre lo mejor de cada agente. Indica entre paréntesis (Agente) quién aportó cada punto clave. Responde en español, estructurado con headers y bullets.
 
-        const synthRes = await groqStream(synthPrompt, 'Eres HOKU, sintetizador de múltiples agentes IA. Responde en español.');
+IMPORTANTE: Cuando generes código, usa este formato:
+\`\`\`tsx filename="src/components/NombreArchivo.tsx"
+// código aquí
+\`\`\``;
+
+        let synthRes: Response;
+        try {
+          synthRes = await groqStream(synthPrompt, 'Eres HOKU, sintetizador de múltiples agentes IA. Responde en español.');
+        } catch {
+          // Retry after 3s if rate limited
+          await new Promise(r => setTimeout(r, 3000));
+          synthRes = await groqStream(synthPrompt, 'Eres HOKU, sintetizador de múltiples agentes IA. Responde en español.');
+        }
         if (!synthRes.ok || !synthRes.body) {
-          send('\nError en síntesis.\n');
+          // Fallback: concatenate results directly
+          send('⚠️ Síntesis no disponible (rate limit). Mostrando respuestas individuales:\n\n');
+          for (const r of results) {
+            send(`\n── ${r.name.toUpperCase()} ──\n${r.result}\n`);
+          }
           controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           controller.close();
           return;
