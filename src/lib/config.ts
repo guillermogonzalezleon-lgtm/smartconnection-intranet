@@ -46,6 +46,31 @@ export const CONFIG = {
   },
 } as const;
 
+// ── Single source of truth for agent colors ──
+export const AGENT_COLORS: Record<string, string> = Object.fromEntries(
+  Object.values(CONFIG.agents).map(a => [a.id, a.color])
+);
+AGENT_COLORS.deployer = '#3b82f6';
+
+// ── Agent icons ──
+export const AGENT_ICONS: Record<string, string> = {
+  hoku: 'bi-stars', groq: 'bi-cpu', claude: 'bi-robot', grok: 'bi-lightning-charge',
+  deepseek: 'bi-code-slash', mistral: 'bi-translate', openai: 'bi-braces',
+  cohere: 'bi-file-text', openrouter: 'bi-shuffle', bedrock: 'bi-cloud',
+  gemini: 'bi-gem', deployer: 'bi-gear-wide-connected',
+};
+
+// ── Client-side API helper (use in 'use client' components) ──
+export const api = (payload: Record<string, unknown>) =>
+  fetch('/api/agents', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json());
+
+export const deployApi = (payload: Record<string, unknown>) =>
+  fetch('/api/deploy', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json());
+
+// ── Persist helper (fire-and-forget to agent_logs) ──
+export const persist = (agentId: string, action: string, detail: string, status = 'success') =>
+  api({ action: 'execute', agentId: 'deployer', prompt: '', taskType: 'general' }).catch(() => {});
+
 export function formatDate(d: string | Date, style: 'short' | 'long' | 'relative' = 'short'): string {
   const date = typeof d === 'string' ? new Date(d) : d;
   if (isNaN(date.getTime())) return '—';

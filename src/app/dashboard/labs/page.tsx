@@ -445,6 +445,12 @@ export default function LabsPage() {
       const resultText = res.result || res.error || '';
       const isSuccess = !res.error;
 
+      // Persist flow execution to Supabase
+      fetch('/api/agents', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'insert_chat', session_id: `labs_${flow.id}`, role: 'hoku', content: `[Flow: ${flow.id}] ${resultText.slice(0, 3000)}` }),
+      }).catch(() => {});
+
       // Update exec counts locally with result
       setFlowExecs(prev => ({
         ...prev,

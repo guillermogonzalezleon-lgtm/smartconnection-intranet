@@ -26,11 +26,7 @@ interface PipelineStep {
 const CATEGORIAS = ['Todas', 'Conversion', 'SEO', 'Contenido', 'Navegacion', 'WhatsApp', 'i18n', 'Checkout'];
 const ESTADOS_FILTER = ['Todas', 'Pendiente', 'En progreso', 'Implementado'];
 
-const agentColors: Record<string, string> = {
-  hoku: '#ff6b6b', groq: '#f59e0b', claude: '#00e5b0', grok: '#8b5cf6',
-  deepseek: '#0ea5e9', mistral: '#f97316', openai: '#10b981', cohere: '#1e3a5f',
-  openrouter: '#6366f1', bedrock: '#f97316', gemini: '#22c55e', deployer: '#3b82f6',
-};
+import { AGENT_COLORS as agentColors } from '@/lib/config';
 const estadoColors: Record<string, { bg: string; text: string; border: string }> = {
   pendiente: { bg: 'rgba(245,158,11,0.08)', text: '#f59e0b', border: 'rgba(245,158,11,0.25)' },
   en_progreso: { bg: 'rgba(59,130,246,0.08)', text: '#3b82f6', border: 'rgba(59,130,246,0.25)' },

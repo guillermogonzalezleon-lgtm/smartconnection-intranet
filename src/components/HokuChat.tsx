@@ -43,8 +43,7 @@ function isHtmlContent(block: CodeBlock): boolean {
   return ['html', 'htm'].includes(block.lang) || block.filename.endsWith('.html');
 }
 
-const apiCall = (payload: Record<string, unknown>) =>
-  fetch('/api/agents', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json());
+import { api as apiCall } from '@/lib/config';
 
 export default function HokuChat() {
   const [open, setOpen] = useState(false);

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { AGENT_COLORS, AGENT_ICONS } from '@/lib/config';
 
 interface ModalData {
   title: string;
@@ -70,20 +71,9 @@ export default function Dashboard() {
   const active = agents.filter(a => a.active).length;
   const tasks = agents.reduce((s, a) => s + ((a.tasks_count as number) || 0), 0);
 
-  const agentMeta: Record<string, { color: string; icon: string }> = {
-    hoku: { color: '#ff6b6b', icon: 'bi-stars' },
-    groq: { color: '#f59e0b', icon: 'bi-cpu' },
-    claude: { color: '#00e5b0', icon: 'bi-robot' },
-    grok: { color: '#8b5cf6', icon: 'bi-lightning-charge' },
-    deepseek: { color: '#0ea5e9', icon: 'bi-code-slash' },
-    mistral: { color: '#f97316', icon: 'bi-translate' },
-    openai: { color: '#10b981', icon: 'bi-braces' },
-    cohere: { color: '#1e3a5f', icon: 'bi-file-text' },
-    openrouter: { color: '#6366f1', icon: 'bi-shuffle' },
-    bedrock: { color: '#f97316', icon: 'bi-cloud' },
-    gemini: { color: '#22c55e', icon: 'bi-gem' },
-    deployer: { color: '#3b82f6', icon: 'bi-gear-wide-connected' },
-  };
+  const agentMeta = Object.fromEntries(
+    Object.entries(AGENT_COLORS).map(([id, color]) => [id, { color, icon: AGENT_ICONS[id] || 'bi-cpu' }])
+  );
 
   const kpis = [
     { icon: 'bi-robot', value: active, label: 'Agentes Activos', color: '#00e5b0', onClick: () => router.push('/dashboard/agents') },

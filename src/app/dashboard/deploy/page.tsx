@@ -231,9 +231,10 @@ export default function DeployCenter() {
   /* ── Save deploy report to Supabase ── */
   const saveDeployReport = async (report: ReportData, logLines: LogLine[]) => {
     try {
+      // Save full report to ux_insights
       await deployApi({
         action: 'save_improvement',
-        titulo: `Deploy Report — ${report.repo}`,
+        titulo: `Deploy ${report.source} — ${new Date().toLocaleDateString('es-CL')}`,
         descripcion: JSON.stringify({
           ...report,
           logs: logLines.map(l => l.text).join('\n'),
@@ -242,6 +243,13 @@ export default function DeployCenter() {
         impacto: report.steps.every(s => s.status === 'done') ? 'Exitoso' : 'Con errores',
         agente: 'deployer',
         ciclo: 1,
+      });
+      // Save detailed pipeline log to agent_logs
+      await api({
+        action: 'insert_chat',
+        session_id: `deploy_${Date.now()}`,
+        role: 'hoku',
+        content: `[Pipeline ${report.source}] ${report.totalTime}s · ${report.steps.map(s => `${s.name}:${s.time}s`).join(' → ')}\n\n${logLines.map(l => l.text).slice(-50).join('\n')}`,
       });
     } catch { /* ignore */ }
   };
