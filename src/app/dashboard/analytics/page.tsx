@@ -175,8 +175,50 @@ export default function AnalyticsPage() {
           Intranet <span style={{ margin: '0 8px', color: '#475569' }}>/</span>{' '}
           <span style={{ color: '#fff', fontWeight: 600 }}>Analytics</span>
         </div>
-        {/* Period filters */}
-        <div style={{ display: 'flex', gap: 4 }}>
+        {/* Period filters + Export */}
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <button
+            onClick={() => {
+              const rows: string[] = ['Sección,Clave,Valor'];
+              // Pageviews
+              sortedPages.forEach(([page, count]) => rows.push(`Páginas,"${page}",${count}`));
+              // Sources
+              sortedSources.forEach(([name, count]) => rows.push(`Fuente,"${name}",${count}`));
+              // Devices
+              rows.push(`Dispositivos,Desktop,${desktopCount}`);
+              rows.push(`Dispositivos,Mobile,${mobileCount}`);
+              // KPIs
+              rows.push(`KPI,Visitas hoy,${visitasHoy}`);
+              rows.push(`KPI,Visitas 7d,${visitasSemana}`);
+              rows.push(`KPI,Visitas 30d,${visitas30d}`);
+              rows.push(`KPI,Leads totales,${leadsCount}`);
+              rows.push(`KPI,Reuniones,${meetingsCount}`);
+              rows.push(`KPI,Conversión,${conversionPct}%`);
+              const csv = rows.join('\n');
+              const blob = new Blob([csv], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a'); a.href = url; a.download = 'analytics.csv'; a.click();
+              URL.revokeObjectURL(url);
+            }}
+            style={{
+              padding: '6px 16px',
+              borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(255,255,255,0.03)',
+              color: '#94a3b8',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              letterSpacing: '0.02em',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              marginRight: 8,
+            }}
+          >
+            <i className="bi bi-download" /> Exportar CSV
+          </button>
           {periods.map((p) => (
             <button
               key={p.key}
@@ -215,7 +257,9 @@ export default function AnalyticsPage() {
               fontSize: '0.85rem',
             }}
           >
-            <i className="bi bi-arrow-repeat" style={{ animation: 'spin 1s linear infinite' }} />
+            <div role="status" aria-label="Cargando">
+              <i className="bi bi-arrow-repeat" style={{ animation: 'spin 1s linear infinite' }} />
+            </div>
             Cargando datos...
           </div>
         )}

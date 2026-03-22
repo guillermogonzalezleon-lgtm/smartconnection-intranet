@@ -4,11 +4,12 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!;
 export async function supabaseQuery<T = Record<string, unknown>>(
   table: string,
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE' = 'GET',
-  options: { body?: Record<string, unknown>; filter?: string; order?: string; limit?: number } = {}
+  options: { body?: Record<string, unknown>; filter?: string; order?: string; limit?: number; offset?: number } = {}
 ): Promise<T[]> {
   const params = new URLSearchParams();
   if (options.order) params.set('order', options.order);
   if (options.limit) params.set('limit', String(options.limit));
+  if (options.offset) params.set('offset', String(options.offset));
   const filterPart = options.filter ? `&${options.filter}` : '';
   const url = `${SUPABASE_URL}/rest/v1/${table}?${params}${filterPart}`;
 

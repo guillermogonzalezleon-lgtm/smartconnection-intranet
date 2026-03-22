@@ -9,7 +9,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { action, agentId, task, agents: agentIds, prompt, taskType, context, table, order, limit, filter } = body;
+    const { action, agentId, task, agents: agentIds, prompt, taskType, context, table, order, limit, filter, offset } = body;
 
     // Parallel execution of multiple agents
     if (action === 'parallel' && agentIds && task) {
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     if (action === 'query' && table) {
       const allowed = ['leads', 'reuniones', 'analytics', 'agent_logs', 'agent_config', 'ux_insights', 'projects', 'project_tasks'];
       if (!allowed.includes(table)) return NextResponse.json({ error: 'Tabla no permitida' }, { status: 400 });
-      const data = await supabaseQuery(table, 'GET', { order: order || 'created_at.desc', limit: limit || 50, filter });
+      const data = await supabaseQuery(table, 'GET', { order: order || 'created_at.desc', limit: limit || 50, filter, offset });
       return NextResponse.json({ data });
     }
 
