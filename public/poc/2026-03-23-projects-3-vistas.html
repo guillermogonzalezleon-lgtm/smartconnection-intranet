@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PoC — Proyectos 3 Vistas · Panchita 🐕</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#06080f;--s1:#0d1117;--s2:#161b28;--teal:#00e5b0;--blue:#4f8ef7;--green:#1fd975;--amber:#f5a623;--red:#f04747;--violet:#b794ff;--text:#dce4f0;--muted:#6b8099;--dim:#2a3d58}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text)}
+.wrap{max-width:1200px;margin:0 auto;padding:40px 32px}
+h1{font-size:32px;font-weight:900;letter-spacing:-.03em;margin-bottom:6px}
+h2{font-size:20px;font-weight:800;margin:32px 0 12px}
+.sub{font-size:13px;color:var(--muted);margin-bottom:24px}
+.tag{display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;margin-right:4px}
+.t-ok{background:rgba(31,217,117,.1);color:var(--green)}.t-warn{background:rgba(245,166,35,.1);color:var(--amber)}.t-err{background:rgba(240,71,71,.1);color:var(--red)}.t-info{background:rgba(79,142,247,.1);color:var(--blue)}.t-teal{background:rgba(0,229,176,.1);color:var(--teal)}
+.divider{border:none;border-top:1px solid rgba(255,255,255,.06);margin:40px 0}
+.card{background:var(--s1);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:16px;margin-bottom:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:8px 12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid rgba(255,255,255,.06);font-weight:700}
+td{padding:8px 12px;font-size:12px;border-bottom:1px solid rgba(255,255,255,.03)}
+
+/* Demo frame */
+.frame{border:1px solid rgba(255,255,255,.06);border-radius:14px;overflow:hidden;background:var(--s1)}
+.frame-bar{height:40px;background:var(--s2);border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;padding:0 14px;gap:10px}
+.dots{display:flex;gap:4px}
+.dot{width:8px;height:8px;border-radius:50%}
+.frame-url{font-size:11px;color:var(--dim);font-family:'JetBrains Mono',monospace}
+.frame-body{min-height:500px}
+
+/* Toggle */
+.toggle{display:flex;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid rgba(255,255,255,.06);overflow:hidden;margin-left:auto}
+.toggle-btn{padding:6px 16px;font-size:12px;font-weight:600;cursor:pointer;border:none;color:var(--muted);background:transparent;font-family:'Inter',sans-serif}
+.toggle-btn.on{background:rgba(0,229,176,.12);color:var(--teal)}
+
+/* Header inside demo */
+.demo-head{height:48px;background:rgba(6,8,15,.92);border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;padding:0 20px;gap:10px}
+.demo-title{font-size:14px;font-weight:700;color:var(--text)}
+.demo-sub{font-size:11px;color:var(--dim)}
+
+/* ═══ KANBAN ═══ */
+.kanban{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;padding:20px}
+.k-col{min-height:400px}
+.k-head{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:0 4px}
+.k-dot{width:8px;height:8px;border-radius:50%}
+.k-label{font-size:12px;font-weight:700}
+.k-count{font-size:10px;color:var(--dim);background:rgba(255,255,255,.04);padding:1px 6px;border-radius:10px}
+.k-card{background:var(--s2);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:12px;margin-bottom:8px;cursor:grab;transition:all .2s;position:relative}
+.k-card:hover{border-color:rgba(0,229,176,.2);transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.3)}
+.k-card:active{cursor:grabbing;transform:scale(.98)}
+.k-name{font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px}
+.k-desc{font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.4}
+.k-foot{display:flex;align-items:center;gap:6px}
+.k-priority{width:6px;height:6px;border-radius:50%;position:absolute;top:12px;right:12px}
+.k-progress{flex:1;height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden}
+.k-fill{height:100%;border-radius:2px}
+.k-pct{font-size:10px;font-weight:700;min-width:28px;text-align:right}
+.k-avatar{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff}
+.k-tags{display:flex;gap:3px;margin-top:6px}
+.k-tag{font-size:9px;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,.03);color:var(--dim)}
+
+/* ═══ TABLE ═══ */
+.m-table{width:100%;border-collapse:collapse}
+.m-table th{padding:10px 14px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;background:rgba(255,255,255,.02);border-bottom:2px solid rgba(255,255,255,.06);text-align:left}
+.m-table td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.03);font-size:12px}
+.m-table tr:hover td{background:rgba(0,229,176,.02)}
+.status-pill{padding:4px 12px;border-radius:6px;font-size:10px;font-weight:700;display:inline-block;text-align:center;min-width:85px}
+.avatar-sm{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff}
+.prog-bar{height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;flex:1}
+.prog-fill{height:100%;border-radius:3px}
+
+/* ═══ TIMELINE ═══ */
+.tl-wrap{padding:20px;overflow-x:auto}
+.tl-header{display:flex;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:4px}
+.tl-name-col{width:220px;flex-shrink:0;padding:8px 12px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase}
+.tl-months{flex:1;display:flex}
+.tl-month{flex:1;text-align:center;font-size:10px;color:var(--dim);padding:8px 0;border-left:1px solid rgba(255,255,255,.03);font-family:'JetBrains Mono',monospace}
+.tl-row{display:flex;align-items:center;min-height:44px;border-bottom:1px solid rgba(255,255,255,.02);transition:background .15s}
+.tl-row:hover{background:rgba(0,229,176,.02)}
+.tl-project{width:220px;flex-shrink:0;padding:8px 12px;display:flex;align-items:center;gap:8px}
+.tl-p-name{font-size:12px;font-weight:700;color:var(--text)}
+.tl-p-status{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px}
+.tl-bars{flex:1;display:flex;position:relative;height:28px}
+.tl-bar{position:absolute;height:20px;top:4px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:rgba(0,0,0,.7);transition:all .2s}
+.tl-bar:hover{transform:scaleY(1.3);box-shadow:0 2px 12px rgba(0,0,0,.4)}
+.tl-grid-line{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.03)}
+.tl-today{position:absolute;top:0;bottom:0;width:2px;background:var(--red);z-index:2}
+.tl-today-label{position:absolute;top:-18px;font-size:8px;color:var(--red);font-weight:700;white-space:nowrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- REPORTE -->
+<div style="margin-bottom:8px">
+  <span class="tag t-teal">🐕 PANCHITA</span>
+  <span class="tag t-info">PoC v2</span>
+  <span class="tag t-ok">23-03-2026</span>
+</div>
+
+<h1>Proyectos — 3 Vistas</h1>
+<p class="sub">Kanban (drag & drop) + Tabla (Monday) + Timeline (Gantt) — mismos datos, 3 formas de ver</p>
+
+<div class="grid3">
+  <div class="card" style="text-align:center"><div style="font-size:36px;font-weight:900;color:var(--teal)">☰</div><div style="font-size:11px;color:var(--muted);margin-top:4px">Kanban</div><div style="font-size:10px;color:var(--green)">✓ Ya funciona</div></div>
+  <div class="card" style="text-align:center"><div style="font-size:36px;font-weight:900;color:var(--blue)">▤</div><div style="font-size:11px;color:var(--muted);margin-top:4px">Tabla</div><div style="font-size:10px;color:var(--green)">✓ Implementada</div></div>
+  <div class="card" style="text-align:center"><div style="font-size:36px;font-weight:900;color:var(--amber)">📊</div><div style="font-size:11px;color:var(--muted);margin-top:4px">Timeline</div><div style="font-size:10px;color:var(--red)">✗ Nueva</div></div>
+</div>
+
+<h2>Propuesta</h2>
+<table>
+  <thead><tr><th>Vista</th><th>Para qué</th><th>Estado</th></tr></thead>
+  <tbody>
+    <tr><td><strong>☰ Kanban</strong></td><td>Mover proyectos entre columnas con drag & drop. Vista rápida del flujo.</td><td><span class="tag t-ok">✅ Default</span></td></tr>
+    <tr><td><strong>▤ Tabla</strong></td><td>Ver todos los datos en filas. Status, prioridad, owner, progreso, fecha.</td><td><span class="tag t-ok">✅ Lista</span></td></tr>
+    <tr><td><strong>📊 Timeline</strong></td><td>Barras Gantt por mes. Ver overlap, deadlines, progreso temporal.</td><td><span class="tag t-err">🆕 Por implementar</span></td></tr>
+  </tbody>
+</table>
+
+<hr class="divider">
+
+<!-- DEMO -->
+<h2>🖥️ Demo — Las 3 Vistas</h2>
+
+<div class="frame">
+  <div class="frame-bar">
+    <div class="dots"><div class="dot" style="background:var(--red)"></div><div class="dot" style="background:var(--amber)"></div><div class="dot" style="background:var(--green)"></div></div>
+    <span class="frame-url">intranet.smconnection.cl/dashboard/projects</span>
+  </div>
+  <div class="frame-body">
+    <!-- Demo header -->
+    <div class="demo-head">
+      <span class="demo-title">Proyectos</span>
+      <span class="demo-sub">5 proyectos</span>
+      <div class="toggle" id="view-toggle">
+        <button class="toggle-btn on" onclick="switchView('kanban')">☰ Kanban</button>
+        <button class="toggle-btn" onclick="switchView('table')">▤ Tabla</button>
+        <button class="toggle-btn" onclick="switchView('timeline')">📊 Timeline</button>
+      </div>
+      <button style="background:linear-gradient(135deg,var(--teal),#00c49a);border:none;border-radius:8px;padding:6px 14px;color:#0a0d14;font-size:11px;font-weight:700;cursor:pointer;margin-left:8px">+ Nuevo</button>
+    </div>
+
+    <!-- ═══ KANBAN VIEW ═══ -->
+    <div id="v-kanban" class="kanban">
+      <!-- Backlog -->
+      <div class="k-col">
+        <div class="k-head"><div class="k-dot" style="background:var(--muted)"></div><span class="k-label">Backlog</span><span class="k-count">3</span></div>
+        <div class="k-card" draggable="true"><div class="k-priority" style="background:var(--red)"></div><div class="k-name">InfoPet — RAG Veterinario</div><div class="k-desc">Asistente IA + Bsale + Jumpseller</div><div class="k-foot"><div class="k-avatar" style="background:var(--amber)">GG</div><div class="k-progress"><div class="k-fill" style="width:20%;background:var(--amber)"></div></div><span class="k-pct" style="color:var(--amber)">20%</span></div><div class="k-tags"><span class="k-tag">Claude</span><span class="k-tag">Supabase</span></div></div>
+        <div class="k-card" draggable="true"><div class="k-priority" style="background:var(--amber)"></div><div class="k-name">Marketplace MeLi + Amazon</div><div class="k-desc">Helium 10, scraping, análisis</div><div class="k-foot"><div class="k-avatar" style="background:var(--green)">GG</div><div class="k-progress"><div class="k-fill" style="width:40%;background:var(--amber)"></div></div><span class="k-pct" style="color:var(--amber)">40%</span></div><div class="k-tags"><span class="k-tag">Next.js</span><span class="k-tag">MeLi API</span></div></div>
+        <div class="k-card" draggable="true"><div class="k-priority" style="background:var(--green)"></div><div class="k-name">VOY — Migración Supabase</div><div class="k-desc">Airtable → Supabase, cotizaciones IA</div><div class="k-foot"><div class="k-avatar" style="background:var(--red)">GG</div><div class="k-progress"><div class="k-fill" style="width:10%;background:var(--red)"></div></div><span class="k-pct" style="color:var(--red)">10%</span></div><div class="k-tags"><span class="k-tag">Supabase</span><span class="k-tag">jsPDF</span></div></div>
+      </div>
+      <!-- In Progress -->
+      <div class="k-col">
+        <div class="k-head"><div class="k-dot" style="background:var(--blue)"></div><span class="k-label">In Progress</span><span class="k-count">2</span></div>
+        <div class="k-card" draggable="true" style="border-color:rgba(0,229,176,.15)"><div class="k-priority" style="background:var(--red)"></div><div class="k-name">Intranet SmartConnection v2</div><div class="k-desc">Dashboard, 12 agentes IA, CRM, Deploy</div><div class="k-foot"><div class="k-avatar" style="background:var(--blue)">GG</div><div class="k-progress"><div class="k-fill" style="width:85%;background:var(--green)"></div></div><span class="k-pct" style="color:var(--green)">85%</span></div><div class="k-tags"><span class="k-tag">Next.js 16</span><span class="k-tag">Supabase</span><span class="k-tag">AWS</span></div></div>
+        <div class="k-card" draggable="true"><div class="k-priority" style="background:var(--amber)"></div><div class="k-name">SmartConnection Marketing</div><div class="k-desc">smconnection.cl — Astro + S3</div><div class="k-foot"><div class="k-avatar" style="background:var(--violet)">GG</div><div class="k-progress"><div class="k-fill" style="width:70%;background:var(--blue)"></div></div><span class="k-pct" style="color:var(--blue)">70%</span></div><div class="k-tags"><span class="k-tag">Astro</span><span class="k-tag">CloudFront</span></div></div>
+      </div>
+      <!-- Done -->
+      <div class="k-col">
+        <div class="k-head"><div class="k-dot" style="background:var(--green)"></div><span class="k-label">Done</span><span class="k-count">0</span></div>
+        <div style="padding:40px 20px;text-align:center;color:var(--dim);font-size:12px;border:1px dashed rgba(255,255,255,.06);border-radius:10px">Arrastra aquí para completar</div>
+      </div>
+    </div>
+
+    <!-- ═══ TABLE VIEW ═══ -->
+    <div id="v-table" style="display:none;padding:0">
+      <table class="m-table">
+        <thead><tr><th>Proyecto</th><th>Status</th><th>Prioridad</th><th>Owner</th><th>Progreso</th><th>Due Date</th></tr></thead>
+        <tbody>
+          <tr><td><div style="font-weight:700">Intranet SmartConnection v2</div><div style="font-size:10px;color:var(--dim)">Dashboard, agentes IA, CRM</div></td><td><span class="status-pill" style="background:rgba(79,142,247,.15);color:var(--blue)">In Progress</span></td><td><span style="display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:var(--red)"></span>Alta</span></td><td><div style="display:flex;align-items:center;gap:6px"><span class="avatar-sm" style="background:var(--blue)">GG</span>Guillermo</div></td><td><div style="display:flex;align-items:center;gap:6px"><div class="prog-bar"><div class="prog-fill" style="width:85%;background:var(--green)"></div></div><span style="font-size:11px;font-weight:700;color:var(--green)">85%</span></div></td><td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">30 Abr</td></tr>
+          <tr><td><div style="font-weight:700">SmartConnection Marketing</div><div style="font-size:10px;color:var(--dim)">smconnection.cl</div></td><td><span class="status-pill" style="background:rgba(79,142,247,.15);color:var(--blue)">In Progress</span></td><td><span style="display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:var(--amber)"></span>Media</span></td><td><div style="display:flex;align-items:center;gap:6px"><span class="avatar-sm" style="background:var(--violet)">GG</span>Guillermo</div></td><td><div style="display:flex;align-items:center;gap:6px"><div class="prog-bar"><div class="prog-fill" style="width:70%;background:var(--blue)"></div></div><span style="font-size:11px;font-weight:700;color:var(--blue)">70%</span></div></td><td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">30 Jun</td></tr>
+          <tr><td><div style="font-weight:700">InfoPet — RAG Veterinario</div><div style="font-size:10px;color:var(--dim)">Asistente IA</div></td><td><span class="status-pill" style="background:rgba(107,128,153,.12);color:var(--muted)">Backlog</span></td><td><span style="display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:var(--red)"></span>Alta</span></td><td><div style="display:flex;align-items:center;gap:6px"><span class="avatar-sm" style="background:var(--amber)">GG</span>Guillermo</div></td><td><div style="display:flex;align-items:center;gap:6px"><div class="prog-bar"><div class="prog-fill" style="width:20%;background:var(--amber)"></div></div><span style="font-size:11px;font-weight:700;color:var(--amber)">20%</span></div></td><td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">31 Jul</td></tr>
+          <tr><td><div style="font-weight:700">Marketplace MeLi + Amazon</div><div style="font-size:10px;color:var(--dim)">Helium 10, scraping</div></td><td><span class="status-pill" style="background:rgba(107,128,153,.12);color:var(--muted)">Backlog</span></td><td><span style="display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:var(--amber)"></span>Media</span></td><td><div style="display:flex;align-items:center;gap:6px"><span class="avatar-sm" style="background:var(--green)">GG</span>Guillermo</div></td><td><div style="display:flex;align-items:center;gap:6px"><div class="prog-bar"><div class="prog-fill" style="width:40%;background:var(--amber)"></div></div><span style="font-size:11px;font-weight:700;color:var(--amber)">40%</span></div></td><td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">30 Sep</td></tr>
+          <tr><td><div style="font-weight:700">VOY — Migración Supabase</div><div style="font-size:10px;color:var(--dim)">Airtable → Supabase</div></td><td><span class="status-pill" style="background:rgba(107,128,153,.12);color:var(--muted)">Backlog</span></td><td><span style="display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:var(--green)"></span>Baja</span></td><td><div style="display:flex;align-items:center;gap:6px"><span class="avatar-sm" style="background:var(--red)">GG</span>Guillermo</div></td><td><div style="display:flex;align-items:center;gap:6px"><div class="prog-bar"><div class="prog-fill" style="width:10%;background:var(--red)"></div></div><span style="font-size:11px;font-weight:700;color:var(--red)">10%</span></div></td><td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">31 Oct</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ═══ TIMELINE VIEW ═══ -->
+    <div id="v-timeline" style="display:none">
+      <div class="tl-wrap">
+        <!-- Header months -->
+        <div class="tl-header">
+          <div class="tl-name-col">Proyecto</div>
+          <div class="tl-months">
+            <div class="tl-month">Mar</div>
+            <div class="tl-month">Abr</div>
+            <div class="tl-month">May</div>
+            <div class="tl-month">Jun</div>
+            <div class="tl-month">Jul</div>
+            <div class="tl-month">Ago</div>
+            <div class="tl-month">Sep</div>
+            <div class="tl-month">Oct</div>
+          </div>
+        </div>
+        <!-- Rows -->
+        <div class="tl-row">
+          <div class="tl-project"><span class="tl-p-name">Intranet v2</span></div>
+          <div class="tl-bars">
+            <div class="tl-bar" style="left:0%;width:25%;background:linear-gradient(90deg,var(--teal),var(--green))">85%</div>
+            <div class="tl-today" style="left:12%"><div class="tl-today-label">Hoy</div></div>
+          </div>
+        </div>
+        <div class="tl-row">
+          <div class="tl-project"><span class="tl-p-name">Marketing</span></div>
+          <div class="tl-bars">
+            <div class="tl-bar" style="left:8%;width:37%;background:linear-gradient(90deg,var(--blue),var(--violet))">70%</div>
+          </div>
+        </div>
+        <div class="tl-row">
+          <div class="tl-project"><span class="tl-p-name">InfoPet RAG</span></div>
+          <div class="tl-bars">
+            <div class="tl-bar" style="left:25%;width:37%;background:linear-gradient(90deg,var(--amber),var(--red))">20%</div>
+          </div>
+        </div>
+        <div class="tl-row">
+          <div class="tl-project"><span class="tl-p-name">Marketplace</span></div>
+          <div class="tl-bars">
+            <div class="tl-bar" style="left:37%;width:37%;background:linear-gradient(90deg,var(--green),var(--teal))">40%</div>
+          </div>
+        </div>
+        <div class="tl-row">
+          <div class="tl-project"><span class="tl-p-name">VOY</span></div>
+          <div class="tl-bars">
+            <div class="tl-bar" style="left:50%;width:37%;background:linear-gradient(90deg,var(--violet),var(--blue))">10%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div style="margin-top:32px;text-align:center;font-size:11px;color:var(--dim)">
+  PoC generado por Panchita 🐕 · Smart Connection · 23 marzo 2026<br>
+  Kanban = drag & drop (ya funciona) · Tabla = filas Monday · Timeline = barras Gantt
+</div>
+
+</div>
+
+<script>
+function switchView(v) {
+  document.getElementById('v-kanban').style.display = v === 'kanban' ? 'grid' : 'none';
+  document.getElementById('v-table').style.display = v === 'table' ? 'block' : 'none';
+  document.getElementById('v-timeline').style.display = v === 'timeline' ? 'block' : 'none';
+  document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('on'));
+  event.target.classList.add('on');
+}
+</script>
+</body>
+</html>

@@ -68,7 +68,7 @@ export default function ProjectsPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', description: '', priority: 'medium', category: '', owner: 'Guillermo', tags: '', due_date: '', status: 'backlog', lead_id: '' });
-  const [view, setView] = useState<'kanban' | 'table'>('kanban');
+  const [view, setView] = useState<'kanban' | 'table' | 'timeline'>('kanban');
   const [availableLeads, setAvailableLeads] = useState<Record<string, unknown>[]>([]);
 
   useEffect(() => {
@@ -219,6 +219,7 @@ export default function ProjectsPage() {
           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
             <button onClick={() => setView('kanban')} style={{ padding: '5px 12px', fontSize: '0.65rem', fontWeight: 600, cursor: 'pointer', background: view === 'kanban' ? 'rgba(0,229,176,0.12)' : 'transparent', color: view === 'kanban' ? '#00e5b0' : '#64748b', border: 'none' }}>☰ Kanban</button>
             <button onClick={() => setView('table')} style={{ padding: '5px 12px', fontSize: '0.65rem', fontWeight: 600, cursor: 'pointer', background: view === 'table' ? 'rgba(0,229,176,0.12)' : 'transparent', color: view === 'table' ? '#00e5b0' : '#64748b', border: 'none' }}>▤ Tabla</button>
+            <button onClick={() => setView('timeline')} style={{ padding: '5px 12px', fontSize: '0.65rem', fontWeight: 600, cursor: 'pointer', background: view === 'timeline' ? 'rgba(0,229,176,0.12)' : 'transparent', color: view === 'timeline' ? '#00e5b0' : '#64748b', border: 'none' }}>📊 Timeline</button>
           </div>
           <button onClick={() => { resetForm(); setShowCreate(true); }} style={{ background: 'linear-gradient(135deg, #00e5b0 0%, #00c49a 100%)', border: 'none', borderRadius: 8, padding: '6px 16px', color: '#0a0d14', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}>
             <i className="bi bi-plus-lg" style={{ fontSize: '0.8rem' }}></i> Nuevo
@@ -258,6 +259,70 @@ export default function ProjectsPage() {
               <div role="status" aria-label="Cargando" style={{ width: 20, height: 20, border: '2px solid rgba(255,255,255,0.1)', borderTopColor: '#00e5b0', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
               Cargando proyectos...
             </div>
+          </div>
+        ) : view === 'timeline' ? (
+          /* Timeline View — Gantt */
+          <div style={{ background: '#0d1117', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, overflow: 'hidden' }}>
+            {/* Month headers */}
+            <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ width: 200, flexShrink: 0, padding: '10px 14px', fontSize: '0.6rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Proyecto</div>
+              <div style={{ flex: 1, display: 'flex' }}>
+                {['Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'].map(m => (
+                  <div key={m} style={{ flex: 1, textAlign: 'center', fontSize: '0.6rem', color: '#2a3d58', padding: '10px 0', borderLeft: '1px solid rgba(255,255,255,0.03)', fontFamily: "'JetBrains Mono', monospace" }}>{m}</div>
+                ))}
+              </div>
+            </div>
+            {/* Project rows */}
+            {filtered.map(p => {
+              const col = COLUMNS.find(c => c.key === p.status);
+              const pc = PRIORITY_COLORS[p.priority] || '#64748b';
+              // Calculate bar position from dates
+              const startMonth = p.created_at ? new Date(p.created_at).getMonth() : 2; // Mar=2
+              const endMonth = p.due_date ? new Date(p.due_date).getMonth() : startMonth + 3;
+              const totalMonths = 10; // Mar-Dic
+              const leftPct = Math.max(0, ((startMonth - 2) / totalMonths) * 100);
+              const widthPct = Math.max(8, ((endMonth - startMonth + 1) / totalMonths) * 100);
+              const barColor = p.status === 'done' ? '#1fd975' : col?.color || '#4f8ef7';
+              // Today marker
+              const todayMonth = new Date().getMonth();
+              const todayPct = ((todayMonth - 2 + new Date().getDate() / 30) / totalMonths) * 100;
+
+              return (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', minHeight: 44, borderBottom: '1px solid rgba(255,255,255,0.02)', transition: 'background 0.15s' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,229,176,0.02)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  <div style={{ width: 200, flexShrink: 0, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: pc, flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>{p.name}</div>
+                      <div style={{ fontSize: '0.55rem', color: '#475569' }}>{p.owner || '—'}</div>
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, position: 'relative', height: 28, display: 'flex' }}>
+                    {/* Grid lines */}
+                    {Array.from({ length: 10 }).map((_, i) => (
+                      <div key={i} style={{ position: 'absolute', left: `${(i / 10) * 100}%`, top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,0.02)' }} />
+                    ))}
+                    {/* Today line */}
+                    <div style={{ position: 'absolute', left: `${todayPct}%`, top: 0, bottom: 0, width: 2, background: '#ef4444', zIndex: 2 }} />
+                    {/* Bar */}
+                    <div style={{
+                      position: 'absolute', left: `${leftPct}%`, width: `${widthPct}%`,
+                      height: 20, top: 4, borderRadius: 6,
+                      background: `linear-gradient(90deg, ${barColor}, ${barColor}aa)`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '0.55rem', fontWeight: 700, color: 'rgba(0,0,0,0.7)',
+                      transition: 'all 0.2s', cursor: 'pointer',
+                    }}
+                      onMouseEnter={e => (e.currentTarget.style.transform = 'scaleY(1.3)')}
+                      onMouseLeave={e => (e.currentTarget.style.transform = 'scaleY(1)')}>
+                      {p.progress || 0}%
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {filtered.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: '#475569', fontSize: '0.8rem' }}>Sin proyectos</div>}
           </div>
         ) : view === 'table' ? (
           /* Table View — estilo Monday */

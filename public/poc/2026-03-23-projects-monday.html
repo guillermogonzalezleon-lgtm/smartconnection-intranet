@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PoC — Proyectos estilo Monday · Panchita 🐕</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#06080f;--s1:#0d1117;--s2:#161b28;--teal:#00e5b0;--blue:#4f8ef7;--green:#1fd975;--amber:#f5a623;--red:#f04747;--violet:#b794ff;--text:#dce4f0;--muted:#6b8099;--dim:#2a3d58}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
+.container{max-width:1200px;margin:0 auto;padding:40px 32px}
+h1{font-size:36px;font-weight:900;letter-spacing:-.03em;margin-bottom:8px}
+h2{font-size:24px;font-weight:800;letter-spacing:-.02em;margin-bottom:16px;margin-top:40px}
+h3{font-size:16px;font-weight:700;margin-bottom:8px}
+.sub{font-size:14px;color:var(--muted);margin-bottom:32px}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;margin-right:4px}
+.t-ok{background:rgba(31,217,117,.1);color:var(--green)}
+.t-warn{background:rgba(245,166,35,.1);color:var(--amber)}
+.t-err{background:rgba(240,71,71,.1);color:var(--red)}
+.t-info{background:rgba(79,142,247,.1);color:var(--blue)}
+.t-teal{background:rgba(0,229,176,.1);color:var(--teal)}
+.divider{border:none;border-top:1px solid rgba(255,255,255,.06);margin:48px 0}
+.card{background:var(--s1);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:20px;margin-bottom:12px;transition:all .2s}
+.card:hover{border-color:rgba(0,229,176,.15);transform:translateY(-1px)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+table{width:100%;border-collapse:collapse;margin-top:12px}
+th{text-align:left;padding:8px 12px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid rgba(255,255,255,.06);font-weight:700}
+td{padding:8px 12px;font-size:13px;border-bottom:1px solid rgba(255,255,255,.03)}
+tr:hover td{background:rgba(0,229,176,.02)}
+.badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:6px;display:inline-block}
+.progress{height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px}
+.avatar{width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0}
+.score-box{text-align:center;padding:24px}
+.score-num{font-size:56px;font-weight:900}
+.score-label{font-size:12px;color:var(--muted)}
+
+/* DEMO SECTION */
+.demo-header{background:var(--s1);border:1px solid rgba(255,255,255,.06);border-radius:12px 12px 0 0;padding:12px 20px;display:flex;align-items:center;gap:12px}
+.demo-dots{display:flex;gap:4px}
+.demo-dot{width:8px;height:8px;border-radius:50%}
+.demo-body{background:var(--s1);border:1px solid rgba(255,255,255,.06);border-top:none;border-radius:0 0 12px 12px;overflow:hidden}
+
+/* Monday-style table */
+.m-table{width:100%;border-collapse:collapse}
+.m-table th{padding:10px 14px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;background:rgba(255,255,255,.02);border-bottom:2px solid rgba(255,255,255,.06);text-align:left;position:sticky;top:0}
+.m-table td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.03);font-size:13px}
+.m-table tr:hover td{background:rgba(0,229,176,.02)}
+.m-table tr{transition:background .15s}
+.status-cell{padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;text-align:center;display:inline-block;min-width:90px}
+.priority-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+.timeline-bar{height:8px;border-radius:4px;position:relative;overflow:hidden}
+.view-toggle{display:flex;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid rgba(255,255,255,.06);overflow:hidden}
+.view-btn{padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;border:none;color:var(--muted);background:transparent;transition:all .15s}
+.view-btn.active{background:rgba(0,229,176,.12);color:var(--teal)}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<!-- ════════════════════════════════════════════════
+     PARTE 1: REPORTE
+════════════════════════════════════════════════ -->
+
+<div style="margin-bottom:8px">
+  <span class="tag t-teal">🐕 PANCHITA</span>
+  <span class="tag t-info">PoC</span>
+  <span class="tag t-ok">23-03-2026</span>
+</div>
+
+<h1>Proyectos — Rediseño estilo Monday</h1>
+<p class="sub">Assessment del estado actual + propuesta visual de la nueva versión</p>
+
+<!-- Score -->
+<div class="grid3">
+  <div class="card score-box">
+    <div class="score-num" style="color:var(--amber)">7</div>
+    <div class="score-label">Estado actual /10</div>
+  </div>
+  <div class="card score-box">
+    <div class="score-num" style="color:var(--green)">9</div>
+    <div class="score-label">Propuesta /10</div>
+  </div>
+  <div class="card score-box">
+    <div class="score-num" style="color:var(--blue)">2d</div>
+    <div class="score-label">Estimación</div>
+  </div>
+</div>
+
+<!-- Assessment actual -->
+<h2>📊 Assessment — Estado Actual</h2>
+
+<table>
+  <thead>
+    <tr><th>Feature</th><th>Estado</th><th>Nota</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Kanban 3 columnas</td><td><span class="tag t-ok">✅ Funciona</span></td><td>Backlog → In Progress → Done</td></tr>
+    <tr><td>Drag & Drop</td><td><span class="tag t-ok">✅ Funciona</span></td><td>Mueve entre columnas</td></tr>
+    <tr><td>CRUD completo</td><td><span class="tag t-ok">✅ Funciona</span></td><td>Crear, editar, eliminar</td></tr>
+    <tr><td>Vista Tabla</td><td><span class="tag t-ok">✅ Nuevo</span></td><td>Recién implementada</td></tr>
+    <tr><td>Link a Leads</td><td><span class="tag t-ok">✅ Funciona</span></td><td>lead_id en form</td></tr>
+    <tr><td>Filtros</td><td><span class="tag t-warn">⚠️ Básico</span></td><td>Solo prioridad y categoría</td></tr>
+    <tr><td>Timeline visual</td><td><span class="tag t-err">❌ No existe</span></td><td>due_date sin representación visual</td></tr>
+    <tr><td>Sub-tareas</td><td><span class="tag t-err">❌ No existe</span></td><td>Tabla project_tasks vacía</td></tr>
+    <tr><td>Vista Timeline</td><td><span class="tag t-err">❌ No existe</span></td><td>Gantt/roadmap visual</td></tr>
+    <tr><td>Automations</td><td><span class="tag t-err">❌ No existe</span></td><td>Notificaciones, auto-status</td></tr>
+    <tr><td>Inline edit</td><td><span class="tag t-err">❌ No existe</span></td><td>Editar directo en tabla sin modal</td></tr>
+  </tbody>
+</table>
+
+<!-- Problemas -->
+<h2>🔴 Problemas Encontrados</h2>
+
+<div class="grid2">
+  <div class="card" style="border-left:3px solid var(--red)">
+    <h3 style="color:var(--red)">1. Sin timeline visual</h3>
+    <p style="font-size:13px;color:var(--muted)">Los proyectos tienen due_date pero no se visualiza como barra de tiempo. No puedes ver overlap ni dependencias.</p>
+  </div>
+  <div class="card" style="border-left:3px solid var(--red)">
+    <h3 style="color:var(--red)">2. Sin sub-tareas</h3>
+    <p style="font-size:13px;color:var(--muted)">La tabla project_tasks existe en Supabase pero no se usa. Proyectos grandes no se pueden desglosar.</p>
+  </div>
+  <div class="card" style="border-left:3px solid var(--amber)">
+    <h3 style="color:var(--amber)">3. Filtros limitados</h3>
+    <p style="font-size:13px;color:var(--muted)">Solo filtra por prioridad y categoría. Falta filtrar por owner, status, fecha, tags.</p>
+  </div>
+  <div class="card" style="border-left:3px solid var(--amber)">
+    <h3 style="color:var(--amber)">4. No hay inline edit</h3>
+    <p style="font-size:13px;color:var(--muted)">Para editar hay que abrir modal. Monday permite editar directo en la celda.</p>
+  </div>
+</div>
+
+<!-- Recomendaciones -->
+<h2>💡 Recomendaciones</h2>
+
+<div class="card">
+  <table>
+    <thead><tr><th>#</th><th>Mejora</th><th>Prioridad</th><th>Esfuerzo</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Timeline visual con barras de fecha</td><td><span class="tag t-err">Alta</span></td><td>4h</td></tr>
+      <tr><td>2</td><td>Sub-tareas expandibles por proyecto</td><td><span class="tag t-err">Alta</span></td><td>6h</td></tr>
+      <tr><td>3</td><td>Inline edit en vista tabla</td><td><span class="tag t-warn">Media</span></td><td>4h</td></tr>
+      <tr><td>4</td><td>Vista Timeline (Gantt simplificado)</td><td><span class="tag t-warn">Media</span></td><td>6h</td></tr>
+      <tr><td>5</td><td>Filtros avanzados (owner, fecha, tags)</td><td><span class="tag t-info">Baja</span></td><td>2h</td></tr>
+      <tr><td>6</td><td>Automaciones (auto-status, notificaciones)</td><td><span class="tag t-info">Baja</span></td><td>4h</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════
+     PARTE 2: DEMO VISUAL
+════════════════════════════════════════════════ -->
+
+<div style="margin-bottom:8px">
+  <span class="tag t-teal">DEMO</span>
+  <span class="tag t-info">Interactiva</span>
+</div>
+
+<h2>🖥️ Propuesta Visual — Vista Tabla estilo Monday</h2>
+<p class="sub">Así se vería la nueva versión con timeline, status inline, y sub-tareas</p>
+
+<!-- Demo browser frame -->
+<div class="demo-header">
+  <div class="demo-dots">
+    <div class="demo-dot" style="background:#f04747"></div>
+    <div class="demo-dot" style="background:#f5a623"></div>
+    <div class="demo-dot" style="background:#1fd975"></div>
+  </div>
+  <span style="font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace">intranet.smconnection.cl/dashboard/projects</span>
+  <div style="margin-left:auto;display:flex;gap:6px">
+    <div class="view-toggle">
+      <button class="view-btn">☰ Kanban</button>
+      <button class="view-btn active">▤ Tabla</button>
+      <button class="view-btn">📊 Timeline</button>
+    </div>
+  </div>
+</div>
+
+<div class="demo-body" style="padding:0;overflow-x:auto">
+  <table class="m-table">
+    <thead>
+      <tr>
+        <th style="width:30px"></th>
+        <th>Proyecto</th>
+        <th style="width:120px">Status</th>
+        <th style="width:100px">Prioridad</th>
+        <th style="width:120px">Owner</th>
+        <th style="width:140px">Progreso</th>
+        <th style="width:180px">Timeline</th>
+        <th style="width:100px">Due</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Project 1 -->
+      <tr>
+        <td style="color:var(--dim);cursor:pointer">▸</td>
+        <td>
+          <div style="font-weight:700;color:#f1f5f9">Intranet SmartConnection v2</div>
+          <div style="font-size:11px;color:var(--dim)">Dashboard, agentes IA, CRM</div>
+        </td>
+        <td><div class="status-cell" style="background:rgba(59,130,246,.15);color:var(--blue)">In Progress</div></td>
+        <td><span class="priority-dot" style="background:var(--red)"></span><span style="font-size:12px">Alta</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div class="avatar" style="background:var(--blue)">GG</div>
+            <span style="font-size:12px;color:var(--muted)">Guillermo</span>
+          </div>
+        </td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="progress" style="flex:1"><div class="progress-fill" style="width:85%;background:var(--green)"></div></div>
+            <span style="font-size:12px;font-weight:700;color:var(--green)">85%</span>
+          </div>
+        </td>
+        <td>
+          <div class="timeline-bar" style="background:rgba(59,130,246,.1)">
+            <div style="position:absolute;left:10%;right:15%;height:100%;background:var(--blue);border-radius:4px"></div>
+          </div>
+          <div style="font-size:9px;color:var(--dim);margin-top:2px;font-family:'JetBrains Mono',monospace">Mar 1 — Abr 30</div>
+        </td>
+        <td style="font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace">30 Abr</td>
+      </tr>
+      <!-- Sub-tasks (expanded) -->
+      <tr style="background:rgba(255,255,255,.01)">
+        <td></td>
+        <td style="padding-left:32px">
+          <span style="font-size:12px;color:var(--muted)">↳</span>
+          <span style="font-size:12px;color:var(--text)">ML Knowledge Base + FTS</span>
+        </td>
+        <td><div class="status-cell" style="background:rgba(31,217,117,.12);color:var(--green);font-size:10px;min-width:70px">Done</div></td>
+        <td></td>
+        <td></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="progress" style="flex:1"><div class="progress-fill" style="width:100%;background:var(--green)"></div></div>
+            <span style="font-size:11px;color:var(--green)">✓</span>
+          </div>
+        </td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr style="background:rgba(255,255,255,.01)">
+        <td></td>
+        <td style="padding-left:32px">
+          <span style="font-size:12px;color:var(--muted)">↳</span>
+          <span style="font-size:12px;color:var(--text)">Deploy Pipeline 7 pasos</span>
+        </td>
+        <td><div class="status-cell" style="background:rgba(31,217,117,.12);color:var(--green);font-size:10px;min-width:70px">Done</div></td>
+        <td></td>
+        <td></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="progress" style="flex:1"><div class="progress-fill" style="width:100%;background:var(--green)"></div></div>
+            <span style="font-size:11px;color:var(--green)">✓</span>
+          </div>
+        </td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr style="background:rgba(255,255,255,.01)">
+        <td></td>
+        <td style="padding-left:32px">
+          <span style="font-size:12px;color:var(--muted)">↳</span>
+          <span style="font-size:12px;color:var(--text)">Langfuse Observability</span>
+        </td>
+        <td><div class="status-cell" style="background:rgba(245,166,35,.12);color:var(--amber);font-size:10px;min-width:70px">Pending</div></td>
+        <td></td>
+        <td></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="progress" style="flex:1"><div class="progress-fill" style="width:0%;background:var(--amber)"></div></div>
+            <span style="font-size:11px;color:var(--dim)">0%</span>
+          </div>
+        </td>
+        <td></td>
+        <td></td>
+      </tr>
+
+      <!-- Project 2 -->
+      <tr>
+        <td style="color:var(--dim);cursor:pointer">▸</td>
+        <td>
+          <div style="font-weight:700;color:#f1f5f9">SmartConnection Marketing</div>
+          <div style="font-size:11px;color:var(--dim)">smconnection.cl — Astro + S3</div>
+        </td>
+        <td><div class="status-cell" style="background:rgba(59,130,246,.15);color:var(--blue)">In Progress</div></td>
+        <td><span class="priority-dot" style="background:var(--amber)"></span><span style="font-size:12px">Media</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div class="avatar" style="background:var(--violet)">GG</div>
+            <span style="font-size:12px;color:var(--muted)">Guillermo</span>
+          </div>
+        </td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="progress" style="flex:1"><div class="progress-fill" style="width:70%;background:var(--blue)"></div></div>
+            <span style="font-size:12px;font-weight:700;color:var(--blue)">70%</span>
+          </div>
+        </td>
+        <td>
+          <div class="timeline-bar" style="background:rgba(139,92,246,.1)">
+            <div style="position:absolute;left:20%;right:30%;height:100%;background:var(--violet);border-radius:4px"></div>
+          </div>
+          <div style="font-size:9px;color:var(--dim);margin-top:2px;font-family:'JetBrains Mono',monospace">Mar 15 — Jun 30</div>
+        </td>
+        <td style="font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace">30 Jun</td>
+      </tr>
+
+      <!-- Project 3 -->
+      <tr>
+        <td style="color:var(--dim);cursor:pointer">▸</td>
+        <td>
+          <div style="font-weight:700;color:#f1f5f9">InfoPet — RAG Veterinario</div>
+          <div style="font-size:11px;color:var(--dim)">Asistente IA + Bsale + Jumpseller</div>
+        </td>
+        <td><div class="status-cell" style="background:rgba(107,128,153,.12);color:var(--muted)">Backlog</div></td>
+        <td><span class="priority-dot" style="background:var(--red)"></span><span style="font-size:12px">Alta</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div class="avatar" style="background:var(--amber)">GG</div>
+            <span style="font-size:12px;color:var(--muted)">Guillermo</span>
+          </div>
+        </td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="progress" style="flex:1"><div class="progress-fill" style="width:20%;background:var(--amber)"></div></div>
+            <span style="font-size:12px;font-weight:700;color:var(--amber)">20%</span>
+          </div>
+        </td>
+        <td>
+          <div class="timeline-bar" style="background:rgba(245,166,35,.1)">
+            <div style="position:absolute;left:50%;right:5%;height:100%;background:var(--amber);border-radius:4px"></div>
+          </div>
+          <div style="font-size:9px;color:var(--dim);margin-top:2px;font-family:'JetBrains Mono',monospace">May 1 — Jul 31</div>
+        </td>
+        <td style="font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace">31 Jul</td>
+      </tr>
+
+      <!-- Project 4 -->
+      <tr>
+        <td style="color:var(--dim);cursor:pointer">▸</td>
+        <td>
+          <div style="font-weight:700;color:#f1f5f9">Marketplace MeLi + Amazon</div>
+          <div style="font-size:11px;color:var(--dim)">Helium 10, scraping, análisis</div>
+        </td>
+        <td><div class="status-cell" style="background:rgba(107,128,153,.12);color:var(--muted)">Backlog</div></td>
+        <td><span class="priority-dot" style="background:var(--amber)"></span><span style="font-size:12px">Media</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div class="avatar" style="background:var(--green)">GG</div>
+            <span style="font-size:12px;color:var(--muted)">Guillermo</span>
+          </div>
+        </td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="progress" style="flex:1"><div class="progress-fill" style="width:40%;background:var(--amber)"></div></div>
+            <span style="font-size:12px;font-weight:700;color:var(--amber)">40%</span>
+          </div>
+        </td>
+        <td>
+          <div class="timeline-bar" style="background:rgba(31,217,117,.1)">
+            <div style="position:absolute;left:60%;right:0;height:100%;background:var(--green);border-radius:4px"></div>
+          </div>
+          <div style="font-size:9px;color:var(--dim);margin-top:2px;font-family:'JetBrains Mono',monospace">Jun 1 — Sep 30</div>
+        </td>
+        <td style="font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace">30 Sep</td>
+      </tr>
+
+      <!-- Project 5 -->
+      <tr>
+        <td style="color:var(--dim);cursor:pointer">▸</td>
+        <td>
+          <div style="font-weight:700;color:#f1f5f9">VOY — Migración Supabase</div>
+          <div style="font-size:11px;color:var(--dim)">Airtable → Supabase, cotizaciones IA</div>
+        </td>
+        <td><div class="status-cell" style="background:rgba(107,128,153,.12);color:var(--muted)">Backlog</div></td>
+        <td><span class="priority-dot" style="background:var(--green)"></span><span style="font-size:12px">Baja</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div class="avatar" style="background:var(--red)">GG</div>
+            <span style="font-size:12px;color:var(--muted)">Guillermo</span>
+          </div>
+        </td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="progress" style="flex:1"><div class="progress-fill" style="width:10%;background:var(--red)"></div></div>
+            <span style="font-size:12px;font-weight:700;color:var(--red)">10%</span>
+          </div>
+        </td>
+        <td>
+          <div class="timeline-bar" style="background:rgba(240,71,71,.1)">
+            <div style="position:absolute;left:70%;right:0;height:100%;background:var(--red);border-radius:4px"></div>
+          </div>
+          <div style="font-size:9px;color:var(--dim);margin-top:2px;font-family:'JetBrains Mono',monospace">Jul 1 — Oct 31</div>
+        </td>
+        <td style="font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace">31 Oct</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Summary -->
+<div style="margin-top:24px;display:flex;gap:12px">
+  <div class="card" style="flex:1;text-align:center">
+    <div style="font-size:28px;font-weight:900;color:var(--teal)">5</div>
+    <div style="font-size:11px;color:var(--muted)">Proyectos</div>
+  </div>
+  <div class="card" style="flex:1;text-align:center">
+    <div style="font-size:28px;font-weight:900;color:var(--blue)">2</div>
+    <div style="font-size:11px;color:var(--muted)">In Progress</div>
+  </div>
+  <div class="card" style="flex:1;text-align:center">
+    <div style="font-size:28px;font-weight:900;color:var(--amber)">3</div>
+    <div style="font-size:11px;color:var(--muted)">Backlog</div>
+  </div>
+  <div class="card" style="flex:1;text-align:center">
+    <div style="font-size:28px;font-weight:900;color:var(--green)">45%</div>
+    <div style="font-size:11px;color:var(--muted)">Progreso Promedio</div>
+  </div>
+</div>
+
+<div style="margin-top:40px;text-align:center;font-size:11px;color:var(--dim)">
+  PoC generado por Panchita 🐕 · Smart Connection · 23 marzo 2026
+</div>
+
+</div>
+</body>
+</html>
