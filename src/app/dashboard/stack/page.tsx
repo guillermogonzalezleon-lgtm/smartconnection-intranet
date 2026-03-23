@@ -244,7 +244,6 @@ export default function StackPage() {
     { id: 'agents', label: 'Hoku Agents', icon: 'bi-robot' },
     { id: 'comparison', label: 'Comparativa', icon: 'bi-bar-chart' },
     { id: 'discovery', label: 'Discovery', icon: 'bi-compass' },
-    { id: 'missions', label: 'Misiones', icon: 'bi-flag' },
     { id: 'decisions', label: 'Decisiones', icon: 'bi-signpost-split' },
     { id: 'projects', label: 'Proyectos', icon: 'bi-diagram-3' },
   ];
@@ -475,49 +474,6 @@ export default function StackPage() {
                 );
               })}
             </div>
-          </>
-        )}
-
-        {/* ── Section: Missions ── */}
-        {activeSection === 'missions' && (
-          <>
-            <h2 style={s.sectionTitle}><i className="bi bi-flag" style={{ color: '#f59e0b' }}></i> Misiones — 8 Semanas de Aprendizaje</h2>
-            {MISSIONS.map((mission, i) => {
-              const dc = difficultyColor(mission.difficulty);
-              return (
-                <div key={i} style={s.missionCard}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(245,158,11,0.2)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'; }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(245,158,11,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', fontWeight: 900, color: '#f59e0b', flexShrink: 0 }}>
-                      S{mission.week}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#f1f5f9' }}>{mission.title}</div>
-                      <span style={s.badge(dc.bg, dc.color)}>{mission.difficulty}</span>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
-                    <div>
-                      <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>Objetivos</div>
-                      {mission.objectives.map((obj, j) => (
-                        <div key={j} style={{ fontSize: '0.78rem', color: '#94a3b8', padding: '2px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ color: '#f59e0b' }}>→</span> {obj}
-                        </div>
-                      ))}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>Herramientas</div>
-                      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                        {mission.tools.map((tool, j) => (
-                          <span key={j} style={s.tag}>{tool}</span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
           </>
         )}
 

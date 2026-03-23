@@ -190,6 +190,8 @@ export default function LearnPage() {
   const [levelFilter, setLevelFilter] = useState('Todos');
   const [search, setSearch] = useState('');
   const [activeResource, setActiveResource] = useState<{ course: Course; resource: Resource } | null>(null);
+  const [tab, setTab] = useState<'tech' | 'missions'>('tech');
+  const [activeMission, setActiveMission] = useState<string | null>(null);
   const [iframeError, setIframeError] = useState(false);
 
   // Sites known to block iframes
@@ -231,12 +233,104 @@ export default function LearnPage() {
         <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Intranet</span>
         <span style={{ color: '#2d3748' }}>/</span>
         <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f1f5f9' }}>Discovery Center</span>
+        <div style={{ display: 'flex', gap: 4, marginLeft: 16 }}>
+          {[{ id: 'tech' as const, label: 'Tecnología' }, { id: 'missions' as const, label: 'Misiones' }].map(t => (
+            <button key={t.id} onClick={() => { setTab(t.id); setActiveResource(null); }} style={{
+              padding: '4px 12px', borderRadius: 6, fontSize: '0.65rem', fontWeight: 600, cursor: 'pointer',
+              background: tab === t.id ? 'rgba(0,229,176,0.12)' : 'transparent',
+              color: tab === t.id ? '#00e5b0' : '#64748b',
+              border: tab === t.id ? '1px solid rgba(0,229,176,0.2)' : '1px solid rgba(255,255,255,0.04)',
+            }}>{t.label}</button>
+          ))}
+        </div>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: '0.62rem', color: '#475569' }}>{COURSES.length} cursos · {COURSES.reduce((s, c) => s + c.resources.length, 0)} recursos</span>
       </div>
 
-      {/* Main content: split view when resource is active */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      {/* MISSIONS TAB */}
+      {tab === 'missions' && (
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+          {/* Mission list */}
+          <div style={{ width: activeMission ? 340 : '100%', flexShrink: 0, overflow: 'auto', padding: activeMission ? '1rem' : '1.5rem 2rem', borderRight: activeMission ? '1px solid rgba(255,255,255,0.06)' : 'none', transition: 'width 0.3s' }}>
+            {!activeMission && <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f1f5f9', marginBottom: 4 }}>Misiones — 8 Semanas</h2>}
+            {!activeMission && <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: 20 }}>Cada misión abre una herramienta interactiva en el panel derecho.</p>}
+            <div style={{ display: 'grid', gridTemplateColumns: activeMission ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: 8 }}>
+              {[
+                { id: 'm1', week: 1, title: 'Master prompting con Claude & Groq', level: 'Beginner', tools: ['Claude', 'Groq'], url: 'https://www.typescriptlang.org/play', urlLabel: 'TS Playground' },
+                { id: 'm2', week: 2, title: 'Primera app Next.js con IA', level: 'Beginner', tools: ['Next.js', 'Vercel'], url: 'https://play.tailwindcss.com', urlLabel: 'Tailwind Play' },
+                { id: 'm3', week: 3, title: 'Supabase + pgvector para RAG', level: 'Intermediate', tools: ['Supabase', 'OpenAI'], url: '/dashboard/agents', urlLabel: 'Workspace Agentes' },
+                { id: 'm4', week: 4, title: 'Tool Use — Claude llama APIs', level: 'Intermediate', tools: ['Claude', 'Bsale'], url: '/dashboard/labs', urlLabel: 'Extensiones' },
+                { id: 'm5', week: 5, title: 'Agregar modelo a Hoku + Langfuse', level: 'Intermediate', tools: ['Hoku', 'Langfuse'], url: '/dashboard/agents', urlLabel: 'Agentes IA' },
+                { id: 'm6', week: 6, title: 'Crear MCP Server', level: 'Advanced', tools: ['MCP', 'TypeScript'], url: '/dashboard/stack', urlLabel: 'Stack 2026' },
+                { id: 'm7', week: 7, title: 'GitHub Actions + DeepSeek DevSecOps', level: 'Advanced', tools: ['GitHub', 'DeepSeek'], url: '/dashboard/deploy', urlLabel: 'Deploy Center' },
+                { id: 'm8', week: 8, title: 'InfoPet — Asistente veterinario RAG', level: 'Advanced', tools: ['Claude', 'Supabase'], url: '/dashboard/improvements', urlLabel: 'Mejoras & UX' },
+              ].map(m => {
+                const isActive = activeMission === m.id;
+                const lc = m.level === 'Beginner' ? '#22c55e' : m.level === 'Intermediate' ? '#f59e0b' : '#8b5cf6';
+                return (
+                  <div key={m.id} onClick={() => setActiveMission(isActive ? null : m.id)}
+                    style={{ background: isActive ? 'rgba(0,229,176,0.04)' : '#0d1117', border: `1px solid ${isActive ? 'rgba(0,229,176,0.2)' : 'rgba(255,255,255,0.06)'}`, borderRadius: 12, padding: activeMission ? '10px 12px' : '16px 18px', cursor: 'pointer', transition: 'all 0.15s' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: activeMission ? 4 : 8 }}>
+                      <div style={{ width: activeMission ? 28 : 36, height: activeMission ? 28 : 36, borderRadius: 8, background: `${lc}15`, border: `1px solid ${lc}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: activeMission ? '0.7rem' : '0.85rem', fontWeight: 900, color: lc, flexShrink: 0 }}>S{m.week}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: activeMission ? '0.72rem' : '0.85rem', fontWeight: 700, color: '#f1f5f9' }}>{m.title}</div>
+                        <div style={{ fontSize: '0.58rem', color: '#64748b', display: 'flex', gap: 6, marginTop: 2 }}>
+                          <span style={{ color: lc }}>{m.level}</span>
+                          <span>·</span>
+                          <span>{m.urlLabel}</span>
+                        </div>
+                      </div>
+                    </div>
+                    {!activeMission && (
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                        {m.tools.map(t => <span key={t} style={{ fontSize: '0.52rem', padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.03)', color: '#64748b', border: '1px solid rgba(255,255,255,0.05)' }}>{t}</span>)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          {/* Mission iframe — grande */}
+          {activeMission && (() => {
+            const m = [
+              { id: 'm1', url: 'https://www.typescriptlang.org/play', title: 'TypeScript Playground' },
+              { id: 'm2', url: 'https://play.tailwindcss.com', title: 'Tailwind Play' },
+              { id: 'm3', url: '/dashboard/agents', title: 'Workspace Agentes' },
+              { id: 'm4', url: '/dashboard/labs', title: 'Extensiones' },
+              { id: 'm5', url: '/dashboard/agents', title: 'Agentes IA' },
+              { id: 'm6', url: '/dashboard/stack', title: 'Stack 2026' },
+              { id: 'm7', url: '/dashboard/deploy', title: 'Deploy Center' },
+              { id: 'm8', url: '/dashboard/improvements', title: 'Mejoras & UX' },
+            ].find(x => x.id === activeMission);
+            if (!m) return null;
+            const blocked = isBlocked(m.url);
+            return (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#06080f' }}>
+                <div style={{ flexShrink: 0, padding: '8px 14px', background: '#0d1117', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: 3 }}><div style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444' }} /><div style={{ width: 7, height: 7, borderRadius: '50%', background: '#f59e0b' }} /><div style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e' }} /></div>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f1f5f9' }}>{m.title}</span>
+                  <span style={{ fontSize: '0.6rem', color: '#475569', fontFamily: "'JetBrains Mono', monospace", flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.url}</span>
+                  <a href={m.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.6rem', padding: '3px 10px', borderRadius: 6, background: 'rgba(59,130,246,0.1)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.2)', textDecoration: 'none', fontWeight: 600 }}>Abrir ↗</a>
+                  <button onClick={() => setActiveMission(null)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
+                </div>
+                {blocked ? (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+                    <div style={{ fontSize: 36 }}>🔗</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: '#f1f5f9' }}>{m.title}</div>
+                    <a href={m.url} target="_blank" rel="noopener noreferrer" style={{ padding: '10px 24px', borderRadius: 10, background: 'rgba(0,229,176,0.1)', border: '1px solid rgba(0,229,176,0.2)', color: '#00e5b0', textDecoration: 'none', fontWeight: 700 }}>Abrir en nueva pestaña ↗</a>
+                  </div>
+                ) : (
+                  <iframe src={m.url} style={{ flex: 1, border: 'none', background: '#fff' }} title={m.title} sandbox="allow-scripts allow-same-origin allow-popups allow-forms" />
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* TECH TAB */}
+      {tab === 'tech' && <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Course list (shrinks when preview is open) */}
         <div style={{
           width: activeResource ? 360 : '100%',
@@ -408,7 +502,7 @@ export default function LearnPage() {
             )}
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }
