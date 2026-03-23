@@ -293,35 +293,44 @@ export default function LearnPage() {
           </div>
           {/* Mission iframe — grande */}
           {activeMission && (() => {
-            const m = [
-              { id: 'm1', url: 'https://www.typescriptlang.org/play', title: 'TypeScript Playground' },
-              { id: 'm2', url: 'https://play.tailwindcss.com', title: 'Tailwind Play' },
-              { id: 'm3', url: '/dashboard/agents', title: 'Workspace Agentes' },
-              { id: 'm4', url: '/dashboard/labs', title: 'Extensiones' },
-              { id: 'm5', url: '/dashboard/agents', title: 'Agentes IA' },
-              { id: 'm6', url: '/dashboard/stack', title: 'Stack 2026' },
-              { id: 'm7', url: '/dashboard/deploy', title: 'Deploy Center' },
-              { id: 'm8', url: '/dashboard/improvements', title: 'Mejoras & UX' },
-            ].find(x => x.id === activeMission);
+            const missions = [
+              { id: 'm1', url: 'https://www.typescriptlang.org/play', title: 'TypeScript Playground', internal: false, desc: 'Practica TypeScript en el playground oficial. Escribe código, ve los tipos, experimenta.' },
+              { id: 'm2', url: 'https://play.tailwindcss.com', title: 'Tailwind Play', internal: false, desc: 'Diseña con Tailwind CSS en tiempo real. Prueba clases, dark mode, responsive.' },
+              { id: 'm3', url: '/dashboard/agents', title: 'Workspace Agentes', internal: true, desc: 'Ejecuta agentes IA: Hoku fusión, Groq, Claude. Prueba modos chat, code, SAP.' },
+              { id: 'm4', url: '/dashboard/labs', title: 'Extensiones', internal: true, desc: 'Explora 50+ conectores. Ejecuta automatizaciones con Hoku.' },
+              { id: 'm5', url: '/dashboard/agents', title: 'Agentes IA', internal: true, desc: 'Agrega un modelo a Hoku. Configura Langfuse para tracing.' },
+              { id: 'm6', url: '/dashboard/stack', title: 'Stack 2026', internal: true, desc: 'Revisa la arquitectura completa. 24 herramientas, 10 modelos IA.' },
+              { id: 'm7', url: '/dashboard/deploy', title: 'Deploy Center', internal: true, desc: 'Pipeline de 7 pasos. Health checks, stress test, CDN invalidation.' },
+              { id: 'm8', url: '/dashboard/improvements', title: 'Mejoras & UX', internal: true, desc: 'Genera mejoras con Hoku. Deploy con preview POC.' },
+            ];
+            const m = missions.find(x => x.id === activeMission);
             if (!m) return null;
-            const blocked = isBlocked(m.url);
+            const isExternal = !m.internal && !isBlocked(m.url);
             return (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#06080f' }}>
                 <div style={{ flexShrink: 0, padding: '8px 14px', background: '#0d1117', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ display: 'flex', gap: 3 }}><div style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444' }} /><div style={{ width: 7, height: 7, borderRadius: '50%', background: '#f59e0b' }} /><div style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e' }} /></div>
                   <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f1f5f9' }}>{m.title}</span>
                   <span style={{ fontSize: '0.6rem', color: '#475569', fontFamily: "'JetBrains Mono', monospace", flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.url}</span>
-                  <a href={m.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.6rem', padding: '3px 10px', borderRadius: 6, background: 'rgba(59,130,246,0.1)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.2)', textDecoration: 'none', fontWeight: 600 }}>Abrir ↗</a>
+                  <a href={m.url} style={{ fontSize: '0.6rem', padding: '3px 10px', borderRadius: 6, background: 'rgba(0,229,176,0.1)', color: '#00e5b0', border: '1px solid rgba(0,229,176,0.2)', textDecoration: 'none', fontWeight: 600 }}>{m.internal ? 'Ir →' : 'Abrir ↗'}</a>
                   <button onClick={() => setActiveMission(null)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
                 </div>
-                {blocked ? (
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-                    <div style={{ fontSize: 36 }}>🔗</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: '#f1f5f9' }}>{m.title}</div>
-                    <a href={m.url} target="_blank" rel="noopener noreferrer" style={{ padding: '10px 24px', borderRadius: 10, background: 'rgba(0,229,176,0.1)', border: '1px solid rgba(0,229,176,0.2)', color: '#00e5b0', textDecoration: 'none', fontWeight: 700 }}>Abrir en nueva pestaña ↗</a>
-                  </div>
-                ) : (
+                {isExternal ? (
                   <iframe src={m.url} style={{ flex: 1, border: 'none', background: '#fff' }} title={m.title} sandbox="allow-scripts allow-same-origin allow-popups allow-forms" />
+                ) : (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 40 }}>
+                    <div style={{ fontSize: 48 }}>{m.internal ? '🏠' : '🔗'}</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: '#f1f5f9' }}>{m.title}</div>
+                    <div style={{ fontSize: 13, color: '#94a3b8', textAlign: 'center', maxWidth: 400, lineHeight: 1.6 }}>{m.desc}</div>
+                    <a href={m.url} style={{
+                      padding: '14px 36px', borderRadius: 12, fontSize: 15, fontWeight: 700,
+                      background: 'linear-gradient(135deg, rgba(0,229,176,0.15), rgba(0,229,176,0.08))',
+                      border: '1px solid rgba(0,229,176,0.25)', color: '#00e5b0',
+                      textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8,
+                      transition: 'all 0.2s',
+                    }}>{m.internal ? `Ir a ${m.title} →` : `Abrir en nueva pestaña ↗`}</a>
+                    {m.internal && <div style={{ fontSize: 11, color: '#2a3d58' }}>Se abre dentro de la intranet</div>}
+                  </div>
                 )}
               </div>
             );
