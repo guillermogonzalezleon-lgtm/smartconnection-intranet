@@ -192,6 +192,7 @@ export default function LearnPage() {
   const [activeResource, setActiveResource] = useState<{ course: Course; resource: Resource } | null>(null);
   const [tab, setTab] = useState<'tech' | 'missions'>('tech');
   const [activeMission, setActiveMission] = useState<string | null>(null);
+  const [activeStep, setActiveStep] = useState(0);
   const [iframeError, setIframeError] = useState(false);
 
   // Sites known to block iframes
@@ -250,91 +251,137 @@ export default function LearnPage() {
       {/* MISSIONS TAB */}
       {tab === 'missions' && (
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-          {/* Mission list */}
-          <div style={{ width: activeMission ? 340 : '100%', flexShrink: 0, overflow: 'auto', padding: activeMission ? '1rem' : '1.5rem 2rem', borderRight: activeMission ? '1px solid rgba(255,255,255,0.06)' : 'none', transition: 'width 0.3s' }}>
-            {!activeMission && <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f1f5f9', marginBottom: 4 }}>Misiones — 8 Semanas</h2>}
-            {!activeMission && <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: 20 }}>Cada misión abre una herramienta interactiva en el panel derecho.</p>}
-            <div style={{ display: 'grid', gridTemplateColumns: activeMission ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: 8 }}>
-              {[
-                { id: 'm1', week: 1, title: 'Master prompting con Claude & Groq', level: 'Beginner', tools: ['Claude', 'Groq'], url: 'https://www.typescriptlang.org/play', urlLabel: 'TS Playground' },
-                { id: 'm2', week: 2, title: 'Primera app Next.js con IA', level: 'Beginner', tools: ['Next.js', 'Vercel'], url: 'https://play.tailwindcss.com', urlLabel: 'Tailwind Play' },
-                { id: 'm3', week: 3, title: 'Supabase + pgvector para RAG', level: 'Intermediate', tools: ['Supabase', 'OpenAI'], url: '/dashboard/agents', urlLabel: 'Workspace Agentes' },
-                { id: 'm4', week: 4, title: 'Tool Use — Claude llama APIs', level: 'Intermediate', tools: ['Claude', 'Bsale'], url: '/dashboard/labs', urlLabel: 'Extensiones' },
-                { id: 'm5', week: 5, title: 'Agregar modelo a Hoku + Langfuse', level: 'Intermediate', tools: ['Hoku', 'Langfuse'], url: '/dashboard/agents', urlLabel: 'Agentes IA' },
-                { id: 'm6', week: 6, title: 'Crear MCP Server', level: 'Advanced', tools: ['MCP', 'TypeScript'], url: '/dashboard/stack', urlLabel: 'Stack 2026' },
-                { id: 'm7', week: 7, title: 'GitHub Actions + DeepSeek DevSecOps', level: 'Advanced', tools: ['GitHub', 'DeepSeek'], url: '/dashboard/deploy', urlLabel: 'Deploy Center' },
-                { id: 'm8', week: 8, title: 'InfoPet — Asistente veterinario RAG', level: 'Advanced', tools: ['Claude', 'Supabase'], url: '/dashboard/improvements', urlLabel: 'Mejoras & UX' },
-              ].map(m => {
-                const isActive = activeMission === m.id;
-                const lc = m.level === 'Beginner' ? '#22c55e' : m.level === 'Intermediate' ? '#f59e0b' : '#8b5cf6';
-                return (
-                  <div key={m.id} onClick={() => setActiveMission(isActive ? null : m.id)}
-                    style={{ background: isActive ? 'rgba(0,229,176,0.04)' : '#0d1117', border: `1px solid ${isActive ? 'rgba(0,229,176,0.2)' : 'rgba(255,255,255,0.06)'}`, borderRadius: 12, padding: activeMission ? '10px 12px' : '16px 18px', cursor: 'pointer', transition: 'all 0.15s' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: activeMission ? 4 : 8 }}>
-                      <div style={{ width: activeMission ? 28 : 36, height: activeMission ? 28 : 36, borderRadius: 8, background: `${lc}15`, border: `1px solid ${lc}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: activeMission ? '0.7rem' : '0.85rem', fontWeight: 900, color: lc, flexShrink: 0 }}>S{m.week}</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: activeMission ? '0.72rem' : '0.85rem', fontWeight: 700, color: '#f1f5f9' }}>{m.title}</div>
-                        <div style={{ fontSize: '0.58rem', color: '#64748b', display: 'flex', gap: 6, marginTop: 2 }}>
-                          <span style={{ color: lc }}>{m.level}</span>
-                          <span>·</span>
-                          <span>{m.urlLabel}</span>
+          {/* Mission sidebar */}
+          <div style={{ width: 300, flexShrink: 0, overflow: 'auto', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+            {[
+              { id: 'm1', week: 1, title: 'Master prompting', level: 'Beginner', steps: 4 },
+              { id: 'm2', week: 2, title: 'Primera app Next.js con IA', level: 'Beginner', steps: 3 },
+              { id: 'm3', week: 3, title: 'Supabase + pgvector RAG', level: 'Intermediate', steps: 4 },
+              { id: 'm4', week: 4, title: 'Tool Use — Claude llama APIs', level: 'Intermediate', steps: 3 },
+              { id: 'm5', week: 5, title: 'Hoku + Langfuse tracing', level: 'Intermediate', steps: 3 },
+              { id: 'm6', week: 6, title: 'Crear MCP Server', level: 'Advanced', steps: 4 },
+              { id: 'm7', week: 7, title: 'GitHub Actions DevSecOps', level: 'Advanced', steps: 3 },
+              { id: 'm8', week: 8, title: 'InfoPet RAG veterinario', level: 'Advanced', steps: 4 },
+            ].map(m => {
+              const lc = m.level === 'Beginner' ? '#22c55e' : m.level === 'Intermediate' ? '#f59e0b' : '#8b5cf6';
+              return (
+                <div key={m.id} onClick={() => { setActiveMission(m.id); setActiveStep(0); }}
+                  style={{ padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.03)', borderLeft: `3px solid ${activeMission === m.id ? lc : 'transparent'}`, background: activeMission === m.id ? 'rgba(0,229,176,0.04)' : 'transparent', transition: 'all 0.15s' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 8, background: `${lc}15`, border: `1px solid ${lc}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 900, color: lc, flexShrink: 0 }}>S{m.week}</div>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: activeMission === m.id ? '#f1f5f9' : '#94a3b8' }}>{m.title}</div>
+                      <div style={{ fontSize: '0.55rem', color: '#475569' }}>{m.level} · {m.steps} pasos</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* Lesson content */}
+          <div style={{ flex: 1, overflow: 'auto', padding: '32px', maxWidth: 720 }}>
+            {!activeMission ? (
+              <div style={{ textAlign: 'center', padding: '80px 20px' }}>
+                <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>🎓</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 8 }}>Selecciona una misión</div>
+                <div style={{ fontSize: 13, color: '#64748b' }}>8 semanas de aprendizaje práctico con contenido interactivo</div>
+              </div>
+            ) : (() => {
+              const LESSONS: Record<string, { title: string; content: React.ReactNode }[]> = {
+                m1: [
+                  { title: '¿Qué es un prompt y por qué importa?', content: (
+                    <>
+                      <p style={{ fontSize: 14, color: '#94a3b8', lineHeight: 1.7, marginBottom: 16 }}>Un prompt es la instrucción que le das a un modelo de IA. La calidad determina la respuesta. Piénsalo como dar instrucciones a alguien muy capaz pero muy literal.</p>
+                      <h4 style={{ fontSize: 15, fontWeight: 700, color: '#00e5b0', margin: '20px 0 10px' }}>Anatomía de un buen prompt</h4>
+                      {['Contexto — Quién eres, qué proyecto, qué stack', 'Tarea — Qué necesitas exactamente', 'Formato — Cómo quieres la respuesta', 'Restricciones — Qué NO hacer'].map((s, i) => (
+                        <div key={i} style={{ display: 'flex', gap: 10, margin: '6px 0' }}>
+                          <span style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(0,229,176,0.1)', border: '1px solid rgba(0,229,176,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700, color: '#00e5b0', flexShrink: 0 }}>{i+1}</span>
+                          <span style={{ fontSize: 13, color: '#d1d5db', lineHeight: 1.6 }}>{s}</span>
+                        </div>
+                      ))}
+                      <h4 style={{ fontSize: 15, fontWeight: 700, color: '#00e5b0', margin: '20px 0 10px' }}>Ejemplo</h4>
+                      <pre style={{ background: '#06080f', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 16, fontSize: 12, lineHeight: 1.7, color: '#a8d8ea', overflow: 'auto', margin: '12px 0' }}>{`// ❌ Prompt malo:
+"Hazme un login"
+
+// ✅ Prompt bueno:
+"Eres dev senior Next.js 16 + TypeScript.
+Crea LoginForm.tsx con:
+- Supabase Auth (email + password)
+- Validación con zod
+- Loading state y errores
+- Dark mode Tailwind
+- Client component ('use client')"`}</pre>
+                      <div style={{ background: 'rgba(0,229,176,0.05)', border: '1px solid rgba(0,229,176,0.15)', borderRadius: 10, padding: '12px 16px', margin: '16px 0', fontSize: 13, color: '#00e5b0', lineHeight: 1.6 }}>💡 <strong>Tip:</strong> En la intranet, los agentes ya tienen system prompts. Modo &quot;SAP&quot; incluye contexto de consultoría automáticamente.</div>
+                      <div style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: 10, padding: 16, margin: '16px 0', fontSize: 13, color: '#b794ff', lineHeight: 1.6 }}>🎯 <strong>Ejercicio:</strong> Abre el chat de Hoku (🐾 abajo a la derecha). Prueba el prompt malo y el bueno. Compara las respuestas. ¿Cuál es mejor?</div>
+                    </>
+                  )},
+                  { title: 'Chain-of-thought para debugging', content: (
+                    <>
+                      <p style={{ fontSize: 14, color: '#94a3b8', lineHeight: 1.7, marginBottom: 16 }}>Chain-of-thought (CoT) le pide al modelo que &quot;piense paso a paso&quot;. Esto mejora dramáticamente la calidad en tareas complejas como debugging.</p>
+                      <pre style={{ background: '#06080f', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 16, fontSize: 12, lineHeight: 1.7, color: '#a8d8ea', overflow: 'auto', margin: '12px 0' }}>{`"Tengo este error en mi API route de Next.js:
+TypeError: Cannot read properties of undefined
+
+Analiza paso a paso:
+1. ¿Qué variable podría ser undefined?
+2. ¿En qué línea ocurre?
+3. ¿Qué condición falta?
+4. Dame el fix exacto con el código corregido"`}</pre>
+                      <div style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: 10, padding: '12px 16px', margin: '16px 0', fontSize: 13, color: '#f5a623', lineHeight: 1.6 }}>⚠️ <strong>Importante:</strong> Sin CoT, el modelo adivina. Con CoT, razona. La diferencia es enorme en bugs complejos.</div>
+                      <div style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: 10, padding: 16, margin: '16px 0', fontSize: 13, color: '#b794ff', lineHeight: 1.6 }}>🎯 <strong>Ejercicio:</strong> Pega un error real de tu proyecto en el chat de Hoku. Primero sin CoT, luego con &quot;analiza paso a paso&quot;. Compara.</div>
+                    </>
+                  )},
+                  { title: 'System prompts y modos', content: (
+                    <>
+                      <p style={{ fontSize: 14, color: '#94a3b8', lineHeight: 1.7, marginBottom: 16 }}>Un system prompt define la personalidad y contexto base del agente. En la intranet, cada modo (Chat, Code, SAP, Deploy) tiene su propio system prompt.</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, margin: '16px 0' }}>
+                        {[{m:'💬 Chat',d:'Conversación general, respuestas concisas'},{m:'</> Code',d:'Genera código funcional con filename'},{m:'🏢 SAP',d:'Consultoría SAP Chile, propuestas en UF'},{m:'🚀 Deploy',d:'DevOps, AWS, CI/CD, infraestructura'}].map(x => (
+                          <div key={x.m} style={{ background: '#0d1117', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: 12 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: '#f1f5f9', marginBottom: 4 }}>{x.m}</div>
+                            <div style={{ fontSize: 11, color: '#64748b' }}>{x.d}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: 10, padding: 16, margin: '16px 0', fontSize: 13, color: '#b794ff', lineHeight: 1.6 }}>🎯 <strong>Ejercicio:</strong> Ve a Agentes IA → selecciona Hoku → prueba el mismo prompt en modo Chat vs Code. ¿Cómo cambia la respuesta?</div>
+                    </>
+                  )},
+                  { title: 'Hoku vs Panchita — cuándo usar cada uno', content: (
+                    <>
+                      <p style={{ fontSize: 14, color: '#94a3b8', lineHeight: 1.7, marginBottom: 16 }}>Hoku 🐾 y Panchita 🐕 son dos personalidades del mismo motor. La diferencia está en el approach.</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, margin: '16px 0' }}>
+                        <div style={{ background: '#0d1117', border: '1px solid rgba(226,232,240,0.1)', borderRadius: 10, padding: 16 }}>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: '#e2e8f0', marginBottom: 8 }}>🐾 Hoku</div>
+                          <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.6 }}>Rebelde. Ejecuta directo.<br/>No pregunta, hace.<br/>Ideal para tareas claras.</div>
+                        </div>
+                        <div style={{ background: '#0d1117', border: '1px solid rgba(212,165,116,0.1)', borderRadius: 10, padding: 16 }}>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: '#d4a574', marginBottom: 8 }}>🐕 Panchita</div>
+                          <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.6 }}>Metódica. Planifica primero.<br/>Pregunta, valida, confirma.<br/>Ideal para decisiones.</div>
                         </div>
                       </div>
-                    </div>
-                    {!activeMission && (
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                        {m.tools.map(t => <span key={t} style={{ fontSize: '0.52rem', padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.03)', color: '#64748b', border: '1px solid rgba(255,255,255,0.05)' }}>{t}</span>)}
-                      </div>
-                    )}
+                      <div style={{ background: 'rgba(0,229,176,0.05)', border: '1px solid rgba(0,229,176,0.15)', borderRadius: 10, padding: '12px 16px', margin: '16px 0', fontSize: 13, color: '#00e5b0', lineHeight: 1.6 }}>💡 <strong>Resumen:</strong> Usa Hoku para &quot;hazlo ya&quot;. Usa Panchita para &quot;pensemos primero&quot;.</div>
+                    </>
+                  )},
+                ],
+              };
+              const steps = LESSONS[activeMission] || [{ title: 'Contenido en desarrollo', content: <p style={{ color: '#64748b' }}>Esta misión está siendo creada. Pronto tendrá contenido interactivo.</p> }];
+              const step = steps[activeStep] || steps[0];
+              return (
+                <>
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
+                    <span style={{ fontSize: '0.6rem', fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'rgba(0,229,176,0.1)', color: '#00e5b0' }}>Semana {activeMission?.replace('m','')}</span>
+                    <span style={{ fontSize: '0.6rem', fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'rgba(79,142,247,0.1)', color: '#4f8ef7' }}>Paso {activeStep + 1} de {steps.length}</span>
                   </div>
-                );
-              })}
-            </div>
+                  <h2 style={{ fontSize: 22, fontWeight: 800, color: '#f1f5f9', marginBottom: 16 }}>{step.title}</h2>
+                  {step.content}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 32, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    <button onClick={() => setActiveStep(Math.max(0, activeStep - 1))} disabled={activeStep === 0}
+                      style={{ padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: activeStep === 0 ? 'default' : 'pointer', background: 'rgba(255,255,255,0.04)', color: activeStep === 0 ? '#2a3d58' : '#94a3b8', border: 'none' }}>← Anterior</button>
+                    <button onClick={() => setActiveStep(Math.min(steps.length - 1, activeStep + 1))} disabled={activeStep >= steps.length - 1}
+                      style={{ padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: activeStep >= steps.length - 1 ? 'default' : 'pointer', background: activeStep >= steps.length - 1 ? 'rgba(255,255,255,0.04)' : 'rgba(0,229,176,0.1)', color: activeStep >= steps.length - 1 ? '#2a3d58' : '#00e5b0', border: activeStep >= steps.length - 1 ? 'none' : '1px solid rgba(0,229,176,0.2)' }}>Siguiente →</button>
+                  </div>
+                </>
+              );
+            })()}
           </div>
-          {/* Mission iframe — grande */}
-          {activeMission && (() => {
-            const missions = [
-              { id: 'm1', url: 'https://www.typescriptlang.org/play', title: 'TypeScript Playground', internal: false, desc: 'Practica TypeScript en el playground oficial. Escribe código, ve los tipos, experimenta.' },
-              { id: 'm2', url: 'https://play.tailwindcss.com', title: 'Tailwind Play', internal: false, desc: 'Diseña con Tailwind CSS en tiempo real. Prueba clases, dark mode, responsive.' },
-              { id: 'm3', url: '/dashboard/agents', title: 'Workspace Agentes', internal: true, desc: 'Ejecuta agentes IA: Hoku fusión, Groq, Claude. Prueba modos chat, code, SAP.' },
-              { id: 'm4', url: '/dashboard/labs', title: 'Extensiones', internal: true, desc: 'Explora 50+ conectores. Ejecuta automatizaciones con Hoku.' },
-              { id: 'm5', url: '/dashboard/agents', title: 'Agentes IA', internal: true, desc: 'Agrega un modelo a Hoku. Configura Langfuse para tracing.' },
-              { id: 'm6', url: '/dashboard/stack', title: 'Stack 2026', internal: true, desc: 'Revisa la arquitectura completa. 24 herramientas, 10 modelos IA.' },
-              { id: 'm7', url: '/dashboard/deploy', title: 'Deploy Center', internal: true, desc: 'Pipeline de 7 pasos. Health checks, stress test, CDN invalidation.' },
-              { id: 'm8', url: '/dashboard/improvements', title: 'Mejoras & UX', internal: true, desc: 'Genera mejoras con Hoku. Deploy con preview POC.' },
-            ];
-            const m = missions.find(x => x.id === activeMission);
-            if (!m) return null;
-            const isExternal = !m.internal && !isBlocked(m.url);
-            return (
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#06080f' }}>
-                <div style={{ flexShrink: 0, padding: '8px 14px', background: '#0d1117', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ display: 'flex', gap: 3 }}><div style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444' }} /><div style={{ width: 7, height: 7, borderRadius: '50%', background: '#f59e0b' }} /><div style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e' }} /></div>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f1f5f9' }}>{m.title}</span>
-                  <span style={{ fontSize: '0.6rem', color: '#475569', fontFamily: "'JetBrains Mono', monospace", flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.url}</span>
-                  <a href={m.url} style={{ fontSize: '0.6rem', padding: '3px 10px', borderRadius: 6, background: 'rgba(0,229,176,0.1)', color: '#00e5b0', border: '1px solid rgba(0,229,176,0.2)', textDecoration: 'none', fontWeight: 600 }}>{m.internal ? 'Ir →' : 'Abrir ↗'}</a>
-                  <button onClick={() => setActiveMission(null)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
-                </div>
-                {isExternal ? (
-                  <iframe src={m.url} style={{ flex: 1, border: 'none', background: '#fff' }} title={m.title} sandbox="allow-scripts allow-same-origin allow-popups allow-forms" />
-                ) : (
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 40 }}>
-                    <div style={{ fontSize: 48 }}>{m.internal ? '🏠' : '🔗'}</div>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: '#f1f5f9' }}>{m.title}</div>
-                    <div style={{ fontSize: 13, color: '#94a3b8', textAlign: 'center', maxWidth: 400, lineHeight: 1.6 }}>{m.desc}</div>
-                    <a href={m.url} style={{
-                      padding: '14px 36px', borderRadius: 12, fontSize: 15, fontWeight: 700,
-                      background: 'linear-gradient(135deg, rgba(0,229,176,0.15), rgba(0,229,176,0.08))',
-                      border: '1px solid rgba(0,229,176,0.25)', color: '#00e5b0',
-                      textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8,
-                      transition: 'all 0.2s',
-                    }}>{m.internal ? `Ir a ${m.title} →` : `Abrir en nueva pestaña ↗`}</a>
-                    {m.internal && <div style={{ fontSize: 11, color: '#2a3d58' }}>Se abre dentro de la intranet</div>}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
         </div>
       )}
 

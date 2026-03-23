@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PoC — Misiones Interactivas · Panchita 🐕</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#06080f;--s1:#0d1117;--s2:#161b28;--teal:#00e5b0;--blue:#4f8ef7;--green:#1fd975;--amber:#f5a623;--red:#f04747;--violet:#b794ff;--text:#dce4f0;--muted:#6b8099;--dim:#2a3d58}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text)}
+.wrap{max-width:1200px;margin:0 auto;padding:32px}
+h1{font-size:28px;font-weight:900;letter-spacing:-.02em;margin-bottom:6px}
+.sub{font-size:13px;color:var(--muted);margin-bottom:24px}
+.tag{display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;margin-right:4px}
+.t-ok{background:rgba(31,217,117,.1);color:var(--green)}.t-warn{background:rgba(245,166,35,.1);color:var(--amber)}.t-err{background:rgba(240,71,71,.1);color:var(--red)}.t-teal{background:rgba(0,229,176,.1);color:var(--teal)}.t-info{background:rgba(79,142,247,.1);color:var(--blue)}
+.divider{border:none;border-top:1px solid rgba(255,255,255,.06);margin:32px 0}
+.card{background:var(--s1);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:16px}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:8px 12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid rgba(255,255,255,.06);font-weight:700}
+td{padding:8px 12px;font-size:12px;border-bottom:1px solid rgba(255,255,255,.03)}
+
+/* Demo frame */
+.frame{border:1px solid rgba(255,255,255,.06);border-radius:14px;overflow:hidden;background:var(--s1);margin-top:20px}
+.frame-bar{height:40px;background:var(--s2);border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;padding:0 14px;gap:8px}
+.dots{display:flex;gap:4px}.dot{width:8px;height:8px;border-radius:50%}
+
+/* Split layout */
+.split{display:flex;height:600px}
+.sidebar{width:300px;border-right:1px solid rgba(255,255,255,.06);overflow-y:auto;flex-shrink:0}
+.content{flex:1;overflow-y:auto;padding:0}
+
+/* Mission cards */
+.m-card{padding:12px 16px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);transition:all .15s;border-left:3px solid transparent}
+.m-card:hover{background:rgba(0,229,176,.02)}
+.m-card.active{background:rgba(0,229,176,.04);border-left-color:var(--teal)}
+.m-week{width:28px;height:28px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;flex-shrink:0}
+.m-title{font-size:13px;font-weight:700;color:var(--text)}
+.m-meta{font-size:10px;color:var(--dim);margin-top:2px}
+
+/* Lesson content */
+.lesson{padding:32px;max-width:700px}
+.lesson h2{font-size:22px;font-weight:800;margin-bottom:8px;color:var(--text)}
+.lesson .badge-row{display:flex;gap:6px;margin-bottom:20px}
+.lesson p{font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:16px}
+.lesson h3{font-size:16px;font-weight:700;color:var(--teal);margin:24px 0 10px}
+.lesson .code-block{background:var(--bg);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:16px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.7;color:#a8d8ea;overflow-x:auto;margin:12px 0 16px}
+.lesson .tip{background:rgba(0,229,176,.05);border:1px solid rgba(0,229,176,.15);border-radius:10px;padding:12px 16px;margin:12px 0 16px;font-size:13px;color:var(--teal);line-height:1.6}
+.lesson .tip strong{color:#fff}
+.lesson .warning{background:rgba(245,166,35,.05);border:1px solid rgba(245,166,35,.15);border-radius:10px;padding:12px 16px;margin:12px 0 16px;font-size:13px;color:var(--amber);line-height:1.6}
+.lesson .exercise{background:rgba(139,92,246,.05);border:1px solid rgba(139,92,246,.15);border-radius:10px;padding:16px;margin:16px 0;font-size:13px;color:var(--violet);line-height:1.6}
+.lesson .exercise strong{color:#fff}
+.lesson .step{display:flex;gap:12px;margin:8px 0}
+.lesson .step-num{width:24px;height:24px;border-radius:50%;background:rgba(0,229,176,.1);border:1px solid rgba(0,229,176,.2);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--teal);flex-shrink:0}
+.lesson .step-text{font-size:13px;color:var(--muted);line-height:1.6}
+.lesson .nav-btns{display:flex;gap:8px;margin-top:32px;padding-top:20px;border-top:1px solid rgba(255,255,255,.06)}
+.lesson .nav-btn{padding:10px 20px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .15s}
+.lesson .nav-btn.prev{background:rgba(255,255,255,.04);color:var(--muted)}
+.lesson .nav-btn.next{background:rgba(0,229,176,.1);color:var(--teal);border:1px solid rgba(0,229,176,.2)}
+.lesson .nav-btn:hover{transform:translateY(-1px)}
+.lesson .video{width:100%;aspect-ratio:16/9;border-radius:10px;border:1px solid rgba(255,255,255,.06);margin:12px 0 16px;background:var(--s2);display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- REPORTE -->
+<div style="margin-bottom:8px">
+  <span class="tag t-teal">🐕 PANCHITA</span>
+  <span class="tag t-info">PoC</span>
+  <span class="tag t-ok">23-03-2026</span>
+</div>
+
+<h1>Misiones — Contenido Interactivo Inline</h1>
+<p class="sub">Cada misión tiene lecciones con texto, código, tips y ejercicios. Todo dentro del panel, sin redirigir.</p>
+
+<!-- Problema vs Solución -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px">
+  <div class="card" style="border-left:3px solid var(--red)">
+    <div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:8px">❌ ANTES (actual)</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.6">
+      • Click en misión → redirige a otra página o muestra botón "Ir →"<br>
+      • Iframe intenta cargar la intranet dentro de sí misma<br>
+      • No hay contenido de aprendizaje real<br>
+      • El usuario se pierde y no aprende nada
+    </div>
+  </div>
+  <div class="card" style="border-left:3px solid var(--green)">
+    <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:8px">✅ DESPUÉS (propuesta)</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.6">
+      • Click en misión → contenido inline en el panel derecho<br>
+      • Lecciones con texto, código de ejemplo, tips, ejercicios<br>
+      • Navegación Anterior/Siguiente entre pasos<br>
+      • Todo dentro del Discovery sin salir
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- DEMO -->
+<div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px">🖥️ Demo — Misión S1 expandida</div>
+
+<div class="frame">
+  <div class="frame-bar">
+    <div class="dots"><div class="dot" style="background:var(--red)"></div><div class="dot" style="background:var(--amber)"></div><div class="dot" style="background:var(--green)"></div></div>
+    <span style="font-size:11px;color:var(--dim);font-family:'JetBrains Mono',monospace">intranet.smconnection.cl/dashboard/learn → Misiones</span>
+  </div>
+  <div class="split">
+    <!-- Sidebar missions -->
+    <div class="sidebar">
+      <div class="m-card active" onclick="showMission(1)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="m-week" style="background:rgba(34,197,94,.1);color:var(--green)">S1</div>
+          <div><div class="m-title">Master prompting</div><div class="m-meta">Beginner · 4 pasos</div></div>
+        </div>
+      </div>
+      <div class="m-card" onclick="showMission(2)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="m-week" style="background:rgba(34,197,94,.1);color:var(--green)">S2</div>
+          <div><div class="m-title">Primera app Next.js</div><div class="m-meta">Beginner · 3 pasos</div></div>
+        </div>
+      </div>
+      <div class="m-card" onclick="showMission(3)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="m-week" style="background:rgba(245,158,11,.1);color:var(--amber)">S3</div>
+          <div><div class="m-title">Supabase + RAG</div><div class="m-meta">Intermediate · 4 pasos</div></div>
+        </div>
+      </div>
+      <div class="m-card" onclick="showMission(4)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="m-week" style="background:rgba(245,158,11,.1);color:var(--amber)">S4</div>
+          <div><div class="m-title">Tool Use — APIs</div><div class="m-meta">Intermediate · 3 pasos</div></div>
+        </div>
+      </div>
+      <div class="m-card" onclick="showMission(5)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="m-week" style="background:rgba(139,92,246,.1);color:var(--violet)">S5</div>
+          <div><div class="m-title">MCP Server</div><div class="m-meta">Advanced · 4 pasos</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Content panel -->
+    <div class="content" id="lesson-content">
+      <div class="lesson">
+        <div class="badge-row">
+          <span class="tag t-ok">Semana 1</span>
+          <span class="tag t-ok">Beginner</span>
+          <span class="tag t-info">Paso 1 de 4</span>
+        </div>
+
+        <h2>¿Qué es un prompt y por qué importa?</h2>
+
+        <p>Un prompt es la instrucción que le das a un modelo de IA. La calidad de tu prompt determina directamente la calidad de la respuesta. Piénsalo como dar instrucciones a un compañero de trabajo muy capaz pero muy literal.</p>
+
+        <h3>Anatomía de un buen prompt</h3>
+
+        <p>Todo buen prompt tiene 4 partes:</p>
+
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-text"><strong style="color:var(--text)">Contexto</strong> — Quién eres, qué proyecto es, qué stack usas</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-text"><strong style="color:var(--text)">Tarea</strong> — Qué necesitas exactamente, con el mayor detalle posible</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-text"><strong style="color:var(--text)">Formato</strong> — Cómo quieres la respuesta (código, bullets, tabla, etc.)</div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-text"><strong style="color:var(--text)">Restricciones</strong> — Qué NO hacer, límites, tecnologías específicas</div>
+        </div>
+
+        <h3>Ejemplo real</h3>
+
+        <div class="code-block">
+<span style="color:var(--teal)">// ❌ Prompt malo:</span>
+"Hazme un componente de login"
+
+<span style="color:var(--green)">// ✅ Prompt bueno:</span>
+"Eres un dev senior de Next.js 16 con TypeScript.
+Crea un componente LoginForm.tsx que:
+- Use Supabase Auth (email + password)
+- Tenga validación con zod
+- Muestre loading state y errores
+- Estilo dark mode con Tailwind
+- NO uses 'use server', es client component"</div>
+
+        <div class="tip">
+          <strong>💡 Tip de Hoku:</strong> En la intranet, los agentes ya tienen system prompts configurados. Cuando usas modo "SAP", el prompt incluye automáticamente contexto de consultoría SAP Chile. No necesitas repetirlo.
+        </div>
+
+        <h3>Comparando modelos</h3>
+
+        <p>Cada modelo responde diferente al mismo prompt. Aquí un ejemplo con "Genera un componente de pricing":</p>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0">
+          <div class="card" style="padding:12px">
+            <div style="font-size:11px;font-weight:700;color:var(--amber);margin-bottom:4px">⚡ Groq (0.3s)</div>
+            <div style="font-size:11px;color:var(--muted)">Responde ultra rápido pero a veces superficial. Ideal para iteraciones rápidas.</div>
+          </div>
+          <div class="card" style="padding:12px">
+            <div style="font-size:11px;font-weight:700;color:var(--teal);margin-bottom:4px">🤖 Claude (1.2s)</div>
+            <div style="font-size:11px;color:var(--muted)">Código más robusto, mejor estructura, maneja edge cases. Ideal para producción.</div>
+          </div>
+        </div>
+
+        <div class="exercise">
+          <strong>🎯 Ejercicio:</strong><br><br>
+          Abre el <strong>Chat de Hoku</strong> (botón 🐾 abajo a la derecha) y prueba estos 2 prompts con el mismo pedido. Compara las respuestas:<br><br>
+          1. "Crea un componente de pricing"<br>
+          2. "Eres un dev senior Next.js. Crea un componente PricingTable.tsx con 3 planes (Básico $29, Pro $59, Enterprise $99), toggle mensual/anual, CTA con botón teal, dark mode, responsive. TypeScript estricto."<br><br>
+          <strong>¿Cuál respuesta es mejor? ¿Por qué?</strong>
+        </div>
+
+        <div class="nav-btns">
+          <button class="nav-btn prev" disabled>← Anterior</button>
+          <button class="nav-btn next" onclick="alert('Paso 2: Chain-of-thought para debugging')">Siguiente: Chain-of-thought →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Checklist -->
+<div style="margin-top:24px">
+  <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px">📋 Checklist de entrega</div>
+  <table>
+    <thead><tr><th>Item</th><th>Estado</th></tr></thead>
+    <tbody>
+      <tr><td>Contenido inline (no redirect)</td><td><span class="tag t-ok">✅</span></td></tr>
+      <tr><td>Pasos con texto + código + tips</td><td><span class="tag t-ok">✅</span></td></tr>
+      <tr><td>Ejercicio práctico por paso</td><td><span class="tag t-ok">✅</span></td></tr>
+      <tr><td>Navegación Anterior/Siguiente</td><td><span class="tag t-ok">✅</span></td></tr>
+      <tr><td>Comparativa modelos visual</td><td><span class="tag t-ok">✅</span></td></tr>
+      <tr><td>Sin iframe, sin redirect</td><td><span class="tag t-ok">✅</span></td></tr>
+      <tr><td>Videos YouTube embed</td><td><span class="tag t-warn">⚠️ Opcional</span></td></tr>
+      <tr><td>Progreso persistido</td><td><span class="tag t-warn">⚠️ v2</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div style="margin-top:24px;text-align:center;font-size:11px;color:var(--dim)">
+  🐕 Panchita → 🐾 Hoku — Handoff: cada misión necesita contenido real inline con pasos, código, tips y ejercicios. No más links ni iframes.
+</div>
+
+</div>
+
+<script>
+function showMission(n) {
+  document.querySelectorAll('.m-card').forEach(c => c.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  if (n === 1) return; // ya está mostrando S1
+  document.getElementById('lesson-content').innerHTML = `
+    <div class="lesson">
+      <div class="badge-row"><span class="tag t-ok">Semana ${n}</span><span class="tag t-info">En desarrollo</span></div>
+      <h2>Contenido de la Semana ${n}</h2>
+      <p>Aquí irá el contenido interactivo de esta misión con pasos, código de ejemplo, tips y ejercicios prácticos.</p>
+      <div class="exercise"><strong>🎯 Por definir:</strong><br>Hoku implementará el contenido real de cada semana.</div>
+    </div>`;
+}
+</script>
+</body>
+</html>
