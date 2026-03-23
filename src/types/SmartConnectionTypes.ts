@@ -1,9 +1,8 @@
 interface SmartConnectionProps {
-  deviceId: string;
-  devicePassword: string;
+  dispositivo: string;
+  red: string;
 }
 
-interface ConnectionStatus {
-  connected: boolean;
-  message: string;
+interface EstadoConexión {
+  conectado: boolean;
 }
