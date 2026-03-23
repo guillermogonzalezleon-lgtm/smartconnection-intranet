@@ -60,7 +60,7 @@ export async function POST(request: Request) {
 
     // Generic query
     if (action === 'query' && table) {
-      const allowed = ['leads', 'reuniones', 'analytics', 'agent_logs', 'agent_config', 'ux_insights', 'projects', 'project_tasks', 'hoku_chat', 'hoku_knowledge'];
+      const allowed = ['leads', 'reuniones', 'analytics', 'agent_logs', 'agent_config', 'ux_insights', 'projects', 'project_tasks', 'sprints', 'hoku_chat', 'hoku_knowledge'];
       if (!allowed.includes(table)) return NextResponse.json({ error: 'Tabla no permitida' }, { status: 400 });
       const data = await supabaseQuery(table, 'GET', { order: order || 'created_at.desc', limit: limit || 50, filter, offset });
       return NextResponse.json({ data });
@@ -197,6 +197,52 @@ export async function POST(request: Request) {
     // Delete project
     if (action === 'delete_project' && body.projectId) {
       await supabaseQuery('projects', 'DELETE', { filter: `id=eq.${body.projectId}` });
+      return NextResponse.json({ success: true });
+    }
+
+    // ── Sprints CRUD ──
+    if (action === 'create_sprint' && body.name) {
+      const data = await supabaseInsert('sprints', {
+        name: body.name,
+        goal: body.goal || '',
+        start_date: body.start_date,
+        end_date: body.end_date,
+        status: body.status || 'planning',
+      });
+      return NextResponse.json({ success: true, data });
+    }
+
+    if (action === 'update_sprint' && body.sprintId) {
+      await supabaseQuery('sprints', 'PATCH', {
+        filter: `id=eq.${body.sprintId}`,
+        body: { ...body.updates }
+      });
+      return NextResponse.json({ success: true });
+    }
+
+    // ── Sub-tareas CRUD ──
+    if (action === 'create_task' && body.project_id && body.title) {
+      const data = await supabaseInsert('project_tasks', {
+        project_id: body.project_id,
+        title: body.title,
+        status: body.status || 'todo',
+        assignee: body.assignee || '',
+        story_points: body.story_points || 0,
+        sprint_id: body.sprint_id || null,
+      });
+      return NextResponse.json({ success: true, data });
+    }
+
+    if (action === 'update_task' && body.taskId) {
+      await supabaseQuery('project_tasks', 'PATCH', {
+        filter: `id=eq.${body.taskId}`,
+        body: { status: body.status, ...(body.updates || {}) },
+      });
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === 'delete_task' && body.taskId) {
+      await supabaseQuery('project_tasks', 'DELETE', { filter: `id=eq.${body.taskId}` });
       return NextResponse.json({ success: true });
     }
 

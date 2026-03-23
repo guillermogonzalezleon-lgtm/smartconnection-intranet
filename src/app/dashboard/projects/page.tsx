@@ -70,6 +70,10 @@ export default function ProjectsPage() {
   const [form, setForm] = useState({ name: '', description: '', priority: 'medium', category: '', owner: 'Guillermo', tags: '', due_date: '', status: 'backlog', lead_id: '' });
   const [view, setView] = useState<'kanban' | 'table' | 'timeline'>('kanban');
   const [availableLeads, setAvailableLeads] = useState<Record<string, unknown>[]>([]);
+  const [tasks, setTasks] = useState<Record<string, any[]>>({});  // project_id -> tasks[]
+  const [expandedProject, setExpandedProject] = useState<string | null>(null);
+  const [sprints, setSprints] = useState<any[]>([]);
+  const [newTask, setNewTask] = useState('');
 
   useEffect(() => {
     fetch('/api/agents', {
@@ -90,6 +94,25 @@ export default function ProjectsPage() {
       .then(r => r.json())
       .then(d => { if (d.data) setAvailableLeads(d.data); })
       .catch(() => {});
+
+    // Cargar sprints
+    fetch('/api/agents', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'query', table: 'sprints', order: 'start_date.asc', limit: 20 })
+    }).then(r => r.json()).then(d => { if (d.data) setSprints(d.data); }).catch(() => {});
+
+    // Cargar todas las tareas
+    fetch('/api/agents', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'query', table: 'project_tasks', order: 'created_at.asc', limit: 200 })
+    }).then(r => r.json()).then(d => {
+      if (d.data) {
+        const grouped: Record<string, any[]> = {};
+        for (const t of d.data) {
+          if (!grouped[t.project_id]) grouped[t.project_id] = [];
+          grouped[t.project_id].push(t);
+        }
+        setTasks(grouped);
+      }
+    }).catch(() => {});
   }, []);
 
   const categories = Array.from(new Set(projects.map(p => p.category).filter(Boolean)));
@@ -195,6 +218,30 @@ export default function ProjectsPage() {
       setProjects(previousProjects);
       alert(`Error al mover proyecto: ${err instanceof Error ? err.message : String(err)}`);
     }
+  };
+
+  const addTask = async (projectId: string) => {
+    if (!newTask.trim()) return;
+    await fetch('/api/agents', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'create_task', project_id: projectId, title: newTask.trim() })
+    });
+    setNewTask('');
+    // Reload tasks
+    const d = await fetch('/api/agents', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'query', table: 'project_tasks', filter: `project_id=eq.${projectId}`, order: 'created_at.asc' })
+    }).then(r => r.json());
+    if (d.data) setTasks(prev => ({ ...prev, [projectId]: d.data }));
+  };
+
+  const toggleTask = async (taskId: string, projectId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'done' ? 'todo' : 'done';
+    await fetch('/api/agents', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update_task', taskId, status: newStatus })
+    });
+    setTasks(prev => ({
+      ...prev,
+      [projectId]: (prev[projectId] || []).map(t => t.id === taskId ? { ...t, status: newStatus } : t)
+    }));
   };
 
   const selectStyle = (active: boolean): React.CSSProperties => ({
@@ -330,7 +377,7 @@ export default function ProjectsPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                  {['Proyecto', 'Status', 'Prioridad', 'Owner', 'Progreso', 'Due Date', 'Categoría'].map(h => (
+                  {['Proyecto', 'Status', 'Prioridad', 'Owner', 'Progreso', 'Due Date', 'Tareas', 'Categoría'].map(h => (
                     <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontSize: '0.62rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>{h}</th>
                   ))}
                 </tr>
@@ -371,6 +418,13 @@ export default function ProjectsPage() {
                         {p.due_date ? new Date(p.due_date).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' }) : '—'}
                       </td>
                       <td style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                        {(tasks[p.id]?.length || 0) > 0 ? (
+                          <span style={{ fontSize: '0.62rem', color: '#94a3b8' }}>
+                            {tasks[p.id].filter((t: any) => t.status === 'done').length}/{tasks[p.id].length}
+                          </span>
+                        ) : <span style={{ fontSize: '0.62rem', color: '#2a3d58' }}>&mdash;</span>}
+                      </td>
+                      <td style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                         {p.category && <span style={{ fontSize: '0.58rem', padding: '2px 8px', borderRadius: 5, background: 'rgba(255,255,255,0.04)', color: '#94a3b8' }}>{p.category}</span>}
                       </td>
                     </tr>
@@ -409,7 +463,8 @@ export default function ProjectsPage() {
                       draggable
                       onDragStart={(e) => { setDraggedId(project.id); e.dataTransfer.effectAllowed = 'move'; }}
                       onDragEnd={() => { setDraggedId(null); setDropTarget(null); }}
-                      onClick={() => openModal(project)}
+                      onClick={() => setExpandedProject(expandedProject === project.id ? null : project.id)}
+                      onDoubleClick={() => openModal(project)}
                       onMouseEnter={() => setHoveredCard(project.id)}
                       onMouseLeave={() => setHoveredCard(null)}
                       style={{
@@ -440,7 +495,14 @@ export default function ProjectsPage() {
                         }}>
                           {PRIORITY_LABELS[project.priority] || project.priority}
                         </span>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#f1f5f9', lineHeight: 1.3, flex: 1 }}>{project.name}</span>
+                        <div style={{ flex: 1 }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#f1f5f9', lineHeight: 1.3 }}>{project.name}</span>
+                          {(tasks[project.id]?.length || 0) > 0 && (
+                            <span style={{ fontSize: '0.55rem', color: '#475569', display: 'block', marginTop: 2 }}>
+                              {tasks[project.id].filter((t: any) => t.status === 'done').length}/{tasks[project.id].length} tareas
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {/* Description */}
@@ -516,6 +578,27 @@ export default function ProjectsPage() {
                           </div>
                         )}
                       </div>
+
+                      {/* Sub-tasks */}
+                      {expandedProject === project.id && (
+                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                          {(tasks[project.id] || []).map((t: any) => (
+                            <div key={t.id} onClick={(e) => { e.stopPropagation(); toggleTask(t.id, project.id, t.status); }}
+                              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', cursor: 'pointer', fontSize: '0.68rem', color: t.status === 'done' ? '#475569' : '#94a3b8', textDecoration: t.status === 'done' ? 'line-through' : 'none' }}>
+                              <span style={{ width: 14, height: 14, borderRadius: 4, border: `1.5px solid ${t.status === 'done' ? '#22c55e' : 'rgba(255,255,255,0.15)'}`, background: t.status === 'done' ? 'rgba(34,197,94,0.15)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.5rem', color: '#22c55e', flexShrink: 0 }}>
+                                {t.status === 'done' && '\u2713'}
+                              </span>
+                              {t.title}
+                            </div>
+                          ))}
+                          <div style={{ display: 'flex', gap: 4, marginTop: 4 }} onClick={e => e.stopPropagation()}>
+                            <input value={newTask} onChange={e => setNewTask(e.target.value)}
+                              onKeyDown={e => e.key === 'Enter' && addTask(project.id)}
+                              placeholder="+ Agregar tarea..."
+                              style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 4, padding: '3px 6px', color: '#94a3b8', fontSize: '0.62rem', outline: 'none' }} />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
