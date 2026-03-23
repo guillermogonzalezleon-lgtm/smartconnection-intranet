@@ -388,9 +388,54 @@ IMPORTANTE: Cuando generes código, usa este formato:
           }
         }
 
-        // ML: Learn from this execution (fire-and-forget)
+        // Tracing: save detailed metrics per agent (Langfuse-like)
         if (results.length > 0) {
           const topic = prompt.slice(0, 150).replace(/[^\w\sáéíóúñ]/gi, '').trim();
+
+          // Save individual agent traces
+          for (const r of results) {
+            const costEstimate = r.result.startsWith('(') ? 0 :
+              r.name === 'Groq' ? 0 :
+              r.name === 'Claude' ? 0.002 :
+              r.name === 'OpenAI' ? 0.001 :
+              r.name === 'DeepSeek' ? 0.0003 :
+              0.0005;
+
+            supabaseInsert('agent_logs', {
+              agent_id: r.name.toLowerCase(),
+              agent_name: r.name,
+              action: 'fusion_trace',
+              detail: JSON.stringify({
+                prompt_preview: topic.slice(0, 80),
+                response_length: r.result.length,
+                cost_usd: costEstimate,
+                success: !r.result.startsWith('('),
+                chatMode: chatMode || false,
+              }),
+              status: r.result.startsWith('(') ? 'error' : 'success',
+              tokens_used: Math.round(r.result.split(/\s+/).length * 1.3),
+            }).catch(() => {});
+          }
+
+          // Save aggregated fusion trace
+          const successCount = results.filter(r => !r.result.startsWith('(')).length;
+          const totalCost = results.reduce((s, r) => s + (r.result.startsWith('(') ? 0 : 0.001), 0);
+
+          supabaseInsert('agent_logs', {
+            agent_id: 'hoku',
+            agent_name: 'Hoku Fusion',
+            action: 'fusion_complete',
+            detail: JSON.stringify({
+              agents_called: results.length,
+              agents_success: successCount,
+              total_cost_usd: Math.round(totalCost * 10000) / 10000,
+              prompt_preview: topic.slice(0, 80),
+            }),
+            status: 'success',
+            tokens_used: results.reduce((s, r) => s + Math.round(r.result.split(/\s+/).length * 1.3), 0),
+          }).catch(() => {});
+
+          // ML: save knowledge
           const bestResults = results.filter(r => !r.result.startsWith('(')).slice(0, 3);
           const learnContent = bestResults.map(r => `[${r.name}]: ${r.result.slice(0, 600)}`).join('\n');
           supabaseInsert('hoku_knowledge', {
@@ -398,14 +443,6 @@ IMPORTANTE: Cuando generes código, usa este formato:
             content: learnContent.slice(0, 3000),
             source: `fusion_${results.length}_agents`,
             quality_score: 0.5,
-          }).catch(() => {});
-          // Log execution
-          supabaseInsert('agent_logs', {
-            agent_id: 'hoku',
-            agent_name: 'Hoku Fusion',
-            action: 'fusion_execute',
-            detail: `${results.length} agentes · ${topic.slice(0, 100)}`,
-            status: 'success',
           }).catch(() => {});
         }
 

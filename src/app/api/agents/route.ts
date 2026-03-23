@@ -89,6 +89,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
+    // ── Panchita → Hoku handoff: save analysis as knowledge ──
+    if (action === 'save_handoff' && body.topic && body.analysis) {
+      await supabaseInsert('hoku_knowledge', {
+        topic: String(body.topic).slice(0, 200),
+        content: String(body.analysis).slice(0, 5000),
+        source: 'panchita_handoff',
+        quality_score: 0.8,
+      });
+      await supabaseInsert('agent_logs', {
+        agent_id: 'panchita',
+        agent_name: 'Panchita',
+        action: 'handoff',
+        detail: `Handoff: ${String(body.topic).slice(0, 200)}`,
+        status: 'success',
+      }).catch(() => {});
+      return NextResponse.json({ success: true });
+    }
+
     // ── Hoku ML: Search knowledge base (full-text search) ──
     if (action === 'hoku_search' && body.query) {
       const words = String(body.query).split(/\s+/).filter(w => w.length > 2).slice(0, 5);

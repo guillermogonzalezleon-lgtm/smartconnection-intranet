@@ -278,6 +278,77 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, sha: newCommit.sha });
     }
 
+    // ── Code Review with Groq ──
+    if (action === 'code_review' && body.code) {
+      const GROQ_KEY = process.env.GROQ_API_KEY;
+      if (!GROQ_KEY) return NextResponse.json({ error: 'GROQ_API_KEY no configurada' }, { status: 500 });
+
+      const reviewRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${GROQ_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [
+            { role: 'system', content: 'Eres un code reviewer experto. Revisa el código y reporta: 1) Bugs potenciales 2) Problemas de seguridad 3) Mejoras de performance. Sé conciso, máximo 5 bullets. Si todo está bien, di "LGTM". Responde en español.' },
+            { role: 'user', content: `Revisa este código:\n\n${String(body.code).slice(0, 4000)}` }
+          ],
+          max_tokens: 500,
+          temperature: 0.3,
+        }),
+      });
+
+      if (!reviewRes.ok) return NextResponse.json({ error: `Groq error: ${reviewRes.status}` }, { status: 502 });
+      const reviewData = await reviewRes.json();
+      const review = reviewData.choices?.[0]?.message?.content || 'Sin respuesta';
+
+      await supabaseInsert('agent_logs', {
+        agent_id: 'hoku', agent_name: 'Hoku Code Review',
+        action: 'code_review', detail: review.slice(0, 500), status: 'success',
+      }).catch(() => {});
+
+      return NextResponse.json({ success: true, review, lgtm: review.toLowerCase().includes('lgtm') });
+    }
+
+    // ── Auto-rollback if health check fails ──
+    if (action === 'auto_rollback') {
+      const repo = body.repo || 'guillermogonzalezleon-lgtm/smartconnection-intranet';
+      // Check health
+      let healthy = false;
+      try {
+        const healthRes = await fetch('https://intranet.smconnection.cl', { method: 'HEAD', signal: AbortSignal.timeout(5000) });
+        healthy = healthRes.ok || healthRes.status === 307;
+      } catch { healthy = false; }
+
+      if (healthy) {
+        return NextResponse.json({ success: true, healthy: true, message: 'Site is healthy, no rollback needed' });
+      }
+
+      // Get previous commit
+      const commits = await githubApi(`/repos/${repo}/commits?per_page=2`);
+      if (!commits || commits.length < 2) {
+        return NextResponse.json({ error: 'No hay commit previo para rollback' }, { status: 400 });
+      }
+
+      const prevSha = commits[1].sha;
+      // Trigger rollback
+      const targetCommit = await githubApi(`/repos/${repo}/git/commits/${prevSha}`);
+      if (!targetCommit?.tree?.sha) return NextResponse.json({ error: 'No se pudo obtener tree' }, { status: 500 });
+
+      const head = await githubApi(`/repos/${repo}/git/refs/heads/main`);
+      const newCommit = await githubApi(`/repos/${repo}/git/commits`, {
+        method: 'POST',
+        body: JSON.stringify({ message: `auto-rollback: site unhealthy, reverting to ${prevSha.slice(0,7)}`, tree: targetCommit.tree.sha, parents: [head.object.sha] }),
+      });
+
+      if (newCommit?.sha) {
+        await githubApi(`/repos/${repo}/git/refs/heads/main`, { method: 'PATCH', body: JSON.stringify({ sha: newCommit.sha }) });
+        await supabaseInsert('agent_logs', { agent_id: 'hoku', agent_name: 'Auto-Rollback', action: 'auto_rollback', detail: `Site unhealthy → reverted to ${prevSha.slice(0,7)}`, status: 'success' }).catch(() => {});
+        return NextResponse.json({ success: true, healthy: false, rolledBack: true, sha: newCommit.sha });
+      }
+
+      return NextResponse.json({ error: 'Rollback failed' }, { status: 500 });
+    }
+
     return NextResponse.json({ error: 'Acción no válida' }, { status: 400 });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
