@@ -68,6 +68,7 @@ export default function ProjectsPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', description: '', priority: 'medium', category: '', owner: 'Guillermo', tags: '', due_date: '', status: 'backlog', lead_id: '' });
+  const [view, setView] = useState<'kanban' | 'table'>('kanban');
   const [availableLeads, setAvailableLeads] = useState<Record<string, unknown>[]>([]);
 
   useEffect(() => {
@@ -213,9 +214,14 @@ export default function ProjectsPage() {
       {/* Header */}
       <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(10,13,20,0.92)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.06)', height: 56, display: 'flex', alignItems: 'center', padding: '0 2rem', fontSize: '0.85rem', color: '#94a3b8' }}>
         Intranet <span style={{ margin: '0 8px', color: '#475569' }}>/</span> <span style={{ color: '#fff', fontWeight: 600 }}>Proyectos</span>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          {/* View toggle */}
+          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+            <button onClick={() => setView('kanban')} style={{ padding: '5px 12px', fontSize: '0.65rem', fontWeight: 600, cursor: 'pointer', background: view === 'kanban' ? 'rgba(0,229,176,0.12)' : 'transparent', color: view === 'kanban' ? '#00e5b0' : '#64748b', border: 'none' }}>☰ Kanban</button>
+            <button onClick={() => setView('table')} style={{ padding: '5px 12px', fontSize: '0.65rem', fontWeight: 600, cursor: 'pointer', background: view === 'table' ? 'rgba(0,229,176,0.12)' : 'transparent', color: view === 'table' ? '#00e5b0' : '#64748b', border: 'none' }}>▤ Tabla</button>
+          </div>
           <button onClick={() => { resetForm(); setShowCreate(true); }} style={{ background: 'linear-gradient(135deg, #00e5b0 0%, #00c49a 100%)', border: 'none', borderRadius: 8, padding: '6px 16px', color: '#0a0d14', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}>
-            <i className="bi bi-plus-lg" style={{ fontSize: '0.8rem' }}></i> Nuevo Proyecto
+            <i className="bi bi-plus-lg" style={{ fontSize: '0.8rem' }}></i> Nuevo
           </button>
         </div>
       </div>
@@ -252,6 +258,62 @@ export default function ProjectsPage() {
               <div role="status" aria-label="Cargando" style={{ width: 20, height: 20, border: '2px solid rgba(255,255,255,0.1)', borderTopColor: '#00e5b0', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
               Cargando proyectos...
             </div>
+          </div>
+        ) : view === 'table' ? (
+          /* Table View — estilo Monday */
+          <div style={{ background: '#0d1117', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+                  {['Proyecto', 'Status', 'Prioridad', 'Owner', 'Progreso', 'Due Date', 'Categoría'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontSize: '0.62rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(p => {
+                  const col = COLUMNS.find(c => c.key === p.status);
+                  const pc = PRIORITY_COLORS[p.priority] || '#64748b';
+                  return (
+                    <tr key={p.id} onClick={() => { setSelectedProject(p); setShowCreate(true); setEditMode(true); setForm({ name: p.name, description: p.description, priority: p.priority, category: p.category, owner: p.owner, tags: (p.tags || []).join(', '), due_date: p.due_date?.split('T')[0] || '', status: p.status, lead_id: (p as unknown as Record<string, unknown>).lead_id as string || '' }); }} style={{ cursor: 'pointer', transition: 'background 0.15s' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,229,176,0.03)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                      <td style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f1f5f9' }}>{p.name}</div>
+                        <div style={{ fontSize: '0.62rem', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 250 }}>{p.description}</div>
+                      </td>
+                      <td style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                        <span style={{ fontSize: '0.62rem', fontWeight: 700, padding: '3px 10px', borderRadius: 6, background: `${col?.color || '#475569'}18`, color: col?.color || '#475569', display: 'inline-block' }}>{col?.label || p.status}</span>
+                      </td>
+                      <td style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                        <span style={{ fontSize: '0.62rem', fontWeight: 700, padding: '3px 10px', borderRadius: 6, background: `${pc}18`, color: pc }}>{PRIORITY_LABELS[p.priority] || p.priority}</span>
+                      </td>
+                      <td style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{ width: 22, height: 22, borderRadius: '50%', background: avatarColor(p.owner || ''), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.5rem', color: '#fff', fontWeight: 700 }}>{getInitials(p.owner || 'NA')}</div>
+                          <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{p.owner || '—'}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ flex: 1, height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${p.progress || 0}%`, background: progressColor(p.progress || 0), borderRadius: 3, transition: 'width 0.4s' }} />
+                          </div>
+                          <span style={{ fontSize: '0.62rem', fontWeight: 700, color: progressColor(p.progress || 0), minWidth: 28 }}>{p.progress || 0}%</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.68rem', color: '#64748b', fontFamily: "'JetBrains Mono', monospace" }}>
+                        {p.due_date ? new Date(p.due_date).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' }) : '—'}
+                      </td>
+                      <td style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                        {p.category && <span style={{ fontSize: '0.58rem', padding: '2px 8px', borderRadius: 5, background: 'rgba(255,255,255,0.04)', color: '#94a3b8' }}>{p.category}</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {filtered.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: '#475569', fontSize: '0.8rem' }}>Sin proyectos</div>}
           </div>
         ) : (
           /* Kanban Board */
