@@ -53,8 +53,9 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
     { href: '/dashboard/analytics', icon: 'bi-graph-up', label: 'Analytics', shortcut: '⌘4' },
     { href: '/dashboard/projects', icon: 'bi-kanban', label: 'Proyectos', shortcut: '⌘5' },
     { href: '/dashboard/improvements', icon: 'bi-stars', label: 'Mejoras & UX', shortcut: '⌘6' },
-    { href: '/dashboard/labs', icon: 'bi-puzzle', label: 'Extensiones', shortcut: '⌘7' },
-    { href: '/dashboard/learn', icon: 'bi-compass', label: 'Discovery', shortcut: '⌘8' },
+    { href: '/dashboard/stack', icon: 'bi-layers', label: 'Stack 2026', shortcut: '⌘7' },
+    { href: '/dashboard/labs', icon: 'bi-puzzle', label: 'Extensiones', shortcut: '⌘8' },
+    { href: '/dashboard/learn', icon: 'bi-compass', label: 'Discovery', shortcut: '⌘9' },
   ];
 
   const infraItems = [

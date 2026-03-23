@@ -190,6 +190,11 @@ export default function LearnPage() {
   const [levelFilter, setLevelFilter] = useState('Todos');
   const [search, setSearch] = useState('');
   const [activeResource, setActiveResource] = useState<{ course: Course; resource: Resource } | null>(null);
+  const [iframeError, setIframeError] = useState(false);
+
+  // Sites known to block iframes
+  const BLOCKED_DOMAINS = ['anthropic.com', 'openai.com', 'platform.openai.com', 'github.com', 'docs.github.com', 'console.groq.com', 'figma.com', 'supabase.com', 'vercel.com', 'sap.com', 'cloud.sap', 'learning.sap', 'community.sap', 'totaltypescript.com'];
+  const isBlocked = (url: string) => BLOCKED_DOMAINS.some(d => url.includes(d));
 
   const filtered = COURSES.filter(c => {
     if (catFilter !== 'Todos' && c.category !== catFilter) return false;
@@ -306,7 +311,7 @@ export default function LearnPage() {
                       const ti = typeIcons[res.type];
                       const isResActive = activeResource?.resource.url === res.url;
                       return (
-                        <button key={i} onClick={() => setActiveResource({ course, resource: res })}
+                        <button key={i} onClick={() => { setIframeError(false); setActiveResource({ course, resource: res }); }}
                           style={{
                             display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px',
                             background: isResActive ? 'rgba(0,229,176,0.08)' : 'rgba(255,255,255,0.02)',
@@ -360,13 +365,29 @@ export default function LearnPage() {
                 }}>✕</button>
               </div>
             </div>
-            {/* Iframe */}
-            <iframe
-              src={activeResource.resource.url}
-              style={{ flex: 1, border: 'none', background: '#fff' }}
-              title={activeResource.resource.title}
-              sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-            />
+            {/* Content */}
+            {isBlocked(activeResource.resource.url) || iframeError ? (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 40 }}>
+                <div style={{ fontSize: 48 }}>{activeResource.course.emoji}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', textAlign: 'center' }}>{activeResource.resource.title}</div>
+                <div style={{ fontSize: 13, color: '#94a3b8', textAlign: 'center', maxWidth: 400, lineHeight: 1.6 }}>{activeResource.resource.description}</div>
+                <div style={{ fontSize: 11, color: '#475569', fontFamily: "'JetBrains Mono', monospace", background: '#111827', padding: '6px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.06)' }}>{activeResource.resource.url}</div>
+                <a href={activeResource.resource.url} target="_blank" rel="noopener noreferrer" style={{
+                  padding: '12px 32px', borderRadius: 12, fontSize: 14, fontWeight: 700,
+                  background: 'rgba(0,229,176,0.1)', border: '1px solid rgba(0,229,176,0.2)',
+                  color: '#00e5b0', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8,
+                }}>Abrir en nueva pestaña ↗</a>
+                <div style={{ fontSize: 10, color: '#2a3d58' }}>Este sitio no permite ser embebido</div>
+              </div>
+            ) : (
+              <iframe
+                src={activeResource.resource.url}
+                style={{ flex: 1, border: 'none', background: '#fff' }}
+                title={activeResource.resource.title}
+                sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                onError={() => setIframeError(true)}
+              />
+            )}
           </div>
         )}
       </div>
