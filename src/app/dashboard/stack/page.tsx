@@ -149,6 +149,75 @@ const DECISIONS: DecisionRow[] = [
   { need: 'SAP BTP + IA', solution: 'Claude + MCP + BTP APIs', reason: 'Diferenciador competitivo' },
 ];
 
+interface Project {
+  name: string; emoji: string; url: string; stack: string[]; status: 'live' | 'dev' | 'planned';
+  score: number; // 0-100 adoption score
+  adopted: string[]; // tech already in use
+  pending: string[]; // tech to adopt
+  roadmap: { q: string; item: string; priority: 'high' | 'medium' | 'low' }[];
+}
+
+const PROJECTS: Project[] = [
+  {
+    name: 'Intranet SmartConnection', emoji: '🏢', url: 'intranet.smconnection.cl', status: 'live', score: 95,
+    stack: ['Next.js 16', 'TypeScript', 'Tailwind v4', 'Supabase', 'AWS Amplify'],
+    adopted: ['Claude', 'Groq', 'DeepSeek', 'Mistral', 'OpenAI', 'Grok', 'Cohere', 'OpenRouter', 'Bedrock', 'Gemini', 'Supabase', 'AWS S3', 'CloudFront', 'GitHub Actions', 'Google Workspace'],
+    pending: ['Langfuse', 'MCP Server', 'pgvector RAG', 'n8n workflows'],
+    roadmap: [
+      { q: 'Q2 2026', item: 'Langfuse observability', priority: 'high' },
+      { q: 'Q2 2026', item: 'MCP Server propio', priority: 'high' },
+      { q: 'Q3 2026', item: 'pgvector RAG en knowledge base', priority: 'medium' },
+      { q: 'Q3 2026', item: 'n8n automaciones', priority: 'medium' },
+    ],
+  },
+  {
+    name: 'SmartConnection Marketing', emoji: '🌐', url: 'smconnection.cl', status: 'live', score: 70,
+    stack: ['Astro', 'Tailwind', 'AWS S3', 'CloudFront'],
+    adopted: ['Astro', 'Tailwind', 'AWS S3', 'CloudFront', 'Route 53', 'Google Workspace'],
+    pending: ['Resend email', 'Analytics tracking', 'Supabase forms', 'SEO con Gemini'],
+    roadmap: [
+      { q: 'Q2 2026', item: 'Resend para formulario contacto', priority: 'high' },
+      { q: 'Q2 2026', item: 'Analytics real con Supabase', priority: 'high' },
+      { q: 'Q3 2026', item: 'Blog con IA (Gemini SEO)', priority: 'medium' },
+    ],
+  },
+  {
+    name: 'VOY', emoji: '🚐', url: 'voy app', status: 'live', score: 60,
+    stack: ['Next.js', 'Airtable', 'jsPDF'],
+    adopted: ['Next.js', 'Airtable', 'jsPDF', 'Tailwind'],
+    pending: ['Supabase migración', 'Claude para cotizaciones', 'Deploy Vercel'],
+    roadmap: [
+      { q: 'Q2 2026', item: 'Migrar de Airtable a Supabase', priority: 'high' },
+      { q: 'Q3 2026', item: 'Claude genera cotizaciones automáticas', priority: 'medium' },
+    ],
+  },
+  {
+    name: 'InfoPet', emoji: '🐾', url: 'infopet (Amplify)', status: 'live', score: 55,
+    stack: ['Next.js', 'AWS Amplify', 'Groq'],
+    adopted: ['Next.js', 'AWS Amplify', 'Groq', 'Bsale', 'Jumpseller'],
+    pending: ['Supabase', 'RAG veterinario', 'Claude tool use', 'MCP Bsale'],
+    roadmap: [
+      { q: 'Q2 2026', item: 'RAG con docs veterinarios', priority: 'high' },
+      { q: 'Q3 2026', item: 'Claude + MCP para Bsale/Jumpseller', priority: 'high' },
+      { q: 'Q3 2026', item: 'Migrar a Supabase', priority: 'medium' },
+    ],
+  },
+  {
+    name: 'Marketplace', emoji: '🛒', url: 'marketplace.smconnection.cl', status: 'dev', score: 40,
+    stack: ['Next.js', 'AWS Amplify'],
+    adopted: ['Next.js', 'Tailwind', 'AWS Amplify'],
+    pending: ['Helium 10 API', 'MeLi API', 'Supabase', 'Groq análisis', 'n8n scrapers'],
+    roadmap: [
+      { q: 'Q2 2026', item: 'MeLi API integración', priority: 'high' },
+      { q: 'Q2 2026', item: 'Helium 10 keywords', priority: 'high' },
+      { q: 'Q3 2026', item: 'n8n scraper automático', priority: 'medium' },
+      { q: 'Q4 2026', item: 'Amazon SP-API', priority: 'low' },
+    ],
+  },
+];
+
+const priorityColors = { high: { bg: 'rgba(239,68,68,0.08)', text: '#ef4444' }, medium: { bg: 'rgba(245,158,11,0.08)', text: '#f59e0b' }, low: { bg: 'rgba(107,128,153,0.08)', text: '#6b8099' } };
+
 const difficultyColor = (d: string) => {
   if (d === 'Beginner') return { bg: 'rgba(34,197,94,0.12)', color: '#22c55e' };
   if (d === 'Intermediate') return { bg: 'rgba(245,158,11,0.12)', color: '#f59e0b' };
@@ -177,6 +246,7 @@ export default function StackPage() {
     { id: 'discovery', label: 'Discovery', icon: 'bi-compass' },
     { id: 'missions', label: 'Misiones', icon: 'bi-flag' },
     { id: 'decisions', label: 'Decisiones', icon: 'bi-signpost-split' },
+    { id: 'projects', label: 'Proyectos', icon: 'bi-diagram-3' },
   ];
 
   const s = {
@@ -476,6 +546,94 @@ export default function StackPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </>
+        )}
+
+        {activeSection === 'projects' && (
+          <>
+            <h2 style={s.sectionTitle}><i className="bi bi-diagram-3" style={{ color: '#00e5b0' }}></i> Proyectos — Assessment & Roadmap</h2>
+            <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1.5rem' }}>Stack adoptado vs pendiente por proyecto. Score = % de tecnologías del stack 2026 implementadas.</p>
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              {PROJECTS.map(p => (
+                <div key={p.name} style={{ background: '#0d1117', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, overflow: 'hidden', transition: 'all 0.2s' }}>
+                  {/* Header */}
+                  <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <span style={{ fontSize: '1.5rem' }}>{p.emoji}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f1f5f9' }}>{p.name}</div>
+                      <div style={{ fontSize: '0.65rem', color: '#64748b', fontFamily: "'JetBrains Mono', monospace" }}>{p.url}</div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 900, color: p.score > 80 ? '#1fd975' : p.score > 60 ? '#f5a623' : '#ef4444' }}>{p.score}%</div>
+                      <div style={{ fontSize: '0.55rem', color: '#64748b' }}>Adopción</div>
+                    </div>
+                    <span style={{ fontSize: '0.6rem', fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: p.status === 'live' ? 'rgba(31,217,117,0.1)' : p.status === 'dev' ? 'rgba(245,158,11,0.1)' : 'rgba(107,128,153,0.1)', color: p.status === 'live' ? '#1fd975' : p.status === 'dev' ? '#f5a623' : '#6b8099' }}>
+                      {p.status === 'live' ? '● Live' : p.status === 'dev' ? '◐ Dev' : '○ Planned'}
+                    </span>
+                  </div>
+                  {/* Progress bar */}
+                  <div style={{ height: 4, background: 'rgba(255,255,255,0.04)' }}>
+                    <div style={{ height: '100%', width: `${p.score}%`, background: p.score > 80 ? '#1fd975' : p.score > 60 ? '#f5a623' : '#ef4444', transition: 'width 0.5s' }} />
+                  </div>
+                  {/* Body */}
+                  <div style={{ padding: '16px 20px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                      {/* Adopted */}
+                      <div>
+                        <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#1fd975', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>✓ Adoptado ({p.adopted.length})</div>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {p.adopted.map(t => (
+                            <span key={t} style={{ fontSize: '0.58rem', padding: '2px 8px', borderRadius: 5, background: 'rgba(31,217,117,0.06)', color: '#1fd975', border: '1px solid rgba(31,217,117,0.12)' }}>{t}</span>
+                          ))}
+                        </div>
+                      </div>
+                      {/* Pending */}
+                      <div>
+                        <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#f5a623', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>⏳ Pendiente ({p.pending.length})</div>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {p.pending.map(t => (
+                            <span key={t} style={{ fontSize: '0.58rem', padding: '2px 8px', borderRadius: 5, background: 'rgba(245,158,11,0.06)', color: '#f5a623', border: '1px solid rgba(245,158,11,0.12)' }}>{t}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    {/* Roadmap */}
+                    <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#94a3b8', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Roadmap</div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {p.roadmap.map((r, i) => {
+                        const pc = priorityColors[r.priority];
+                        return (
+                          <div key={i} style={{ background: pc.bg, border: `1px solid ${pc.text}20`, borderRadius: 8, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: '0.55rem', color: '#64748b', fontFamily: "'JetBrains Mono', monospace" }}>{r.q}</span>
+                            <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#f1f5f9' }}>{r.item}</span>
+                            <span style={{ fontSize: '0.5rem', fontWeight: 700, color: pc.text, textTransform: 'uppercase' }}>{r.priority}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Global summary */}
+            <div style={{ marginTop: '1.5rem', background: '#0d1117', border: '1px solid rgba(0,229,176,0.15)', borderRadius: 14, padding: '20px', display: 'flex', gap: 20, justifyContent: 'center' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', fontWeight: 900, color: '#00e5b0' }}>{Math.round(PROJECTS.reduce((s, p) => s + p.score, 0) / PROJECTS.length)}%</div>
+                <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Score Promedio</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', fontWeight: 900, color: '#1fd975' }}>{PROJECTS.filter(p => p.status === 'live').length}</div>
+                <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Live</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', fontWeight: 900, color: '#f5a623' }}>{PROJECTS.reduce((s, p) => s + p.roadmap.filter(r => r.priority === 'high').length, 0)}</div>
+                <div style={{ fontSize: '0.65rem', color: '#64748b' }}>High Priority</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', fontWeight: 900, color: '#4f8ef7' }}>{PROJECTS.reduce((s, p) => s + p.roadmap.length, 0)}</div>
+                <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Roadmap Items</div>
+              </div>
             </div>
           </>
         )}
