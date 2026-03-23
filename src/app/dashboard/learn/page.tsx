@@ -193,7 +193,25 @@ export default function LearnPage() {
   const [iframeError, setIframeError] = useState(false);
 
   // Sites known to block iframes
-  const BLOCKED_DOMAINS = ['anthropic.com', 'openai.com', 'platform.openai.com', 'github.com', 'docs.github.com', 'console.groq.com', 'figma.com', 'supabase.com', 'vercel.com', 'sap.com', 'cloud.sap', 'learning.sap', 'community.sap', 'totaltypescript.com'];
+  // Verified via curl -I (X-Frame-Options / CSP frame-ancestors)
+  const BLOCKED_DOMAINS = [
+    'docs.anthropic.com',    // SAMEORIGIN
+    'platform.openai.com',   // SAMEORIGIN
+    'console.groq.com',      // CSP frame-src self only
+    'huggingface.co',        // DENY
+    'nextjs.org',            // DENY
+    'supabase.com',          // DENY
+    'docs.aws.amazon.com',   // SAMEORIGIN
+    'figma.com',             // blocked
+    'vercel.com',            // blocked
+    'cloud.sap',             // blocked
+    'learning.sap.com',      // blocked
+    'community.sap.com',     // blocked
+    'docs.github.com',       // CSP frame-ancestors self
+    'github.com',            // CSP
+    'cookbook.openai.com',    // blocked
+    'totaltypescript.com',   // blocked
+  ];
   const isBlocked = (url: string) => BLOCKED_DOMAINS.some(d => url.includes(d));
 
   const filtered = COURSES.filter(c => {
