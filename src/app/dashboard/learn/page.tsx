@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { FlowDiagram, ArchDiagram, ComparisonDiagram, SchemaDiagram } from '@/components/LessonDiagram';
 
 interface Resource {
   title: string;
@@ -299,6 +300,7 @@ export default function LearnPage() {
                           <span style={{ fontSize: 13, color: '#d1d5db', lineHeight: 1.6 }}>{s}</span>
                         </div>
                       ))}
+                      <FlowDiagram title="Flujo de un prompt" steps={['Contexto', 'Tarea', 'Formato', 'Restricciones', 'Respuesta IA']} />
                       <h4 style={{ fontSize: 15, fontWeight: 700, color: '#00e5b0', margin: '20px 0 10px' }}>Ejemplo</h4>
                       <pre style={{ background: '#06080f', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 16, fontSize: 12, lineHeight: 1.7, color: '#a8d8ea', overflow: 'auto', margin: '12px 0' }}>{`// ❌ Prompt malo:
 "Hazme un login"
@@ -333,6 +335,12 @@ Analiza paso a paso:
                   { title: 'System prompts y modos', content: (
                     <>
                       <p style={{ fontSize: 14, color: '#94a3b8', lineHeight: 1.7, marginBottom: 16 }}>Un system prompt define la personalidad y contexto base del agente. En la intranet, cada modo (Chat, Code, SAP, Deploy) tiene su propio system prompt.</p>
+                      <ArchDiagram title="Arquitectura de modos" layers={[
+                        { label: 'Usuario', items: [{ name: 'Prompt', color: '#00e5b0' }] },
+                        { label: 'Modo seleccionado', items: [{ name: '💬 Chat', color: '#4f8ef7' }, { name: '</> Code', color: '#1fd975' }, { name: '🏢 SAP', color: '#f5a623' }, { name: '🚀 Deploy', color: '#b794ff' }] },
+                        { label: 'System prompt inyectado', items: [{ name: 'Contexto + reglas + formato', color: '#6b8099' }] },
+                        { label: 'Agente ejecuta', items: [{ name: 'Hoku 9in1', color: '#00e5b0' }] },
+                      ]} />
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, margin: '16px 0' }}>
                         {[{m:'💬 Chat',d:'Conversación general, respuestas concisas'},{m:'</> Code',d:'Genera código funcional con filename'},{m:'🏢 SAP',d:'Consultoría SAP Chile, propuestas en UF'},{m:'🚀 Deploy',d:'DevOps, AWS, CI/CD, infraestructura'}].map(x => (
                           <div key={x.m} style={{ background: '#0d1117', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: 12 }}>
@@ -510,6 +518,7 @@ https://mi-app-ia.vercel.app
                   { title: 'Setup Supabase con pgvector', content: (
                     <>
                       <p style={{ fontSize: 14, color: '#94a3b8', lineHeight: 1.7, marginBottom: 16 }}>pgvector es una extensión de PostgreSQL que permite almacenar y buscar embeddings vectoriales. Supabase la incluye nativamente. Es la base de cualquier sistema RAG.</p>
+                      <FlowDiagram title="Pipeline RAG" steps={['Documento', 'Chunks', 'Embeddings', 'pgvector', 'Query', 'Similitud', 'LLM', 'Respuesta']} colors={['#f5a623','#f5a623','#4f8ef7','#1fd975','#00e5b0','#1fd975','#b794ff','#00e5b0']} />
                       <h4 style={{ fontSize: 15, fontWeight: 700, color: '#00e5b0', margin: '20px 0 10px' }}>Habilitar la extensión</h4>
                       <pre style={{ background: '#06080f', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 16, fontSize: 12, lineHeight: 1.7, color: '#a8d8ea', overflow: 'auto', margin: '12px 0' }}>{`-- En el SQL Editor de Supabase:
 CREATE EXTENSION IF NOT EXISTS vector;`}</pre>
@@ -1059,6 +1068,11 @@ function selectModel(mode: string, complexity: string): string {
                   { title: 'Qué es MCP', content: (
                     <>
                       <p style={{ fontSize: 14, color: '#94a3b8', lineHeight: 1.7, marginBottom: 16 }}>Model Context Protocol (MCP) es un estándar abierto de Anthropic para conectar modelos de IA con herramientas externas. Piensa en USB pero para IA: un protocolo universal para que cualquier modelo use cualquier herramienta.</p>
+                      <ArchDiagram title="Arquitectura MCP" layers={[
+                        { label: 'Host (Claude Code / IDE)', items: [{ name: 'Claude', color: '#00e5b0' }, { name: 'Cursor', color: '#4f8ef7' }] },
+                        { label: 'MCP Protocol (JSON-RPC)', items: [{ name: 'Tools', color: '#f5a623' }, { name: 'Resources', color: '#b794ff' }, { name: 'Prompts', color: '#1fd975' }] },
+                        { label: 'MCP Servers', items: [{ name: 'Supabase', color: '#1fd975' }, { name: 'GitHub', color: '#6b8099' }, { name: 'Bsale', color: '#8b5cf6' }, { name: 'Custom', color: '#f04747' }] },
+                      ]} />
                       <h4 style={{ fontSize: 15, fontWeight: 700, color: '#00e5b0', margin: '20px 0 10px' }}>Arquitectura</h4>
                       <pre style={{ background: '#06080f', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 16, fontSize: 12, lineHeight: 1.7, color: '#a8d8ea', overflow: 'auto', margin: '12px 0' }}>{`// Arquitectura MCP:
 //
@@ -1427,6 +1441,11 @@ jobs:
                   { title: 'Diseñar el schema', content: (
                     <>
                       <p style={{ fontSize: 14, color: '#94a3b8', lineHeight: 1.7, marginBottom: 16 }}>InfoPet es un asistente veterinario con RAG. Necesitamos tablas para productos (de Bsale/Jumpseller), consultas de usuarios y embeddings para búsqueda semántica.</p>
+                      <SchemaDiagram title="Schema InfoPet" tables={[
+                        { name: 'products', color: '#00e5b0', fields: ['id uuid PK', 'name text', 'sku text', 'price int', 'stock int', 'source text', 'embedding vector(1536)'] },
+                        { name: 'vet_docs', color: '#4f8ef7', fields: ['id uuid PK', 'title text', 'content text', 'category text', 'embedding vector(1536)'] },
+                        { name: 'consultations', color: '#f5a623', fields: ['id uuid PK', 'user_query text', 'response text', 'sources jsonb', 'created_at timestamptz'] },
+                      ]} />
                       <h4 style={{ fontSize: 15, fontWeight: 700, color: '#00e5b0', margin: '20px 0 10px' }}>Schema de la base de datos</h4>
                       <pre style={{ background: '#06080f', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 16, fontSize: 12, lineHeight: 1.7, color: '#a8d8ea', overflow: 'auto', margin: '12px 0' }}>{`-- Extensión para embeddings
 CREATE EXTENSION IF NOT EXISTS vector;
