@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 
 export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user: string; role?: string; 'aria-label'?: string }) {
   const [expanded, setExpanded] = useState(false);
+  const [pinned, setPinned] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [isMobile, setIsMobile] = useState(false);
@@ -20,6 +21,8 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
   useEffect(() => {
     const saved = localStorage.getItem('sc-theme') as 'dark' | 'light' | null;
     if (saved) setTheme(saved);
+    const savedPin = localStorage.getItem('sc-sidebar-pinned');
+    if (savedPin === 'true') setPinned(true);
   }, []);
 
   useEffect(() => {
@@ -34,12 +37,30 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
     }
   }, [theme]);
 
+  useEffect(() => {
+    localStorage.setItem('sc-sidebar-pinned', String(pinned));
+  }, [pinned]);
+
+  // Sincronizar CSS variable para que el layout sepa el ancho
+  const w = isMobile ? (mobileOpen ? 240 : 0) : ((pinned || expanded) ? 240 : 64);
+  const showExpanded = isMobile ? mobileOpen : (pinned || expanded);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--sidebar-w', `${w}px`);
+  }, [w]);
+
   const handleLogout = () => {
     fetch('/api/auth', { method: 'DELETE' }).then(() => { window.location.href = '/'; });
   };
 
-  const w = isMobile ? (mobileOpen ? 240 : 0) : (expanded ? 240 : 64);
-  const showExpanded = isMobile ? mobileOpen : expanded;
+  const isDark = theme === 'dark';
+  const sidebarBg = isDark ? '#111827' : '#ffffff';
+  const borderColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
+  const textMuted = isDark ? '#94a3b8' : '#64748b';
+  const textDimmed = isDark ? '#475569' : '#94a3b8';
+  const hoverBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
+  const inputBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)';
+  const inputBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard';
@@ -78,7 +99,7 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
       gap: 10,
       padding: showExpanded ? '8px 10px' : '10px 0',
       borderRadius: 8,
-      color: active ? '#00e5b0' : hovered ? '#cbd5e1' : '#94a3b8',
+      color: active ? '#00e5b0' : hovered ? (isDark ? '#cbd5e1' : '#1e293b') : textMuted,
       fontSize: '0.78rem',
       fontWeight: active ? 600 : 500,
       textDecoration: 'none',
@@ -91,7 +112,7 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
       background: active
         ? 'rgba(0, 229, 176, 0.08)'
         : hovered
-          ? 'rgba(255, 255, 255, 0.04)'
+          ? hoverBg
           : 'transparent',
       transition: 'all 0.15s ease',
     };
@@ -145,13 +166,13 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
     <aside
       role={role}
       aria-label={ariaLabel}
-      onMouseEnter={() => !isMobile && setExpanded(true)}
-      onMouseLeave={() => { if (!isMobile) { setExpanded(false); setHoveredItem(null); } }}
+      onMouseEnter={() => !isMobile && !pinned && setExpanded(true)}
+      onMouseLeave={() => { if (!isMobile && !pinned) { setExpanded(false); setHoveredItem(null); } }}
       style={{
         width: w,
         minWidth: w,
-        background: '#111827',
-        borderRight: '1px solid rgba(255,255,255,0.06)',
+        background: sidebarBg,
+        borderRight: `1px solid ${borderColor}`,
         position: 'fixed',
         top: 0,
         left: 0,
@@ -160,15 +181,36 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
         flexDirection: 'column',
         zIndex: 100,
         fontFamily: "'Inter', system-ui, sans-serif",
-        transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease',
+        transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease, background 0.2s ease',
         overflow: 'hidden',
-        boxShadow: (showExpanded || mobileOpen) ? '8px 0 40px rgba(0,0,0,0.6)' : 'none',
+        boxShadow: (showExpanded && !pinned) || mobileOpen ? '8px 0 40px rgba(0,0,0,0.6)' : 'none',
       }}
     >
-      {/* Logo */}
-      <div style={{ padding: showExpanded ? '1.25rem 1rem' : '1.25rem 0.5rem', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.06)', justifyContent: showExpanded ? 'flex-start' : 'center', transition: 'padding 0.25s' }}>
+      {/* Logo + Pin */}
+      <div style={{ padding: showExpanded ? '1.25rem 1rem' : '1.25rem 0.5rem', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${borderColor}`, justifyContent: showExpanded ? 'flex-start' : 'center', transition: 'padding 0.25s' }}>
         <img src="/img/logo_smart.svg" alt="SC" style={{ height: 24, flexShrink: 0 }} />
         {showExpanded && <span style={{ background: '#00e5b0', color: '#0a0d14', fontSize: '0.5rem', fontWeight: 800, padding: '2px 6px', borderRadius: 999, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>INTRANET</span>}
+        {showExpanded && !isMobile && (
+          <button
+            onClick={() => setPinned(p => !p)}
+            title={pinned ? 'Desfijar sidebar' : 'Fijar sidebar abierto'}
+            style={{
+              marginLeft: 'auto',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: pinned ? '#00e5b0' : textDimmed,
+              fontSize: '0.85rem',
+              padding: 4,
+              borderRadius: 4,
+              transition: 'color 0.15s, transform 0.2s',
+              transform: pinned ? 'rotate(0deg)' : 'rotate(45deg)',
+              flexShrink: 0,
+            }}
+          >
+            <i className="bi bi-pin-fill"></i>
+          </button>
+        )}
       </div>
 
       {/* Command Search Trigger */}
@@ -182,9 +224,9 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
               gap: 8,
               padding: '7px 10px',
               borderRadius: 8,
-              border: '1px solid rgba(255,255,255,0.08)',
-              background: 'rgba(255,255,255,0.03)',
-              color: '#64748b',
+              border: `1px solid ${inputBorder}`,
+              background: inputBg,
+              color: textMuted,
               fontSize: '0.72rem',
               cursor: 'pointer',
               transition: 'all 0.15s ease',
@@ -197,9 +239,9 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
               fontSize: '0.6rem',
               padding: '1px 5px',
               borderRadius: 4,
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              color: '#475569',
+              background: inputBg,
+              border: `1px solid ${inputBorder}`,
+              color: textDimmed,
               fontFamily: 'inherit',
               lineHeight: 1.6,
             }}>⌘K</kbd>
@@ -208,10 +250,10 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
       ) : (
         <div style={{ padding: '0.75rem 0.5rem 0', display: 'flex', justifyContent: 'center' }}>
           <button style={{
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.08)',
+            background: inputBg,
+            border: `1px solid ${inputBorder}`,
             borderRadius: 8,
-            color: '#64748b',
+            color: textMuted,
             padding: '8px 0',
             width: 40,
             cursor: 'pointer',
@@ -223,9 +265,9 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
         </div>
       )}
 
-      {/* Nav */}
-      <div style={{ padding: '0.75rem 0.5rem', flex: 1 }}>
-        {showExpanded && <div style={{ fontSize: '0.55rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '0 8px', marginBottom: 6 }}>Principal</div>}
+      {/* Nav — scrollable */}
+      <div style={{ padding: '0.75rem 0.5rem', flex: 1, overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'thin', scrollbarColor: `${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'} transparent` }}>
+        {showExpanded && <div style={{ fontSize: '0.55rem', fontWeight: 700, color: textDimmed, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '0 8px', marginBottom: 6 }}>Principal</div>}
         {navItems.map(item => (
           <a
             key={item.href}
@@ -256,8 +298,8 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
           </a>
         ))}
 
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }}></div>
-        {showExpanded && <div style={{ fontSize: '0.55rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '0 8px', marginBottom: 6 }}>Infra</div>}
+        <div style={{ height: 1, background: borderColor, margin: '8px 0' }}></div>
+        {showExpanded && <div style={{ fontSize: '0.55rem', fontWeight: 700, color: textDimmed, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '0 8px', marginBottom: 6 }}>Infra</div>}
         {infraItems.map(item => (
           <a
             key={item.href}
@@ -276,9 +318,9 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
 
       {/* Status */}
       {showExpanded && (
-        <div style={{ padding: '0.5rem 0.75rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ padding: '0.5rem 0.75rem', borderTop: `1px solid ${borderColor}` }}>
           {statusItems.map(s => (
-            <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 6px', fontSize: '0.65rem', color: '#64748b' }}>
+            <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 6px', fontSize: '0.65rem', color: textMuted }}>
               <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e', flexShrink: 0 }}></span>
               {s.label} <span style={{ marginLeft: 'auto', fontSize: '0.6rem' }}>{s.status}</span>
             </div>
@@ -287,13 +329,13 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
       )}
 
       {/* Theme Toggle */}
-      <div style={{ padding: showExpanded ? '6px 12px' : '6px 0', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: showExpanded ? 'flex-start' : 'center', gap: 8 }}>
+      <div style={{ padding: showExpanded ? '6px 12px' : '6px 0', borderTop: `1px solid ${borderColor}`, display: 'flex', alignItems: 'center', justifyContent: showExpanded ? 'flex-start' : 'center', gap: 8 }}>
         {showExpanded ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 2, width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: hoverBg, borderRadius: 8, padding: 2, width: '100%' }}>
             <button onClick={() => setTheme('dark')} style={{
               flex: 1, padding: '5px 0', borderRadius: 6, border: 'none', cursor: 'pointer',
               background: theme === 'dark' ? 'rgba(0,229,176,0.12)' : 'transparent',
-              color: theme === 'dark' ? '#00e5b0' : '#475569',
+              color: theme === 'dark' ? '#00e5b0' : textDimmed,
               fontSize: '0.65rem', fontWeight: 600, fontFamily: "'Inter', system-ui",
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
               transition: 'all 0.15s',
@@ -303,7 +345,7 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
             <button onClick={() => setTheme('light')} style={{
               flex: 1, padding: '5px 0', borderRadius: 6, border: 'none', cursor: 'pointer',
               background: theme === 'light' ? 'rgba(245,158,11,0.12)' : 'transparent',
-              color: theme === 'light' ? '#f59e0b' : '#475569',
+              color: theme === 'light' ? '#f59e0b' : textDimmed,
               fontSize: '0.65rem', fontWeight: 600, fontFamily: "'Inter', system-ui",
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
               transition: 'all 0.15s',
@@ -314,7 +356,7 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
         ) : (
           <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} style={{
             background: 'none', border: 'none', cursor: 'pointer', padding: 6,
-            color: theme === 'dark' ? '#475569' : '#f59e0b', fontSize: '0.9rem',
+            color: theme === 'dark' ? textDimmed : '#f59e0b', fontSize: '0.9rem',
             transition: 'color 0.15s',
           }} title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
             <i className={theme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill'}></i>
@@ -323,16 +365,16 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
       </div>
 
       {/* User */}
-      <div style={{ padding: showExpanded ? '0.75rem' : '0.75rem 0', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10, justifyContent: showExpanded ? 'flex-start' : 'center' }}>
+      <div style={{ padding: showExpanded ? '0.75rem' : '0.75rem 0', borderTop: `1px solid ${borderColor}`, display: 'flex', alignItems: 'center', gap: 10, justifyContent: showExpanded ? 'flex-start' : 'center' }}>
         <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(0,229,176,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', color: '#00e5b0', fontWeight: 700, flexShrink: 0 }}>
           {user.charAt(0).toUpperCase()}
         </div>
         {showExpanded && (
           <>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.split('@')[0]}</div>
+              <div style={{ fontSize: '0.7rem', fontWeight: 600, color: isDark ? '#fff' : '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.split('@')[0]}</div>
             </div>
-            <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', padding: 4, fontSize: '0.9rem', transition: 'color 0.15s ease' }} title="Cerrar sesion">
+            <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: textDimmed, cursor: 'pointer', padding: 4, fontSize: '0.9rem', transition: 'color 0.15s ease' }} title="Cerrar sesion">
               <i className="bi bi-box-arrow-right"></i>
             </button>
           </>
