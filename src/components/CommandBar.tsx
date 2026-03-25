@@ -85,7 +85,12 @@ export default function CommandBar() {
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    const openFromSidebar = () => { setOpen(true); setQuery(''); setSelected(0); };
+    window.addEventListener('open-command-bar', openFromSidebar);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('open-command-bar', openFromSidebar);
+    };
   }, [handleKeyDown]);
 
   useEffect(() => {

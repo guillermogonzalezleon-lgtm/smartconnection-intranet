@@ -227,7 +227,7 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
       {showExpanded ? (
         <div style={{ padding: '0.75rem 0.75rem 0' }}>
           <button
-            onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
+            onClick={() => window.dispatchEvent(new CustomEvent('open-command-bar'))}
             style={{
               width: '100%',
               display: 'flex',
@@ -261,7 +261,7 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
       ) : (
         <div style={{ padding: '0.75rem 0.5rem 0', display: 'flex', justifyContent: 'center' }}>
           <button
-            onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
+            onClick={() => window.dispatchEvent(new CustomEvent('open-command-bar'))}
             style={{
               background: inputBg,
               border: `1px solid ${inputBorder}`,
