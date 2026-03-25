@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 
 export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user: string; role?: string; 'aria-label'?: string }) {
@@ -9,6 +9,7 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [isMobile, setIsMobile] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -166,8 +167,17 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
     <aside
       role={role}
       aria-label={ariaLabel}
-      onMouseEnter={() => !isMobile && !pinned && setExpanded(true)}
-      onMouseLeave={() => { if (!isMobile && !pinned) { setExpanded(false); setHoveredItem(null); } }}
+      onMouseEnter={() => {
+        if (!isMobile && !pinned) {
+          if (collapseTimer.current) { clearTimeout(collapseTimer.current); collapseTimer.current = null; }
+          setExpanded(true);
+        }
+      }}
+      onMouseLeave={() => {
+        if (!isMobile && !pinned) {
+          collapseTimer.current = setTimeout(() => { setExpanded(false); setHoveredItem(null); }, 300);
+        }
+      }}
       style={{
         width: w,
         minWidth: w,
@@ -217,6 +227,7 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
       {showExpanded ? (
         <div style={{ padding: '0.75rem 0.75rem 0' }}>
           <button
+            onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
             style={{
               width: '100%',
               display: 'flex',
@@ -249,17 +260,19 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
         </div>
       ) : (
         <div style={{ padding: '0.75rem 0.5rem 0', display: 'flex', justifyContent: 'center' }}>
-          <button style={{
-            background: inputBg,
-            border: `1px solid ${inputBorder}`,
-            borderRadius: 8,
-            color: textMuted,
-            padding: '8px 0',
-            width: 40,
-            cursor: 'pointer',
-            fontSize: '0.85rem',
-            transition: 'all 0.15s ease',
-          }}>
+          <button
+            onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
+            style={{
+              background: inputBg,
+              border: `1px solid ${inputBorder}`,
+              borderRadius: 8,
+              color: textMuted,
+              padding: '8px 0',
+              width: 40,
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+              transition: 'all 0.15s ease',
+            }}>
             <i className="bi bi-search"></i>
           </button>
         </div>
