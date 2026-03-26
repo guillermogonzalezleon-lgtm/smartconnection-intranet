@@ -1,6 +1,7 @@
 .smart-connection {
-  border: 1px solid #ccc;
+  background-color: #f0f0f0;
   padding: 20px;
+  border: 1px solid #ccc;
   border-radius: 10px;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
@@ -9,6 +10,15 @@
   margin-top: 0;
 }
 
-.smart-connection p {
-  margin-bottom: 10px;
+.smart-connection button {
+  background-color: #4CAF50;
+  color: #fff;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.smart-connection button:hover {
+  background-color: #3e8e41;
 }
