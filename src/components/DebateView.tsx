@@ -3,6 +3,30 @@ import { useState, useRef, useEffect, useCallback, type MutableRefObject } from 
 import type { Debate, DebateMessage, Tension, Thread, ThreadMessage } from '@/types/debates';
 import { AGENT_COLORS, AGENT_LIST, HORIZON_LABELS, HORIZON_OPTIONS, MODE_ICONS } from '@/types/debates';
 
+// Tooltip de info — icono ⓘ con hover
+function InfoTip({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+      onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+      <span style={{
+        width: 16, height: 16, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(255,255,255,0.06)', color: '#64748b', fontSize: '0.55rem', fontWeight: 700, cursor: 'help',
+        marginLeft: 4, flexShrink: 0,
+      }} role="img" aria-label={text}>ⓘ</span>
+      {show && (
+        <span style={{
+          position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+          padding: '6px 10px', borderRadius: 6, background: '#1e293b', color: '#e2e8f0',
+          fontSize: '0.65rem', lineHeight: 1.4, whiteSpace: 'normal', width: 220,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)',
+          zIndex: 100, marginBottom: 4, textAlign: 'left', fontWeight: 400,
+        }}>{text}</span>
+      )}
+    </span>
+  );
+}
+
 // ═══ Main Component ═══
 export default function DebateView({ debate: initialDebate, onBack }: { debate: Debate; onBack: () => void }) {
   const [debate, setDebate] = useState<Debate>(initialDebate);
@@ -394,10 +418,12 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
                 ▶ Ejecutar ronda
               </button>
             )}
+            <InfoTip text="Lanza una ronda donde los agentes activos responden uno por uno al tema del debate." />
           </div>
 
           {/* Director de Orquesta */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+            <InfoTip text="Director de Orquesta: controla cuántos agentes participan en cada ronda." />
             {/* Mode buttons */}
             {(['tutti', 'dueto', 'solo'] as const).map(mode => (
               <button key={mode} onClick={() => updateOrchestration({ orchestration_mode: mode })} style={{
@@ -425,23 +451,28 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
             }} aria-pressed={debate.temporal_enabled}>
               ⏱ Temporal {debate.temporal_enabled ? 'ON' : 'OFF'}
             </button>
+            <InfoTip text="Perspectivas temporales: cada agente responde desde un horizonte diferente (1 sprint, 6 meses, incidente, auditoría, 3 años)." />
 
             <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.08)', margin: '0 4px' }} />
 
             {/* Tensions bar toggle */}
             {tensions.length > 0 && (
-              <button onClick={() => setTensionsOpen(!tensionsOpen)} style={{
-                padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                background: 'rgba(249,115,22,0.1)', color: '#f97316',
-                fontWeight: 600, fontSize: '0.7rem',
-              }}>
-                ⚡ {tensions.length} tension{tensions.length !== 1 ? 'es' : ''}
-              </button>
+              <>
+                <button onClick={() => setTensionsOpen(!tensionsOpen)} style={{
+                  padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                  background: 'rgba(249,115,22,0.1)', color: '#f97316',
+                  fontWeight: 600, fontSize: '0.7rem',
+                }}>
+                  ⚡ {tensions.length} tension{tensions.length !== 1 ? 'es' : ''}
+                </button>
+                <InfoTip text="Mapa de tensiones: puntos donde los agentes no se ponen de acuerdo. Ahí están las decisiones reales." />
+              </>
             )}
           </div>
 
           {/* Agent chips */}
           <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+            <InfoTip text="Click en un agente para activarlo/desactivarlo de la siguiente ronda." />
             {AGENT_LIST.map(a => {
               const active = debate.active_agent_ids.includes(a.id);
               return (
@@ -565,6 +596,7 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
                   }} aria-label={`Crear hilo desde mensaje de ${msg.agent_name}`}>
                     💬 Abrir hilo
                   </button>
+                  <InfoTip text="Crea un hilo paralelo desde este mensaje para profundizar sin interrumpir el debate." />
                 </div>
               )}
               {/* New thread form inline */}
@@ -625,7 +657,7 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
             <textarea
               value={userInput} onChange={e => setUserInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendUserMessage(); } }}
-              placeholder="Intervenir en el debate..."
+              placeholder="Intervenir en el debate... (redirige la discusión)"
               rows={1}
               style={{
                 flex: 1, resize: 'none', padding: '8px 12px', borderRadius: 8,
@@ -753,12 +785,13 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
                     flex: 1, padding: '6px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
                     background: 'rgba(34,197,94,0.12)', color: '#22c55e',
                     fontWeight: 700, fontSize: '0.7rem',
-                  }}>Aprobar</button>
+                  }}>✅ Aprobar</button>
                   <button onClick={() => updateThreadStatus('rejected')} style={{
                     flex: 1, padding: '6px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
                     background: 'rgba(239,68,68,0.12)', color: '#ef4444',
                     fontWeight: 700, fontSize: '0.7rem',
-                  }}>Rechazar</button>
+                  }}>❌ Rechazar</button>
+                  <InfoTip text="Aprobar implementa la propuesta. Rechazar la descarta. Puedes revertir después." />
                 </div>
               ) : (
                 <div style={{

@@ -4,6 +4,29 @@ import DebateView from '@/components/DebateView';
 import type { Debate } from '@/types/debates';
 import { AGENT_COLORS, AGENT_LIST, HORIZON_OPTIONS, DEFAULT_TEMPORAL, MODE_ICONS } from '@/types/debates';
 
+function InfoTip({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+      onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+      <span style={{
+        width: 16, height: 16, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(255,255,255,0.06)', color: '#64748b', fontSize: '0.55rem', fontWeight: 700, cursor: 'help',
+        marginLeft: 4, flexShrink: 0,
+      }} role="img" aria-label={text}>ⓘ</span>
+      {show && (
+        <span style={{
+          position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+          padding: '6px 10px', borderRadius: 6, background: '#1e293b', color: '#e2e8f0',
+          fontSize: '0.65rem', lineHeight: 1.4, whiteSpace: 'normal', width: 220,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)',
+          zIndex: 100, marginBottom: 4, textAlign: 'left', fontWeight: 400,
+        }}>{text}</span>
+      )}
+    </span>
+  );
+}
+
 export default function DebatesPage() {
   const [debates, setDebates] = useState<Debate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -229,8 +252,9 @@ export default function DebatesPage() {
 
             {/* Title */}
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: '#94a3b8', marginBottom: 4 }}>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.72rem', fontWeight: 600, color: '#94a3b8', marginBottom: 4 }}>
                 Titulo del debate
+                <InfoTip text="Nombre corto para identificar este debate en la lista." />
               </label>
               <input
                 value={newTitle} onChange={e => setNewTitle(e.target.value)}
@@ -246,8 +270,9 @@ export default function DebatesPage() {
 
             {/* Topic */}
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: '#94a3b8', marginBottom: 4 }}>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.72rem', fontWeight: 600, color: '#94a3b8', marginBottom: 4 }}>
                 Tema / Prompt del debate
+                <InfoTip text="El tema que los agentes van a debatir. Mientras más contexto des, mejor la discusión." />
               </label>
               <textarea
                 value={newTopic} onChange={e => setNewTopic(e.target.value)}
@@ -271,8 +296,9 @@ export default function DebatesPage() {
 
             {/* Agent selector */}
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: '#94a3b8', marginBottom: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.72rem', fontWeight: 600, color: '#94a3b8', marginBottom: 8 }}>
                 Agentes participantes ({newAgents.length} seleccionados)
+                <InfoTip text="Elige qué agentes IA participan. Cada uno tiene su perspectiva y provider." />
               </label>
               {newAgents.length === 0 && (
                 <div style={{ fontSize: '0.65rem', color: '#ef4444', marginBottom: 6 }}>
@@ -307,8 +333,9 @@ export default function DebatesPage() {
 
             {/* Director mode */}
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: '#94a3b8', marginBottom: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.72rem', fontWeight: 600, color: '#94a3b8', marginBottom: 8 }}>
                 Modo Director de Orquesta
+                <InfoTip text="Tutti = todos hablan. Dueto = solo 2 agentes debaten. Solo = 1 agente profundiza." />
               </label>
               <div style={{ display: 'flex', gap: 8 }}>
                 {(['tutti', 'dueto', 'solo'] as const).map(mode => (
@@ -333,8 +360,9 @@ export default function DebatesPage() {
             {/* Temporal perspectives */}
             <div style={{ marginBottom: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#94a3b8' }}>
+                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#94a3b8', display: 'flex', alignItems: 'center' }}>
                   Perspectivas temporales
+                  <InfoTip text="Cada agente argumenta desde un horizonte temporal diferente: corto, mediano o largo plazo." />
                 </label>
                 <button onClick={() => setNewTemporal(!newTemporal)} style={{
                   padding: '3px 10px', borderRadius: 12, border: 'none', cursor: 'pointer',
