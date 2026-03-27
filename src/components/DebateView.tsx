@@ -1,95 +1,7 @@
 'use client';
 import { useState, useRef, useEffect, useCallback, type MutableRefObject } from 'react';
-
-// ═══ Types ═══
-interface DebateMessage {
-  id: string;
-  debate_id: string;
-  agent_id: string;
-  agent_name: string;
-  content: string;
-  role: 'assistant' | 'user' | 'system';
-  time_horizon?: string | null;
-  tokens_used: number;
-  tension_with?: string | null;
-  created_at: string;
-}
-
-interface Tension {
-  id: string;
-  agent_a: string;
-  agent_b: string;
-  summary: string;
-  severity: 'low' | 'medium' | 'high';
-  resolved: boolean;
-  message_id: string;
-}
-
-interface Thread {
-  id: string;
-  debate_id: string;
-  source_message_id: string;
-  title: string;
-  status: 'open' | 'approved' | 'rejected' | 'merged';
-  created_at: string;
-}
-
-interface ThreadMessage {
-  id: string;
-  thread_id: string;
-  agent_id: string;
-  agent_name: string;
-  content: string;
-  role: 'assistant' | 'user';
-  created_at: string;
-}
-
-interface Debate {
-  id: string;
-  title: string;
-  topic: string;
-  status: 'active' | 'paused' | 'completed' | 'archived';
-  orchestration_mode: 'tutti' | 'dueto' | 'solo';
-  active_agent_ids: string[];
-  temporal_enabled: boolean;
-  temporal_config: Record<string, string>;
-  total_tokens: number;
-  total_tensions: number;
-  messages: DebateMessage[];
-  tensions: Tension[];
-  threads: Thread[];
-  created_at: string;
-}
-
-// ═══ Constants ═══
-const AGENT_COLORS: Record<string, string> = {
-  hoku: '#ff6b6b', groq: '#f59e0b', claude: '#00e5b0', grok: '#8b5cf6',
-  deepseek: '#0ea5e9', mistral: '#f97316', openai: '#10b981',
-  panchita: '#d97706', camilita: '#ec4899', arielito: '#3b82f6', sergito: '#a855f7',
-  user: '#94a3b8', cohere: '#1e3a5f', openrouter: '#6366f1', bedrock: '#f97316',
-};
-
-const AGENT_LIST = [
-  { id: 'hoku', name: 'Hoku' }, { id: 'groq', name: 'Groq' },
-  { id: 'claude', name: 'Claude' }, { id: 'panchita', name: 'Panchita' },
-  { id: 'grok', name: 'Grok' }, { id: 'deepseek', name: 'DeepSeek' },
-  { id: 'mistral', name: 'Mistral' }, { id: 'openai', name: 'OpenAI' },
-  { id: 'camilita', name: 'Camilita' }, { id: 'arielito', name: 'Arielito' },
-  { id: 'sergito', name: 'Sergito' },
-];
-
-const HORIZON_LABELS: Record<string, string> = {
-  '1_sprint': '1 Sprint', '6_meses': '6 Meses', incidente: 'Incidente',
-  auditoria: 'Auditoría', '3_anos': '3 Años',
-};
-
-const HORIZON_OPTIONS = [
-  { id: '1_sprint', label: '1 Sprint' }, { id: '6_meses', label: '6 Meses' },
-  { id: 'incidente', label: 'Incidente' }, { id: 'auditoria', label: 'Auditoría' },
-  { id: '3_anos', label: '3 Años' },
-];
-
-const MODE_ICONS: Record<string, string> = { tutti: '🎼', dueto: '🎭', solo: '🎤' };
+import type { Debate, DebateMessage, Tension, Thread, ThreadMessage } from '@/types/debates';
+import { AGENT_COLORS, AGENT_LIST, HORIZON_LABELS, HORIZON_OPTIONS, MODE_ICONS } from '@/types/debates';
 
 // ═══ Main Component ═══
 export default function DebateView({ debate: initialDebate, onBack }: { debate: Debate; onBack: () => void }) {
@@ -589,7 +501,7 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
         )}
 
         {/* Messages area */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }} role="log" aria-label="Mensajes del debate" aria-live="polite">
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }} role="log" aria-label="Mensajes del debate">
           {messages.length === 0 && !streaming && (
             <div style={{ textAlign: 'center', padding: '60px 20px', color: '#475569' }}>
               <div style={{ fontSize: '2rem', marginBottom: 12 }}>🎼</div>
@@ -739,6 +651,21 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
           width: 420, flexShrink: 0, display: 'flex', flexDirection: 'column',
           background: '#080b12', borderLeft: '1px solid rgba(255,255,255,0.06)',
         }} role="complementary" aria-label="Panel de hilos">
+          {/* Mobile close bar */}
+          <div style={{
+            flexShrink: 0, padding: '8px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#e2e8f0' }}>Hilos</span>
+            <button onClick={() => setThreadPanelOpen(false)} style={{
+              padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
+              background: 'rgba(239,68,68,0.1)', color: '#ef4444',
+              fontWeight: 700, fontSize: '0.7rem', minWidth: 44, minHeight: 44,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }} aria-label="Cerrar panel de hilos">
+              ✕ Cerrar
+            </button>
+          </div>
           {/* Thread tabs */}
           <div style={{
             flexShrink: 0, padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)',
@@ -760,12 +687,7 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
                 )}
               </button>
             ))}
-            <button onClick={() => setThreadPanelOpen(false)} style={{
-              padding: '4px 8px', borderRadius: 6, border: 'none', cursor: 'pointer',
-              background: 'none', color: '#475569', fontSize: '0.8rem', marginLeft: 'auto',
-            }} aria-label="Cerrar panel de hilos">
-              ✕
-            </button>
+            <div style={{ marginLeft: 'auto' }} />
           </div>
 
           {activeThread ? (

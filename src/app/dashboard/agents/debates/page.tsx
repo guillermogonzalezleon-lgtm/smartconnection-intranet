@@ -1,84 +1,13 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import DebateView from '@/components/DebateView';
-
-// ═══ Types ═══
-interface Debate {
-  id: string;
-  title: string;
-  topic: string;
-  status: 'active' | 'paused' | 'completed' | 'archived';
-  orchestration_mode: 'tutti' | 'dueto' | 'solo';
-  active_agent_ids: string[];
-  temporal_enabled: boolean;
-  temporal_config: Record<string, string>;
-  total_tokens: number;
-  total_tensions: number;
-  messages: never[];
-  tensions: never[];
-  threads: never[];
-  created_at: string;
-}
-
-interface DebateFull extends Omit<Debate, 'messages' | 'tensions' | 'threads'> {
-  messages: Array<{
-    id: string; debate_id: string; agent_id: string; agent_name: string;
-    content: string; role: 'assistant' | 'user' | 'system';
-    time_horizon?: string | null; tokens_used: number;
-    tension_with?: string | null; created_at: string;
-  }>;
-  tensions: Array<{
-    id: string; agent_a: string; agent_b: string; summary: string;
-    severity: 'low' | 'medium' | 'high'; resolved: boolean; message_id: string;
-  }>;
-  threads: Array<{
-    id: string; debate_id: string; source_message_id: string; title: string;
-    status: 'open' | 'approved' | 'rejected' | 'merged'; created_at: string;
-  }>;
-}
-
-// ═══ Constants ═══
-const AGENT_COLORS: Record<string, string> = {
-  hoku: '#ff6b6b', groq: '#f59e0b', claude: '#00e5b0', grok: '#8b5cf6',
-  deepseek: '#0ea5e9', mistral: '#f97316', openai: '#10b981',
-  panchita: '#d97706', camilita: '#ec4899', arielito: '#3b82f6', sergito: '#a855f7',
-};
-
-const AGENT_LIST = [
-  { id: 'hoku', name: 'Hoku', desc: 'Full-stack rebelde' },
-  { id: 'groq', name: 'Groq', desc: 'Ultra rapido' },
-  { id: 'claude', name: 'Claude', desc: 'Analisis profundo' },
-  { id: 'panchita', name: 'Panchita', desc: 'Analista funcional' },
-  { id: 'grok', name: 'Grok', desc: 'Tendencias' },
-  { id: 'deepseek', name: 'DeepSeek', desc: 'Arquitectura' },
-  { id: 'mistral', name: 'Mistral', desc: 'SEO y estandares' },
-  { id: 'openai', name: 'OpenAI', desc: 'Full-stack' },
-  { id: 'camilita', name: 'Camilita', desc: 'QA y testing' },
-  { id: 'arielito', name: 'Arielito', desc: 'Seguridad' },
-  { id: 'sergito', name: 'Sergito', desc: 'Vision estrategica' },
-];
-
-const HORIZON_OPTIONS = [
-  { id: '1_sprint', label: '1 Sprint' },
-  { id: '6_meses', label: '6 Meses' },
-  { id: 'incidente', label: 'Incidente' },
-  { id: 'auditoria', label: 'Auditoria' },
-  { id: '3_anos', label: '3 Anios' },
-];
-
-const DEFAULT_TEMPORAL: Record<string, string> = {
-  hoku: '1_sprint', panchita: '6_meses', claude: '6_meses',
-  camilita: 'incidente', arielito: 'auditoria', sergito: '3_anos',
-  groq: '1_sprint', grok: '3_anos', deepseek: '6_meses',
-  mistral: '6_meses', openai: '6_meses',
-};
-
-const MODE_ICONS: Record<string, string> = { tutti: '🎼', dueto: '🎭', solo: '🎤' };
+import type { Debate } from '@/types/debates';
+import { AGENT_COLORS, AGENT_LIST, HORIZON_OPTIONS, DEFAULT_TEMPORAL, MODE_ICONS } from '@/types/debates';
 
 export default function DebatesPage() {
   const [debates, setDebates] = useState<Debate[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDebate, setSelectedDebate] = useState<DebateFull | null>(null);
+  const [selectedDebate, setSelectedDebate] = useState<Debate | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
 
   // New debate form
@@ -89,6 +18,25 @@ export default function DebatesPage() {
   const [newTemporal, setNewTemporal] = useState(false);
   const [newTemporalConfig, setNewTemporalConfig] = useState<Record<string, string>>(DEFAULT_TEMPORAL);
   const [creating, setCreating] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // BUG-6: Focus trap + Escape en modal
+  useEffect(() => {
+    if (!showNewModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setShowNewModal(false); return; }
+      if (e.key !== 'Tab' || !modalRef.current) return;
+      const focusable = modalRef.current.querySelectorAll<HTMLElement>('button, input, textarea, select, [tabindex]:not([tabindex="-1"])');
+      if (focusable.length === 0) return;
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    // Auto-focus first input
+    setTimeout(() => { modalRef.current?.querySelector<HTMLElement>('input')?.focus(); }, 50);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showNewModal]);
 
   const loadDebates = useCallback(async () => {
     try {
@@ -265,7 +213,7 @@ export default function DebatesPage() {
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
         }} onClick={e => { if (e.target === e.currentTarget) setShowNewModal(false); }} role="dialog" aria-modal="true" aria-label="Crear nuevo debate">
-          <div style={{
+          <div ref={modalRef} style={{
             width: '90%', maxWidth: 600, maxHeight: '85vh', overflowY: 'auto',
             background: '#0f1623', borderRadius: 16,
             border: '1px solid rgba(255,255,255,0.08)',
@@ -314,11 +262,23 @@ export default function DebatesPage() {
               />
             </div>
 
+            {/* Prompt length warning */}
+            {newTopic.length > 4000 && (
+              <div style={{ fontSize: '0.65rem', color: '#f97316', marginBottom: 8 }}>
+                ⚠️ Prompt largo ({newTopic.length}/5000 chars) — el costo se multiplica por cada agente
+              </div>
+            )}
+
             {/* Agent selector */}
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: '#94a3b8', marginBottom: 8 }}>
                 Agentes participantes ({newAgents.length} seleccionados)
               </label>
+              {newAgents.length === 0 && (
+                <div style={{ fontSize: '0.65rem', color: '#ef4444', marginBottom: 6 }}>
+                  Selecciona al menos 1 agente para iniciar el debate
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {AGENT_LIST.map(a => {
                   const selected = newAgents.includes(a.id);
