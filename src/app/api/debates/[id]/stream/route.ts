@@ -208,7 +208,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
         console.info(`[stream] Iniciando ronda debate=${id} modo=${orchestrationMode} agentes=${filteredAgentIds.length}`, filteredAgentIds);
 
+        // Track provider usage to avoid rate limits
+        const providerMap: Record<string, string> = {
+          hoku: 'groq', panchita: 'claude', camilita: 'groq', arielito: 'groq', sergito: 'groq',
+        };
+        let lastProvider = '';
+
         for (const agentId of filteredAgentIds) {
+          // Delay between same-provider calls to avoid rate limits
+          const currentProvider = providerMap[agentId] || agentId;
+          if (currentProvider === lastProvider) {
+            await new Promise(r => setTimeout(r, 2000));
+          }
+          lastProvider = currentProvider;
+
           const persona = AGENT_PERSONAS[agentId] || { name: agentId, persona: 'Eres un asistente experto.' };
           const horizon = temporalConfig[agentId] || DEFAULT_TEMPORAL[agentId] || '6_meses';
           const temporalInstruction = temporalEnabled && TEMPORAL_HORIZONS[horizon]
@@ -254,8 +267,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             message_id: messageId,
           });
 
-          // Detect tensions with previous messages
+          // Detect tensions with previous messages (skip errors, delay for Groq rate limit)
           for (const prev of newMessages.slice(0, -1)) {
+            if (prev.content.startsWith('(') || result.content.startsWith('(')) continue;
+            await new Promise(r => setTimeout(r, 1500));
             const tension = await detectTension(
               prev.agentName, prev.content,
               persona.name, result.content,

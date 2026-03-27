@@ -130,8 +130,11 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
 
               case 'agent_done':
                 setTypingAgent(null);
-                setMessages(prev => [...prev, {
-                  id: data.message_id || crypto.randomUUID(),
+                const msgId = data.message_id || crypto.randomUUID();
+                setMessages(prev => {
+                  if (prev.some(m => m.id === msgId)) return prev; // dedup
+                  return [...prev, {
+                  id: msgId,
                   debate_id: debate.id,
                   agent_id: data.agent_id,
                   agent_name: data.agent_name,
@@ -141,7 +144,7 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
                   tokens_used: data.tokens || 0,
                   tension_with: null,
                   created_at: new Date().toISOString(),
-                }]);
+                }]});
                 // Actualizar total_tokens en tiempo real
                 setDebate(prev => ({ ...prev, total_tokens: (prev.total_tokens || 0) + (data.tokens || 0) }));
                 break;
