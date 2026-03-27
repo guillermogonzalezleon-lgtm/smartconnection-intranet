@@ -206,6 +206,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           filteredAgentIds = agentIds.slice(0, 1);
         }
 
+        console.info(`[stream] Iniciando ronda debate=${id} modo=${orchestrationMode} agentes=${filteredAgentIds.length}`, filteredAgentIds);
+
         for (const agentId of filteredAgentIds) {
           const persona = AGENT_PERSONAS[agentId] || { name: agentId, persona: 'Eres un asistente experto.' };
           const horizon = temporalConfig[agentId] || DEFAULT_TEMPORAL[agentId] || '6_meses';
@@ -295,8 +297,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           },
         });
 
+        console.info(`[stream] Ronda completada debate=${id} mensajes=${newMessages.length} tokens=${totalTokens}`);
         send('debate_done', { agents_count: agentIds.length, messages: newMessages.length });
       } catch (err) {
+        console.error(`[stream] Error en ronda debate=${id}:`, err);
         send('error', { message: String(err).slice(0, 300) });
       }
 

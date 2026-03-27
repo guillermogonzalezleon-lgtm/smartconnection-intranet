@@ -33,9 +33,10 @@ export async function POST(request: Request) {
       created_by: session.user || 'admin',
     });
 
+    console.info('[debates] Debate creado:', { id: result[0]?.id, title: title.trim(), agents: active_agent_ids.length, mode: orchestration_mode || 'tutti' });
     return Response.json(result[0] || result, { status: 201 });
   } catch (err) {
-    console.error('Error creando debate:', err);
+    console.error('[debates] Error creando debate:', err);
     return Response.json({ error: 'Error al crear el debate' }, { status: 500 });
   }
 }

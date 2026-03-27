@@ -1,14 +1,34 @@
 import { getSession } from '@/lib/auth';
 import { supabaseQuery, supabaseInsert } from '@/lib/supabase';
 
-const GROQ_KEY = process.env.GROQ_API_KEY;
-
 // Mapa de nombres display para agentes
 const AGENT_DISPLAY_NAMES: Record<string, string> = {
   hoku: 'Hoku', groq: 'Groq', claude: 'Claude', panchita: 'Panchita',
   grok: 'Grok', deepseek: 'DeepSeek', mistral: 'Mistral', openai: 'OpenAI',
   camilita: 'Camilita', arielito: 'Arielito', sergito: 'Sergito', user: 'Usuario',
 };
+
+// Provider configs — mapea agent_id al provider real
+const PROVIDER_CONFIGS: Record<string, { url: string; keyEnv: string; model: string }> = {
+  groq: { url: 'https://api.groq.com/openai/v1/chat/completions', keyEnv: 'GROQ_API_KEY', model: 'llama-3.3-70b-versatile' },
+  claude: { url: 'https://api.anthropic.com/v1/messages', keyEnv: 'ANTHROPIC_API_KEY', model: 'claude-haiku-4-5-20251001' },
+  grok: { url: 'https://api.x.ai/v1/chat/completions', keyEnv: 'GROK_API_KEY', model: 'grok-3-mini' },
+  deepseek: { url: 'https://api.deepseek.com/v1/chat/completions', keyEnv: 'DEEPSEEK_API_KEY', model: 'deepseek-chat' },
+  mistral: { url: 'https://api.mistral.ai/v1/chat/completions', keyEnv: 'MISTRAL_API_KEY', model: 'mistral-small-latest' },
+  openai: { url: 'https://api.openai.com/v1/chat/completions', keyEnv: 'OPENAI_API_KEY', model: 'gpt-4o-mini' },
+};
+
+// Mapea agentes-persona a su provider real
+const AGENT_TO_PROVIDER: Record<string, string> = {
+  hoku: 'groq', panchita: 'groq', camilita: 'groq', arielito: 'groq', sergito: 'groq',
+};
+
+function getProviderConfig(agentId: string) {
+  const providerId = AGENT_TO_PROVIDER[agentId] || agentId;
+  const config = PROVIDER_CONFIGS[providerId] || PROVIDER_CONFIGS.groq;
+  const apiKey = process.env[config.keyEnv];
+  return { ...config, apiKey, providerId };
+}
 
 // GET — Listar mensajes de un hilo
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -87,37 +107,41 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     sourceContent = (sourceMessages[0]?.content as string) || '';
   }
 
-  if (!GROQ_KEY) return new Response('GROQ_API_KEY no configurada', { status: 500 });
+  const provider = getProviderConfig(agent_id);
+  if (!provider.apiKey) return new Response(`API key no configurada para ${agent_id} (${provider.keyEnv})`, { status: 500 });
 
   const contextMessages = threadMessages.map(m => ({
     role: (m.role as string) === 'user' ? 'user' as const : 'assistant' as const,
     content: m.content as string,
   }));
 
-  const systemPrompt = `Eres un agente IA participando en un hilo de discusión sobre un punto específico de un debate.
+  const agentName = AGENT_DISPLAY_NAMES[agent_id] || agent_id;
+  const systemPrompt = `Eres ${agentName}, un agente IA participando en un hilo de discusión sobre un punto específico de un debate.
 Contexto original del mensaje que generó este hilo: "${sourceContent.slice(0, 500)}"
 Responde en español. Sé conciso (máximo 2-3 párrafos).`;
 
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
 
-  const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  console.info(`[threads] Streaming respuesta hilo=${id} agente=${agent_id} provider=${provider.providerId}`);
+
+  const providerRes = await fetch(provider.url, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${GROQ_KEY}`, 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${provider.apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model: provider.model,
       messages: [{ role: 'system', content: systemPrompt }, ...contextMessages, { role: 'user', content: content.trim() }],
       stream: true, max_tokens: 1000, temperature: 0.7,
     }),
   });
 
-  if (!groqRes.ok || !groqRes.body) return new Response(`Groq error: ${groqRes.status}`, { status: 502 });
+  if (!providerRes.ok || !providerRes.body) return new Response(`Error ${provider.providerId}: ${providerRes.status}`, { status: 502 });
 
   let fullContent = '';
 
   const stream = new ReadableStream({
     async start(controller) {
-      const reader = groqRes.body!.getReader();
+      const reader = providerRes.body!.getReader();
       let buffer = '';
       try {
         while (true) {
