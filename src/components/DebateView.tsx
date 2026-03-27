@@ -118,6 +118,8 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
                   tension_with: null,
                   created_at: new Date().toISOString(),
                 }]);
+                // Actualizar total_tokens en tiempo real
+                setDebate(prev => ({ ...prev, total_tokens: (prev.total_tokens || 0) + (data.tokens || 0) }));
                 break;
 
               case 'tension_detected':
@@ -711,7 +713,7 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
                         {src.agent_name.slice(0, 2).toUpperCase()}
                       </span>
                       <div style={{ fontSize: '0.7rem', color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        <span style={{ fontWeight: 700, color: agentColor(src.agent_id) }}>{src.agent_name}:</span> {src.content.slice(0, 120)}...
+                        <span style={{ fontWeight: 700, color: agentColor(src.agent_id) }}>{src.agent_name}:</span> {src.content.length > 120 ? `${src.content.slice(0, 120)}...` : src.content}
                       </div>
                     </div>
                   );
@@ -816,7 +818,7 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
       {/* Thread panel toggle (when closed) */}
       {!threadPanelOpen && threads.length > 0 && (
         <button onClick={() => setThreadPanelOpen(true)} style={{
-          position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)',
+          position: 'fixed', right: 16, top: '50%', transform: 'translateY(-50%)',
           padding: '8px 12px', borderRadius: '8px 0 0 8px', border: 'none', cursor: 'pointer',
           background: 'rgba(0,229,176,0.1)', color: '#00e5b0',
           fontWeight: 700, fontSize: '0.7rem', zIndex: 10,

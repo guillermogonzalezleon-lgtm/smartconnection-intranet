@@ -20,7 +20,7 @@ const PROVIDER_CONFIGS: Record<string, { url: string; keyEnv: string; model: str
 
 // Mapea agentes-persona a su provider real
 const AGENT_TO_PROVIDER: Record<string, string> = {
-  hoku: 'groq', panchita: 'groq', camilita: 'groq', arielito: 'groq', sergito: 'groq',
+  hoku: 'groq', panchita: 'claude', camilita: 'groq', arielito: 'groq', sergito: 'groq',
 };
 
 function getProviderConfig(agentId: string) {
@@ -125,14 +125,20 @@ Responde en español. Sé conciso (máximo 2-3 párrafos).`;
 
   console.info(`[threads] Streaming respuesta hilo=${id} agente=${agent_id} provider=${provider.providerId}`);
 
+  const isClaude = provider.providerId === 'claude';
+
+  const providerHeaders: Record<string, string> = isClaude
+    ? { 'x-api-key': provider.apiKey!, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' }
+    : { Authorization: `Bearer ${provider.apiKey}`, 'Content-Type': 'application/json' };
+
+  const providerBody = isClaude
+    ? { model: provider.model, max_tokens: 1000, system: systemPrompt, messages: [...contextMessages, { role: 'user', content: content.trim() }], stream: true }
+    : { model: provider.model, messages: [{ role: 'system', content: systemPrompt }, ...contextMessages, { role: 'user', content: content.trim() }], stream: true, max_tokens: 1000, temperature: 0.7 };
+
   const providerRes = await fetch(provider.url, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${provider.apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: provider.model,
-      messages: [{ role: 'system', content: systemPrompt }, ...contextMessages, { role: 'user', content: content.trim() }],
-      stream: true, max_tokens: 1000, temperature: 0.7,
-    }),
+    headers: providerHeaders,
+    body: JSON.stringify(providerBody),
   });
 
   if (!providerRes.ok || !providerRes.body) return new Response(`Error ${provider.providerId}: ${providerRes.status}`, { status: 502 });
@@ -157,7 +163,10 @@ Responde en español. Sé conciso (máximo 2-3 párrafos).`;
             if (data === '[DONE]') continue;
             try {
               const parsed = JSON.parse(data);
-              const c = parsed.choices?.[0]?.delta?.content;
+              // Claude streaming usa content_block_delta, OpenAI usa choices[0].delta.content
+              const c = isClaude
+                ? (parsed.type === 'content_block_delta' ? parsed.delta?.text : null)
+                : parsed.choices?.[0]?.delta?.content;
               if (c) {
                 fullContent += c;
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: c })}\n\n`));

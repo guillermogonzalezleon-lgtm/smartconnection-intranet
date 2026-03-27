@@ -298,7 +298,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         });
 
         console.info(`[stream] Ronda completada debate=${id} mensajes=${newMessages.length} tokens=${totalTokens}`);
-        send('debate_done', { agents_count: agentIds.length, messages: newMessages.length });
+        send('debate_done', { agents_count: filteredAgentIds.length, messages: newMessages.length });
       } catch (err) {
         console.error(`[stream] Error en ronda debate=${id}:`, err);
         send('error', { message: String(err).slice(0, 300) });
