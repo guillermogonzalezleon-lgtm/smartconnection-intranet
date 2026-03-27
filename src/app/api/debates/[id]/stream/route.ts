@@ -148,13 +148,15 @@ Si NO hay contradicción clara, responde: {"tension": false, "summary": "", "sev
     if (!jsonMatch) return { hasTension: false, summary: '', severity: 'low' };
     const parsed = JSON.parse(jsonMatch[0]);
     return { hasTension: !!parsed.tension, summary: parsed.summary || '', severity: parsed.severity || 'medium' };
-  } catch {
+  } catch (err) {
+    console.error('Error detectando tensión:', err);
     return { hasTension: false, summary: '', severity: 'low' };
   }
 }
 
 // POST — Stream debate: ejecuta agentes secuencialmente con SSE
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
   const session = await getSession();
   if (!session.valid) return new Response('No autorizado', { status: 401 });
 
@@ -184,7 +186,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const send = (event: string, data: Record<string, unknown>) => {
         try {
           controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
-        } catch { /* controller closed */ }
+        } catch (err) { console.error('Stream controller cerrado:', err); }
       };
 
       const previousMessages: { agent: string; content: string }[] = existingMessages.map(m => ({
@@ -192,10 +194,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         content: m.content as string,
       }));
 
-      const newMessages: { agentId: string; agentName: string; content: string; messageId?: string }[] = [];
+      const newMessages: { agentId: string; agentName: string; content: string; messageId?: string; tokens: number }[] = [];
 
       try {
-        for (const agentId of agentIds) {
+        // Filtrar agentes según orchestration_mode
+        const orchestrationMode = (debate.orchestration_mode as string) || 'tutti';
+        let filteredAgentIds = agentIds;
+        if (orchestrationMode === 'dueto') {
+          filteredAgentIds = agentIds.slice(0, 2);
+        } else if (orchestrationMode === 'solo') {
+          filteredAgentIds = agentIds.slice(0, 1);
+        }
+
+        for (const agentId of filteredAgentIds) {
           const persona = AGENT_PERSONAS[agentId] || { name: agentId, persona: 'Eres un asistente experto.' };
           const horizon = temporalConfig[agentId] || DEFAULT_TEMPORAL[agentId] || '6_meses';
           const temporalInstruction = temporalEnabled && TEMPORAL_HORIZONS[horizon]
@@ -231,7 +242,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
           const messageId = saved[0]?.id as string;
 
-          newMessages.push({ agentId, agentName: persona.name, content: result.content, messageId });
+          newMessages.push({ agentId, agentName: persona.name, content: result.content, messageId, tokens: result.tokens });
           previousMessages.push({ agent: persona.name, content: result.content });
 
           send('agent_done', {
@@ -276,7 +287,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         }
 
         // Update debate totals
-        const totalTokens = newMessages.reduce((sum, _m) => sum, 0);
+        const totalTokens = newMessages.reduce((sum, m) => sum + (m.tokens || 0), 0);
         await supabaseQuery('debates', 'PATCH', {
           filter: `id=eq.${id}`,
           body: {
@@ -289,7 +300,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         send('error', { message: String(err).slice(0, 300) });
       }
 
-      try { controller.close(); } catch { /* already closed */ }
+      try { controller.close(); } catch (err) { console.error('Error cerrando controller:', err); }
     },
   });
 
@@ -300,4 +311,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       Connection: 'keep-alive',
     },
   });
+  } catch (err) {
+    console.error('Error en POST stream debate:', err);
+    return Response.json({ error: 'Error al iniciar streaming del debate' }, { status: 500 });
+  }
 }

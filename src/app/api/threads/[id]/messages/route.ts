@@ -3,8 +3,43 @@ import { supabaseQuery, supabaseInsert } from '@/lib/supabase';
 
 const GROQ_KEY = process.env.GROQ_API_KEY;
 
+// Mapa de nombres display para agentes
+const AGENT_DISPLAY_NAMES: Record<string, string> = {
+  hoku: 'Hoku', groq: 'Groq', claude: 'Claude', panchita: 'Panchita',
+  grok: 'Grok', deepseek: 'DeepSeek', mistral: 'Mistral', openai: 'OpenAI',
+  camilita: 'Camilita', arielito: 'Arielito', sergito: 'Sergito', user: 'Usuario',
+};
+
+// GET — Listar mensajes de un hilo
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const session = await getSession();
+    if (!session.valid) return new Response('No autorizado', { status: 401 });
+
+    const { id } = await params;
+
+    const messages = await supabaseQuery('thread_messages', 'GET', {
+      filter: `thread_id=eq.${id}`,
+      order: 'created_at.asc',
+      limit: 200,
+    }) as Record<string, unknown>[];
+
+    // Enriquecer agent_name con nombres display
+    const enriched = messages.map(m => ({
+      ...m,
+      agent_name: AGENT_DISPLAY_NAMES[m.agent_id as string] || (m.agent_name as string) || (m.agent_id as string),
+    }));
+
+    return Response.json(enriched);
+  } catch (err) {
+    console.error('Error al listar mensajes del hilo:', err);
+    return Response.json({ error: 'Error al obtener mensajes del hilo' }, { status: 500 });
+  }
+}
+
 // POST — Enviar mensaje en hilo con respuesta SSE del agente
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
   const session = await getSession();
   if (!session.valid) return new Response('No autorizado', { status: 401 });
 
@@ -13,6 +48,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   if (!content?.trim()) {
     return new Response('Contenido requerido', { status: 400 });
+  }
+
+  if (content.trim().length > 2000) {
+    return Response.json({ error: 'El contenido no puede superar los 2000 caracteres' }, { status: 400 });
   }
 
   // Save user message
@@ -111,11 +150,11 @@ Responde en español. Sé conciso (máximo 2-3 párrafos).`;
         await supabaseInsert('thread_messages', {
           thread_id: id,
           agent_id: agent_id,
-          agent_name: agent_id,
+          agent_name: AGENT_DISPLAY_NAMES[agent_id] || agent_id,
           content: fullContent,
           role: 'assistant',
           tokens_used: Math.round(fullContent.split(/\s+/).length * 1.3),
-        }).catch(() => {});
+        }).catch((err) => { console.error('Error guardando respuesta del agente en hilo:', err); });
       }
 
       controller.enqueue(encoder.encode('data: [DONE]\n\n'));
@@ -126,4 +165,8 @@ Responde en español. Sé conciso (máximo 2-3 párrafos).`;
   return new Response(stream, {
     headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' },
   });
+  } catch (err) {
+    console.error('Error en POST thread messages:', err);
+    return Response.json({ error: 'Error al procesar mensaje del hilo' }, { status: 500 });
+  }
 }

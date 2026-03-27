@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, type MutableRefObject } from 'react';
 
 // ═══ Types ═══
 interface DebateMessage {
@@ -101,6 +101,7 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
   const [typingAgent, setTypingAgent] = useState<string | null>(null);
   const [userInput, setUserInput] = useState('');
   const [tensionsOpen, setTensionsOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Thread panel
   const [activeThread, setActiveThread] = useState<Thread | null>(null);
@@ -108,26 +109,51 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
   const [threadInput, setThreadInput] = useState('');
   const [threadPanelOpen, setThreadPanelOpen] = useState(false);
   const [threadLoading, setThreadLoading] = useState(false);
+  const [creatingThread, setCreatingThread] = useState(false);
 
   // New debate modal
   const [showNewThread, setShowNewThread] = useState<string | null>(null); // message_id for thread creation
   const [newThreadTitle, setNewThreadTitle] = useState('');
 
+  // Refs para race condition y cancelación
+  const streamingRef = useRef(false) as MutableRefObject<boolean>;
+  const abortControllerRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const threadEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, typingAgent]);
   useEffect(() => { threadEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [threadMessages]);
 
+  // ═══ Cancelar debate ═══
+  const cancelDebate = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    streamingRef.current = false;
+    setStreaming(false);
+    setTypingAgent(null);
+  }, []);
+
   // ═══ Streaming debate ═══
   const startDebate = useCallback(async () => {
-    if (streaming) return;
+    if (streamingRef.current) return;
+    streamingRef.current = true;
     setStreaming(true);
     setTypingAgent(null);
+    setError(null);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
-      const res = await fetch(`/api/debates/${debate.id}/stream`, { method: 'POST' });
-      if (!res.ok || !res.body) { setStreaming(false); return; }
+      const res = await fetch(`/api/debates/${debate.id}/stream`, { method: 'POST', signal: controller.signal });
+      if (!res.ok || !res.body) {
+        setError('Error al conectar con el servidor de debate');
+        streamingRef.current = false;
+        setStreaming(false);
+        return;
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -205,16 +231,21 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
                 console.error('Debate stream error:', data.message);
                 break;
             }
-          } catch { /* skip parse errors */ }
+          } catch (err) { console.error('Error parseando evento SSE:', err); }
         }
       }
     } catch (err) {
-      console.error('Stream error:', err);
+      if ((err as Error).name !== 'AbortError') {
+        console.error('Error en stream del debate:', err);
+        setError('Error durante la ejecución del debate');
+      }
     }
 
+    streamingRef.current = false;
+    abortControllerRef.current = null;
     setStreaming(false);
     setTypingAgent(null);
-  }, [debate.id, streaming]);
+  }, [debate.id]);
 
   // ═══ Orchestration ═══
   const updateOrchestration = async (updates: Record<string, unknown>) => {
@@ -225,7 +256,10 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
         body: JSON.stringify(updates),
       });
       setDebate(prev => ({ ...prev, ...updates } as Debate));
-    } catch { /* silent */ }
+    } catch (err) {
+      console.error('Error actualizando orquestación:', err);
+      setError('Error al actualizar la configuración del debate');
+    }
   };
 
   const toggleAgent = (agentId: string) => {
@@ -263,12 +297,16 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
           created_at: new Date().toISOString(),
         }]);
       }
-    } catch { /* silent */ }
+    } catch (err) {
+      console.error('Error enviando mensaje:', err);
+      setError('Error al enviar el mensaje');
+    }
   };
 
   // ═══ Threads ═══
   const createThread = async (messageId: string) => {
-    if (!newThreadTitle.trim()) return;
+    if (!newThreadTitle.trim() || creatingThread) return;
+    setCreatingThread(true);
     try {
       const res = await fetch(`/api/debates/${debate.id}/threads`, {
         method: 'POST',
@@ -283,8 +321,14 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
         setThreadPanelOpen(true);
         setShowNewThread(null);
         setNewThreadTitle('');
+      } else {
+        setError('Error al crear el hilo');
       }
-    } catch { /* silent */ }
+    } catch (err) {
+      console.error('Error creando hilo:', err);
+      setError('Error al crear el hilo de discusión');
+    }
+    setCreatingThread(false);
   };
 
   const openThread = async (thread: Thread) => {
@@ -292,11 +336,19 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
     setThreadPanelOpen(true);
     setThreadLoading(true);
     try {
-      // Load thread messages — we reuse a simple GET pattern
-      const res = await fetch(`/api/threads/${thread.id}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: '', agent_id: '' }) });
-      // For now, load via the thread detail
+      const res = await fetch(`/api/threads/${thread.id}/messages`);
+      if (res.ok) {
+        const data = await res.json();
+        setThreadMessages(Array.isArray(data) ? data : []);
+      } else {
+        setThreadMessages([]);
+        setError('Error al cargar mensajes del hilo');
+      }
+    } catch (err) {
+      console.error('Error cargando mensajes del hilo:', err);
       setThreadMessages([]);
-    } catch { /* silent */ }
+      setError('Error al cargar mensajes del hilo');
+    }
     setThreadLoading(false);
   };
 
@@ -344,7 +396,7 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
             try {
               const p = JSON.parse(d);
               if (p.content) full += p.content;
-            } catch { /* skip */ }
+            } catch (err) { console.error('Error parseando chunk de hilo:', err); }
           }
         }
 
@@ -356,11 +408,14 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
           }]);
         }
       }
-    } catch { /* silent */ }
+    } catch (err) {
+      console.error('Error enviando mensaje en hilo:', err);
+      setError('Error al enviar mensaje en el hilo');
+    }
     setThreadLoading(false);
   };
 
-  const updateThreadStatus = async (status: 'approved' | 'rejected') => {
+  const updateThreadStatus = async (status: 'approved' | 'rejected' | 'open') => {
     if (!activeThread) return;
     try {
       await fetch(`/api/threads/${activeThread.id}`, {
@@ -370,7 +425,10 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
       });
       setActiveThread(prev => prev ? { ...prev, status } : null);
       setThreads(prev => prev.map(t => t.id === activeThread.id ? { ...t, status } : t));
-    } catch { /* silent */ }
+    } catch (err) {
+      console.error('Error actualizando estado del hilo:', err);
+      setError('Error al actualizar el estado del hilo');
+    }
   };
 
   // ═══ Render ═══
@@ -405,13 +463,23 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
                 {messages.length} mensajes · {tensions.length} tensiones · {debate.total_tokens} tokens
               </div>
             </div>
-            <button onClick={startDebate} disabled={streaming} style={{
-              padding: '6px 16px', borderRadius: 8, border: 'none', cursor: streaming ? 'not-allowed' : 'pointer',
-              background: streaming ? 'rgba(148,163,184,0.15)' : 'linear-gradient(135deg, #00e5b0, #0ea5e9)',
-              color: '#fff', fontWeight: 700, fontSize: '0.75rem', opacity: streaming ? 0.6 : 1,
-            }} aria-label="Ejecutar debate">
-              {streaming ? '⏳ Ejecutando...' : '▶ Ejecutar ronda'}
-            </button>
+            {streaming ? (
+              <button onClick={cancelDebate} style={{
+                padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: 'rgba(239,68,68,0.15)', color: '#ef4444',
+                fontWeight: 700, fontSize: '0.75rem',
+              }} aria-label="Cancelar debate">
+                ■ Cancelar
+              </button>
+            ) : (
+              <button onClick={startDebate} style={{
+                padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: 'linear-gradient(135deg, #00e5b0, #0ea5e9)',
+                color: '#fff', fontWeight: 700, fontSize: '0.75rem',
+              }} aria-label="Ejecutar debate">
+                ▶ Ejecutar ronda
+              </button>
+            )}
           </div>
 
           {/* Director de Orquesta */}
@@ -479,6 +547,20 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
             })}
           </div>
         </div>
+
+        {/* Error banner */}
+        {error && (
+          <div style={{
+            flexShrink: 0, padding: '8px 20px', background: 'rgba(239,68,68,0.08)',
+            borderBottom: '1px solid rgba(239,68,68,0.2)', display: 'flex', alignItems: 'center', gap: 8,
+          }} role="alert">
+            <span style={{ fontSize: '0.75rem', color: '#ef4444', flex: 1 }}>{error}</span>
+            <button onClick={() => setError(null)} style={{
+              background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer',
+              fontSize: '0.8rem', padding: '2px 6px',
+            }} aria-label="Cerrar error">✕</button>
+          </div>
+        )}
 
         {/* Tensions bar (collapsible) */}
         {tensionsOpen && tensions.length > 0 && (
@@ -738,7 +820,7 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
               </div>
 
               {/* Thread actions */}
-              {activeThread.status === 'open' && (
+              {activeThread.status === 'open' ? (
                 <div style={{
                   flexShrink: 0, padding: '8px 14px', borderTop: '1px solid rgba(255,255,255,0.04)',
                   display: 'flex', gap: 8,
@@ -753,6 +835,24 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
                     background: 'rgba(239,68,68,0.12)', color: '#ef4444',
                     fontWeight: 700, fontSize: '0.7rem',
                   }}>Rechazar</button>
+                </div>
+              ) : (
+                <div style={{
+                  flexShrink: 0, padding: '8px 14px', borderTop: '1px solid rgba(255,255,255,0.04)',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                }}>
+                  <span style={{
+                    fontSize: '0.65rem', fontWeight: 700, padding: '2px 10px', borderRadius: 8,
+                    background: activeThread.status === 'approved' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                    color: activeThread.status === 'approved' ? '#22c55e' : '#ef4444',
+                  }}>
+                    {activeThread.status === 'approved' ? 'Aprobado' : activeThread.status === 'rejected' ? 'Rechazado' : activeThread.status}
+                  </span>
+                  <button onClick={() => updateThreadStatus('open')} style={{
+                    padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                    background: 'rgba(148,163,184,0.1)', color: '#94a3b8',
+                    fontWeight: 600, fontSize: '0.65rem',
+                  }}>Revertir</button>
                 </div>
               )}
 

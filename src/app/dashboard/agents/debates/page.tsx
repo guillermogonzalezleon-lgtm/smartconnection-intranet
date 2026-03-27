@@ -97,7 +97,7 @@ export default function DebatesPage() {
         const data = await res.json();
         setDebates(data);
       }
-    } catch { /* silent */ }
+    } catch (err) { console.error('Error cargando debates:', err); }
     setLoading(false);
   }, []);
 
@@ -110,7 +110,7 @@ export default function DebatesPage() {
         const data = await res.json();
         setSelectedDebate(data);
       }
-    } catch { /* silent */ }
+    } catch (err) { console.error('Error abriendo debate:', err); }
   };
 
   const createDebate = async () => {
@@ -141,7 +141,7 @@ export default function DebatesPage() {
         });
         loadDebates();
       }
-    } catch { /* silent */ }
+    } catch (err) { console.error('Error creando debate:', err); }
     setCreating(false);
   };
 
