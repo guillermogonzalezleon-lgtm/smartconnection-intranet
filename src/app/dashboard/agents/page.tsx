@@ -308,6 +308,12 @@ export default function AgentsWorkspace() {
       <div style={{ flexShrink: 0, background: 'rgba(15,22,35,0.92)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ height: 48, display: 'flex', alignItems: 'center', padding: '0 1.5rem', fontSize: '0.82rem', color: '#94a3b8' }}>
           <span>Intranet</span><span style={{ margin: '0 8px', color: '#475569' }}>/</span><span style={{ color: '#fff', fontWeight: 600 }}>Agentes IA</span>
+          <a href="/dashboard/agents/debates" style={{
+            marginLeft: 'auto', padding: '5px 14px', borderRadius: 8, textDecoration: 'none',
+            background: 'linear-gradient(135deg, #00e5b0, #0ea5e9)',
+            color: '#fff', fontWeight: 700, fontSize: '0.72rem',
+            display: 'flex', alignItems: 'center', gap: 5,
+          }}>🎼 Debates</a>
         </div>
       </div>
 
