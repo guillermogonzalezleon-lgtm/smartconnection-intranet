@@ -75,6 +75,29 @@ function getTagColor(text: string): string {
   return '#94a3b8';
 }
 
+function InfoTip({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+      onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+      <span style={{
+        width: 16, height: 16, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(255,255,255,0.06)', color: '#64748b', fontSize: '0.55rem', fontWeight: 700, cursor: 'help',
+        marginLeft: 4, flexShrink: 0,
+      }} role="img" aria-label={text}>ⓘ</span>
+      {show && (
+        <span style={{
+          position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+          padding: '6px 10px', borderRadius: 6, background: '#1e293b', color: '#e2e8f0',
+          fontSize: '0.65rem', lineHeight: 1.4, whiteSpace: 'normal', width: 220,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)',
+          zIndex: 100, marginBottom: 4, textAlign: 'left', fontWeight: 400,
+        }}>{text}</span>
+      )}
+    </span>
+  );
+}
+
 /* ── API Helpers (from config) ── */
 import { api, deployApi, formatDate } from '@/lib/config';
 
@@ -822,6 +845,7 @@ export default function DeployCenter() {
               </>
             )}
           </button>
+          <InfoTip text="Ejecuta el pipeline completo: build, tests IA, push, Amplify deploy, health check, stress test y verificación live." />
 
           {/* Rollback button */}
           <div style={{ position: 'relative' }}>
@@ -844,6 +868,7 @@ export default function DeployCenter() {
               <i className="bi bi-arrow-counterclockwise" style={{ fontSize: '1rem' }} />
               Rollback
             </button>
+            <InfoTip text="Revierte a un commit anterior. Selecciona el commit al que quieres volver y se ejecutará el pipeline de rollback." />
 
             {/* Rollback dropdown */}
             {showRollbackMenu && pendingCommits.length > 0 && (
@@ -906,23 +931,26 @@ export default function DeployCenter() {
 
           {/* Ver reporte button */}
           {reportData && !deploying && (
-            <button
-              onClick={() => setShowReport(true)}
-              style={{
-                background: 'rgba(59,130,246,0.06)',
-                border: '1px solid rgba(59,130,246,0.15)',
-                color: '#3b82f6',
-                padding: '14px 20px', borderRadius: 14,
-                fontWeight: 700, fontSize: '0.82rem',
-                cursor: 'pointer',
-                fontFamily: "'Inter', system-ui, sans-serif",
-                display: 'flex', alignItems: 'center', gap: 8,
-                transition: 'all 0.2s',
-              }}
-            >
-              <i className="bi bi-bar-chart" style={{ fontSize: '1rem' }} />
-              Ver reporte
-            </button>
+            <>
+              <button
+                onClick={() => setShowReport(true)}
+                style={{
+                  background: 'rgba(59,130,246,0.06)',
+                  border: '1px solid rgba(59,130,246,0.15)',
+                  color: '#3b82f6',
+                  padding: '14px 20px', borderRadius: 14,
+                  fontWeight: 700, fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  fontFamily: "'Inter', system-ui, sans-serif",
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  transition: 'all 0.2s',
+                }}
+              >
+                <i className="bi bi-bar-chart" style={{ fontSize: '1rem' }} />
+                Ver reporte
+              </button>
+              <InfoTip text="Muestra el reporte detallado del último deploy con tiempos por paso, estado y logs." />
+            </>
           )}
 
           {/* Solo Invalidar CDN */}
@@ -945,6 +973,7 @@ export default function DeployCenter() {
             <i className="bi bi-lightning-charge" style={{ fontSize: '1rem' }} />
             Solo Invalidar CDN
           </button>
+          <InfoTip text="Invalida la caché del CDN (CloudFront) sin hacer deploy. Útil para forzar que se sirva contenido actualizado." />
         </div>
 
         {/* ══════════════════════════════════════════════════════ */}
@@ -965,8 +994,9 @@ export default function DeployCenter() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
             <i className="bi bi-diagram-3" style={{ color: '#00e5b0', fontSize: '1rem' }} />
-            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f1f5f9', margin: 0 }}>
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f1f5f9', margin: 0, display: 'flex', alignItems: 'center' }}>
               Pipeline {isRollback ? '(Rollback)' : ''}
+              <InfoTip text="Pipeline de 7 pasos: Build, Tests IA (12 agentes), Push a GitHub, Deploy en Amplify, Health Check, Stress Test y Live." />
             </h3>
             {deploying && (
               <span style={{

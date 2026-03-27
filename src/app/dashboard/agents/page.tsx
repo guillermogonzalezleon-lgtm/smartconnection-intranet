@@ -32,6 +32,29 @@ const PLACEHOLDERS: Record<string, string> = {
 
 type PipelineStep = 'idle' | 'confirm' | 'preview' | 'pushing' | 'deploying' | 'done' | 'error';
 
+function InfoTip({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+      onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+      <span style={{
+        width: 16, height: 16, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(255,255,255,0.06)', color: '#64748b', fontSize: '0.55rem', fontWeight: 700, cursor: 'help',
+        marginLeft: 4, flexShrink: 0,
+      }} role="img" aria-label={text}>ⓘ</span>
+      {show && (
+        <span style={{
+          position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+          padding: '6px 10px', borderRadius: 6, background: '#1e293b', color: '#e2e8f0',
+          fontSize: '0.65rem', lineHeight: 1.4, whiteSpace: 'normal', width: 220,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)',
+          zIndex: 100, marginBottom: 4, textAlign: 'left', fontWeight: 400,
+        }}>{text}</span>
+      )}
+    </span>
+  );
+}
+
 // Extract code blocks with file paths from output
 function extractCodeFiles(text: string): { path: string; content: string; lang: string }[] {
   const codeBlockRegex = /```(\w+)?(?:\s+(?:filename=)?["']?([^"'\n]+)["']?)?\n([\s\S]*?)```/g;
@@ -322,7 +345,7 @@ export default function AgentsWorkspace() {
         {/* Left: Agents */}
         <div style={{ width: 160, flexShrink: 0, background: '#0a0d14', borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ padding: '10px 10px 6px' }}>
-            <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Agentes</div>
+            <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center' }}>Agentes<InfoTip text="Selecciona un agente IA para ejecutar tareas. Hoku fusiona 9 modelos, los demás usan su modelo específico." /></div>
           </div>
           <div style={{ padding: '0 6px', flex: 1, overflow: 'auto' }}>
             {AGENTS.map(a => {
@@ -355,7 +378,7 @@ export default function AgentsWorkspace() {
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: agent.color }}></span>
             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f1f5f9' }}>{agent.name}</span>
             <span style={{ fontSize: '0.6rem', color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>{agent.model}</span>
-            <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: 2 }}>
+            <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: 2, alignItems: 'center' }}>
               {(['chat', 'code', 'sap', 'deploy'] as const).map(m => (
                 <button key={m} onClick={() => setMode(m)} style={{
                   padding: '3px 8px', borderRadius: 4, fontSize: '0.6rem', fontWeight: 600,
@@ -366,16 +389,19 @@ export default function AgentsWorkspace() {
                   {m === 'chat' ? '\u{1F4AC}' : m === 'code' ? '</>' : m === 'sap' ? '\u{1F3E2}' : '\u{1F680}'} {m.toUpperCase()}
                 </button>
               ))}
+              <InfoTip text="Chat: conversación general. Code: genera código commiteable. SAP: consultas SAP FI. Deploy: tareas DevOps y deploy." />
             </div>
             <div style={{ flex: 1 }}></div>
             <button onClick={execute} disabled={running || !task.trim()} style={{ background: running ? '#1a2235' : `linear-gradient(135deg, ${agent.color}, ${agent.color}cc)`, color: running ? '#64748b' : '#0a0d14', border: 'none', padding: '5px 14px', borderRadius: 7, fontWeight: 700, fontSize: '0.7rem', cursor: running ? 'not-allowed' : 'pointer', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', gap: 5 }}>
               {running ? <><span style={{ width: 8, height: 8, border: '2px solid #475569', borderTopColor: agent.color, borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }}></span> {fmtTime(elapsed)}</> : <>▶ Run</>}
             </button>
+            {!running && <InfoTip text="Ejecuta la tarea con el agente seleccionado. También puedes presionar Enter en el campo de texto." />}
             {running && <button onClick={() => { if (timerRef.current) clearInterval(timerRef.current); setRunning(false); }} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', padding: '5px 10px', borderRadius: 7, fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer', fontFamily: "'Inter', system-ui" }}>⏹</button>}
             {!running && output && pipeline === 'idle' && (
               <>
                 <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.08)', margin: '0 4px' }}></div>
                 <button onClick={startPipeline} style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 7, fontWeight: 700, fontSize: '0.65rem', cursor: 'pointer', fontFamily: "'Inter', system-ui", display: 'flex', alignItems: 'center', gap: 5, boxShadow: '0 2px 12px rgba(59,130,246,0.3)', whiteSpace: 'nowrap' }}>🚀 Deploy</button>
+                <InfoTip text="Inicia el pipeline de deploy: guarda en Supabase, commitea código a GitHub y espera el build de Amplify." />
               </>
             )}
           </div>

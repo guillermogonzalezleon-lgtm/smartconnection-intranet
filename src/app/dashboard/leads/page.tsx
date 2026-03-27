@@ -4,6 +4,29 @@ import { api } from '@/lib/config';
 
 type Lead = Record<string, unknown>;
 
+function InfoTip({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+      onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+      <span style={{
+        width: 16, height: 16, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(255,255,255,0.06)', color: '#64748b', fontSize: '0.55rem', fontWeight: 700, cursor: 'help',
+        marginLeft: 4, flexShrink: 0,
+      }} role="img" aria-label={text}>ⓘ</span>
+      {show && (
+        <span style={{
+          position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+          padding: '6px 10px', borderRadius: 6, background: '#1e293b', color: '#e2e8f0',
+          fontSize: '0.65rem', lineHeight: 1.4, whiteSpace: 'normal', width: 220,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)',
+          zIndex: 100, marginBottom: 4, textAlign: 'left', fontWeight: 400,
+        }}>{text}</span>
+      )}
+    </span>
+  );
+}
+
 const ESTADO_OPTIONS = ['nuevo', 'contactado', 'en_progreso', 'cerrado', 'perdido'];
 
 const COLUMN_MAP: Record<string, string> = {
@@ -137,16 +160,18 @@ export default function LeadsPage() {
       <div style={{ padding: '1.5rem 2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Buscar por nombre o email..." style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '8px 14px', color: '#fff', fontSize: '0.8rem', width: 300, outline: 'none', fontFamily: "'Inter', system-ui" }} />
+          <InfoTip text="Filtra leads por nombre o email en tiempo real. La búsqueda no distingue mayúsculas de minúsculas." />
           <button onClick={exportCSV} style={{ background: 'rgba(0,229,176,0.1)', color: '#00e5b0', border: '1px solid rgba(0,229,176,0.2)', borderRadius: 8, padding: '8px 16px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', system-ui", whiteSpace: 'nowrap', transition: 'all 0.15s' }}>
             Exportar CSV
           </button>
+          <InfoTip text="Descarga todos los leads en formato CSV para abrir en Excel o Google Sheets." />
         </div>
         <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr style={{ textAlign: 'left' }}>
-              {['Fecha', 'Nombre', 'Email', 'Servicio', 'Estado', 'Mensaje'].map(h => (
+              {['Fecha', 'Nombre', 'Email', 'Servicio', 'Estado', 'Mensaje'].map((h, hi) => (
                 <th key={h} onClick={() => handleSort(h)} style={{ padding: '10px 14px', fontSize: '0.65rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', userSelect: 'none' }}>
-                  {h}{sortIndicator(h)}
+                  {h}{sortIndicator(h)}{hi === 0 && <InfoTip text="Haz clic en cualquier columna para ordenar. Clic de nuevo para invertir el orden." />}
                 </th>
               ))}
             </tr></thead>
@@ -195,7 +220,7 @@ export default function LeadsPage() {
               ))}
 
               <div>
-                <label style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 4, display: 'block' }}>Estado</label>
+                <label style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 4, display: 'flex', alignItems: 'center' }}>Estado<InfoTip text="Nuevo: recién llegado. Contactado: se le respondió. En progreso: negociación activa. Cerrado: cliente ganado. Perdido: no convirtió." /></label>
                 <select value={form.estado || 'nuevo'} onChange={e => setForm(p => ({ ...p, estado: e.target.value }))} style={{ ...inputStyle, appearance: 'auto' as React.CSSProperties['appearance'] }}>
                   {ESTADO_OPTIONS.map(o => <option key={o} value={o} style={{ background: '#1e293b' }}>{o}</option>)}
                 </select>
