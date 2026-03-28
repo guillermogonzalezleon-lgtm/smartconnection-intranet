@@ -48,12 +48,47 @@ const SCORE_COLORS: Record<string, string> = {
 const STATUS_COLORS: Record<string, string> = { green: '#22c55e', yellow: '#f59e0b', red: '#ef4444' };
 const STATUS_ICONS: Record<string, string> = { green: '●', yellow: '▲', red: '■' };
 
-const METHODOLOGIES = [
-  { agent: 'Hoku', icon: '🐾', methods: ['Poka-Yoke', 'Jidoka', 'Canary Deploy'], color: '#ff6b6b' },
-  { agent: 'Panchita', icon: '🐕', methods: ['Design Thinking', 'Jobs to Be Done', 'Wardley Mapping'], color: '#d97706' },
-  { agent: 'Camilita', icon: '👩', methods: ['Shift Left', 'Chaos Engineering', 'Exploratory Testing'], color: '#ec4899' },
-  { agent: 'Arielito', icon: '🔍', methods: ['Kaizen', 'Andon', 'OODA', 'Gemba', 'Six Sigma'], color: '#3b82f6' },
-  { agent: 'Sergito', icon: '⚡', methods: ['TRIZ', 'SCAMPER', 'First Principles', 'Blue Ocean'], color: '#a855f7' },
+const TEAM = [
+  {
+    agent: 'Panchita', icon: '🐕', color: '#d97706',
+    role: 'Arquitecta & Diseñadora', breed: 'Kiltro café claro',
+    desc: 'Investigación, análisis funcional, diseño y handoff. Nunca implementa código de producción.',
+    methods: ['Design Thinking', 'Jobs to Be Done', 'Wardley Mapping'],
+    delivers: ['Benchmark competitivo', 'User stories', 'Maqueta HTML', 'Modelo de datos', 'Contratos API'],
+    handoff: 'Hoku',
+  },
+  {
+    agent: 'Hoku', icon: '🐾', color: '#ff6b6b',
+    role: 'Producción Full-Stack', breed: 'Westie blanco',
+    desc: 'Recibe handoff de Panchita. Implementa, testea, code review propio y deploya.',
+    methods: ['Poka-Yoke', 'Jidoka', 'Canary Deploy'],
+    delivers: ['Código producción', 'Tests', 'Deploy con health check', 'Performance >90 Lighthouse'],
+    handoff: 'Camilita + Arielito',
+  },
+  {
+    agent: 'Camilita', icon: '👩', color: '#ec4899',
+    role: 'QA Policía', breed: 'Humana',
+    desc: 'Testea como usuario real que NO sabe programar. Reporta bugs, confusiones y fricciones.',
+    methods: ['Shift Left', 'Chaos Engineering', 'Exploratory Testing'],
+    delivers: ['Bugs con severidad', 'Test por personas', 'Regresión acumulativa', 'Validación specs'],
+    handoff: 'Hoku (bugs) + Panchita (UX)',
+  },
+  {
+    agent: 'Arielito', icon: '🔍', color: '#3b82f6',
+    role: 'Auditor Principal Engineer', breed: 'Humano',
+    desc: 'Mira por debajo del capó: código, arquitectura, seguridad, rendimiento, dependencias.',
+    methods: ['Kaizen', 'Andon', 'OODA', 'Gemba', 'Six Sigma'],
+    delivers: ['Scoring A-F', 'Deuda técnica cuantificada', 'Top 3 acciones', 'Señales Andon'],
+    handoff: 'Hoku (fixes) + Panchita (specs)',
+  },
+  {
+    agent: 'Sergito', icon: '⚡', color: '#a855f7',
+    role: 'Pensador Divergente', breed: 'Humano',
+    desc: 'Conecta dominios que nadie relacionaría. Propone cosas que suenan absurdas hasta que dejan de sonar absurdas.',
+    methods: ['TRIZ', 'SCAMPER', 'First Principles', 'Blue Ocean'],
+    delivers: ['Reframe del problema', 'Ideas divergentes', 'Supuestos cuestionados', 'Visión futuro'],
+    handoff: 'Panchita (evalúa viabilidad)',
+  },
 ];
 
 export default function OpsCenterPage() {
@@ -131,7 +166,7 @@ export default function OpsCenterPage() {
     { id: 'andon' as const, label: 'Andon Board', icon: '🚦' },
     { id: 'kaizen' as const, label: 'Kaizen', icon: '📊' },
     { id: 'ooda' as const, label: 'OODA Log', icon: '🔄' },
-    { id: 'methods' as const, label: 'Metodologías', icon: '🧠' },
+    { id: 'methods' as const, label: 'Equipo', icon: '🧠' },
   ];
 
   return (
@@ -147,7 +182,7 @@ export default function OpsCenterPage() {
           <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Kaizen + Andon + OODA + Metodologías</span>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
             {/* Run per agent */}
-            {METHODOLOGIES.map(m => (
+            {TEAM.map(m => (
               <button key={m.agent} onClick={() => runAgent(m.agent.toLowerCase())} disabled={running !== null}
                 style={{
                   padding: '4px 10px', borderRadius: 6, border: 'none', cursor: running ? 'wait' : 'pointer',
@@ -431,39 +466,110 @@ export default function OpsCenterPage() {
               </div>
             )}
 
-            {/* ═══ METODOLOGÍAS ═══ */}
+            {/* ═══ EQUIPO SMART CONNECTION ═══ */}
             {tab === 'methods' && (
               <div>
-                <div style={{ textAlign: 'center', marginBottom: 24 }}>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>
-                    Metodologias del Equipo SmartConnection
+                {/* Flujo del equipo */}
+                <div style={{
+                  textAlign: 'center', marginBottom: 28, padding: '20px 24px', borderRadius: 14,
+                  background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+                }}>
+                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>
+                    Flujo del Equipo Smart Connection
                   </div>
-                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                    Cada agente aplica metodologias especificas de mejora continua
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    flexWrap: 'wrap', fontSize: '0.78rem', fontWeight: 600,
+                  }}>
+                    <span style={{ color: '#d97706' }}>🐕 Panchita</span>
+                    <span style={{ color: '#475569' }}>diseña →</span>
+                    <span style={{ color: '#ff6b6b' }}>🐾 Hoku</span>
+                    <span style={{ color: '#475569' }}>implementa →</span>
+                    <span style={{ color: '#ec4899' }}>👩 Camilita</span>
+                    <span style={{ color: '#475569' }}>testea +</span>
+                    <span style={{ color: '#3b82f6' }}>🔍 Arielito</span>
+                    <span style={{ color: '#475569' }}>audita</span>
+                  </div>
+                  <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: 8 }}>
+                    ⚡ Sergito salta entre todos con ideas divergentes y reframing
                   </div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-                  {METHODOLOGIES.map(m => (
+
+                {/* Cards del equipo */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
+                  {TEAM.map(m => (
                     <div key={m.agent} style={{
-                      borderRadius: 14, padding: '20px 22px',
-                      background: `linear-gradient(135deg, ${m.color}06, rgba(255,255,255,0.02))`,
+                      borderRadius: 14, overflow: 'hidden',
+                      background: 'rgba(255,255,255,0.02)',
                       border: `1px solid ${m.color}20`,
                       transition: 'all 0.3s',
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                        <span style={{ fontSize: '1.5rem' }}>{m.icon}</span>
-                        <span style={{ fontSize: '0.95rem', fontWeight: 700, color: m.color }}>{m.agent}</span>
-                      </div>
-                      {m.methods.map(method => (
-                        <div key={method} style={{
-                          padding: '8px 12px', marginBottom: 4, borderRadius: 8,
-                          background: 'rgba(255,255,255,0.02)', fontSize: '0.78rem', color: '#cbd5e1',
-                          display: 'flex', alignItems: 'center', gap: 8,
-                        }}>
-                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: m.color, flexShrink: 0 }} />
-                          {method}
+                      {/* Card header */}
+                      <div style={{
+                        padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12,
+                        background: `${m.color}08`, borderBottom: `1px solid ${m.color}15`,
+                      }}>
+                        <span style={{ fontSize: '1.8rem' }}>{m.icon}</span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: '1rem', fontWeight: 700, color: m.color }}>{m.agent}</span>
+                            <span style={{
+                              fontSize: '0.55rem', fontWeight: 600, padding: '2px 8px', borderRadius: 8,
+                              background: `${m.color}12`, color: m.color,
+                            }}>{m.breed}</span>
+                          </div>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#94a3b8', marginTop: 2 }}>{m.role}</div>
                         </div>
-                      ))}
+                      </div>
+
+                      {/* Card body */}
+                      <div style={{ padding: '14px 20px' }}>
+                        {/* Descripción */}
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8', lineHeight: 1.6, marginBottom: 14 }}>
+                          {m.desc}
+                        </div>
+
+                        {/* Metodologías */}
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
+                            Metodologías
+                          </div>
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                            {m.methods.map(method => (
+                              <span key={method} style={{
+                                padding: '3px 10px', borderRadius: 6, fontSize: '0.68rem', fontWeight: 600,
+                                background: `${m.color}10`, color: m.color,
+                                border: `1px solid ${m.color}20`,
+                              }}>{method}</span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Entregables */}
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
+                            Entrega
+                          </div>
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                            {m.delivers.map(d => (
+                              <span key={d} style={{
+                                padding: '3px 8px', borderRadius: 6, fontSize: '0.65rem',
+                                background: 'rgba(255,255,255,0.04)', color: '#cbd5e1',
+                              }}>{d}</span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Handoff */}
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          fontSize: '0.65rem', color: '#64748b', paddingTop: 8,
+                          borderTop: '1px solid rgba(255,255,255,0.04)',
+                        }}>
+                          <span style={{ fontWeight: 600 }}>Handoff →</span>
+                          <span style={{ color: '#94a3b8' }}>{m.handoff}</span>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
