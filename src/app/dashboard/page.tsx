@@ -247,18 +247,18 @@ export default function Dashboard() {
                       <tr key={i} onClick={() => showAgentDetail(a)} style={{ borderTop: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', transition: 'background 0.15s' }}
                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,229,176,0.04)'; }}
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
-                        <td style={{ padding: '0.6rem 1rem', fontSize: '0.8rem', borderBottom: '1px solid rgba(255,255,255,0.04)', color: '#e2e8f0', fontWeight: 600 }}>
+                        <td style={{ padding: '0.6rem 1rem', fontSize: '0.875rem', borderBottom: '1px solid rgba(255,255,255,0.04)', color: '#e2e8f0', fontWeight: 600 }}>
                           <i className={`bi ${m.icon}`} style={{ color: m.color, marginRight: 8 }}></i>{a.name as string}
                         </td>
-                        <td style={{ padding: '0.6rem 1rem', fontSize: '0.7rem', color: '#94a3b8', borderBottom: '1px solid rgba(255,255,255,0.04)', textTransform: 'capitalize' }}>{(a.provider as string) || '—'}</td>
-                        <td style={{ padding: '0.6rem 1rem', fontSize: '0.7rem', fontFamily: "'JetBrains Mono', monospace", color: '#64748b', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>{(a.model as string) || '—'}</td>
+                        <td style={{ padding: '0.6rem 1rem', fontSize: '0.82rem', color: '#94a3b8', borderBottom: '1px solid rgba(255,255,255,0.04)', textTransform: 'capitalize' }}>{(a.provider as string) || '—'}</td>
+                        <td style={{ padding: '0.6rem 1rem', fontSize: '0.82rem', fontFamily: "'JetBrains Mono', monospace", color: '#64748b', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>{(a.model as string) || '—'}</td>
                         <td style={{ padding: '0.6rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                          <span style={{ fontSize: '0.6rem', fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: a.active ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.12)', color: a.active ? '#22c55e' : '#f59e0b', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '3px 10px', borderRadius: 999, background: a.active ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.12)', color: a.active ? '#22c55e' : '#f59e0b', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             <span style={{ width: 6, height: 6, borderRadius: '50%', background: a.active ? '#22c55e' : '#f59e0b', display: 'inline-block', boxShadow: a.active ? '0 0 6px #22c55e' : 'none' }}></span>
                             {a.active ? 'Activo' : 'Standby'}
                           </span>
                         </td>
-                        <td style={{ padding: '0.6rem 1rem', fontSize: '0.8rem', color: '#94a3b8', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>{(a.tasks_count as number) || 0}</td>
+                        <td style={{ padding: '0.6rem 1rem', fontSize: '0.875rem', color: '#94a3b8', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>{(a.tasks_count as number) || 0}</td>
                       </tr>
                     );
                   })}
