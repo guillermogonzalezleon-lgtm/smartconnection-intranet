@@ -336,7 +336,7 @@ export default function AgentsWorkspace() {
             background: 'linear-gradient(135deg, #00e5b0, #0ea5e9)',
             color: '#fff', fontWeight: 700, fontSize: '0.72rem',
             display: 'flex', alignItems: 'center', gap: 5,
-          }}>🎼 Debates</a>
+          }}>⚡ Comparar LLMs</a>
         </div>
       </div>
 
