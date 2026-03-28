@@ -81,7 +81,7 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
   ];
 
   const infraItems = [
-    { href: '/dashboard/ops-center', icon: 'bi-speedometer2', label: 'Andon Board', iconColor: '#00e5b0' },
+    { href: '/dashboard/ops-center', icon: 'bi-speedometer2', label: 'Ops Center', iconColor: '#00e5b0' },
     { href: '/dashboard/deploy', icon: 'bi-rocket-takeoff', label: 'Deploy', iconColor: '#3b82f6' },
     { href: '/dashboard/scan', icon: 'bi-shield-check', label: 'Scan', iconColor: '#1fd975' },
   ];
