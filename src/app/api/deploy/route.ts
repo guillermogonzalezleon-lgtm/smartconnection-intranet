@@ -114,7 +114,7 @@ export async function POST(request: Request) {
     // ── Commit file to GitHub ──
     if (action === 'commit_file') {
       const { repo, path, content, message } = body;
-      const targetRepo = repo || 'guillermogonzalezleon-lgtm/smartconnection-astro';
+      const targetRepo = repo || 'guillermogonzalezleon-lgtm/smartconnection';
       const result = await commitFile(targetRepo, { path, content, message });
       if (result.success) {
         await supabaseInsert('agent_logs', {
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
     // ── Commit multiple files ──
     if (action === 'commit_files') {
       const { repo, files, message } = body as { repo?: string; files: GitHubFile[]; message?: string };
-      const targetRepo = repo || 'guillermogonzalezleon-lgtm/smartconnection-astro';
+      const targetRepo = repo || 'guillermogonzalezleon-lgtm/smartconnection';
       const results = [];
       for (const file of files) {
         file.message = message || file.message;
@@ -148,7 +148,7 @@ export async function POST(request: Request) {
     // ── Trigger deploy (GitHub Actions) ──
     if (action === 'trigger_deploy') {
       const { repo, workflow } = body;
-      const targetRepo = repo || 'guillermogonzalezleon-lgtm/smartconnection-astro';
+      const targetRepo = repo || 'guillermogonzalezleon-lgtm/smartconnection';
       const workflowId = workflow || 'deploy-aws.yml';
       const result = await triggerWorkflow(targetRepo, workflowId);
       await supabaseInsert('agent_logs', {
@@ -162,7 +162,7 @@ export async function POST(request: Request) {
     // ── Full pipeline: save + commit + deploy ──
     if (action === 'full_pipeline') {
       const { repo, files, improvement, workflow } = body;
-      const targetRepo = repo || 'guillermogonzalezleon-lgtm/smartconnection-astro';
+      const targetRepo = repo || 'guillermogonzalezleon-lgtm/smartconnection';
       const steps: { step: string; success: boolean; detail?: string }[] = [];
 
       // Step 1: Save improvement

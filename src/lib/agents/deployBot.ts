@@ -7,7 +7,7 @@ interface AgentResult {
 }
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const GITHUB_REPO = process.env.GITHUB_REPO || 'guillermogonzalezleon-lgtm/smartconnection-astro';
+const GITHUB_REPO = process.env.GITHUB_REPO || 'guillermogonzalezleon-lgtm/smartconnection';
 const WORKFLOW_ID = process.env.GITHUB_WORKFLOW_ID || 'deploy.yml';
 
 export async function run(task: string, _config: { model?: string; systemPrompt?: string; maxTokens?: number; temperature?: number }): Promise<AgentResult> {
