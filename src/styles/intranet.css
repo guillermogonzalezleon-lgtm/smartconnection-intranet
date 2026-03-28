@@ -48,6 +48,28 @@
   /* Sidebar */
   --sidebar-width: 240px;
   --sidebar-collapsed: 64px;
+
+  /* Spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --section-gap: 2.5rem;
+  --card-padding: 1.5rem;
+
+  /* Typography scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-hero: clamp(2rem, 5vw, 3.5rem);
 }
 
 /* Light mode overrides */
@@ -166,6 +188,11 @@
 [data-theme="light"] [style*="rgba(0,0,0,0.6)"] {
   background: rgba(0,0,0,0.4) !important;
 }
+
+/* Global typography and accessibility improvements */
+table td, table th { font-size: var(--text-sm, 0.875rem); }
+table th { font-size: var(--text-xs, 0.75rem); }
+button, a[role="button"], [role="tab"] { min-height: 36px; }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: var(--font-sans); background: var(--bg-base); color: var(--text-primary); min-height: 100vh; -webkit-font-smoothing: antialiased; transition: background 0.3s, color 0.3s; }

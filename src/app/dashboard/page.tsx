@@ -170,14 +170,14 @@ export default function Dashboard() {
         <span>Intranet</span><span style={{ margin: '0 8px', color: '#475569' }}>/</span><span style={{ color: '#fff', fontWeight: 600 }}>Dashboard</span>
       </div>
       <div style={{ padding: '1.5rem 2rem', flex: 1 }}>
-        {/* Welcome Header */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#f1f5f9', margin: 0, lineHeight: 1.3 }}>{getGreeting()}, Guillermo 👋</h1>
-          <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '4px 0 0 0' }}>{capitalizedDate}</p>
+        {/* Welcome Header — Hero */}
+        <div style={{ marginBottom: 'var(--section-gap, 2.5rem)' }}>
+          <h1 style={{ fontSize: 'var(--text-hero, clamp(2rem, 5vw, 3.5rem))', fontWeight: 900, color: 'var(--text-primary, #f1f5f9)', margin: 0, lineHeight: 1.1, letterSpacing: '-0.03em' }}>{getGreeting()}, Guillermo</h1>
+          <p style={{ fontSize: 'var(--text-sm, 0.875rem)', color: 'var(--text-muted, #64748b)', margin: '8px 0 0 0' }}>{capitalizedDate}</p>
         </div>
 
         {/* KPIs */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: 'var(--section-gap, 2.5rem)' }}>
           {loading ? Array.from({ length: 6 }).map((_, i) => (
             <div key={i} style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '1.25rem', position: 'relative', overflow: 'hidden' }}>
               <div style={{ width: 24, height: 24, borderRadius: 6, background: '#1e293b', marginBottom: 10, animation: 'shimmer 1.5s infinite' }}></div>
@@ -198,7 +198,7 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: 'var(--section-gap, 2.5rem)' }}>
           {[
             { icon: 'bi-play-circle-fill', label: 'Ejecutar Agente', color: '#00e5b0', href: '/dashboard/agents' },
             { icon: 'bi-person-plus-fill', label: 'Nuevo Lead', color: '#3b82f6', href: '/dashboard/leads' },
@@ -226,11 +226,11 @@ export default function Dashboard() {
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead><tr>
-                  <th style={{ textAlign: 'left', padding: '0.6rem 1rem', fontSize: '0.65rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Agente</th>
-                  <th style={{ textAlign: 'left', padding: '0.6rem 1rem', fontSize: '0.65rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Provider</th>
-                  <th style={{ textAlign: 'left', padding: '0.6rem 1rem', fontSize: '0.65rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Modelo</th>
-                  <th style={{ textAlign: 'left', padding: '0.6rem 1rem', fontSize: '0.65rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Estado</th>
-                  <th style={{ textAlign: 'left', padding: '0.6rem 1rem', fontSize: '0.65rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Tareas</th>
+                  <th style={{ textAlign: 'left', padding: '0.6rem 1rem', fontSize: '0.75rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Agente</th>
+                  <th style={{ textAlign: 'left', padding: '0.6rem 1rem', fontSize: '0.75rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Provider</th>
+                  <th style={{ textAlign: 'left', padding: '0.6rem 1rem', fontSize: '0.75rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Modelo</th>
+                  <th style={{ textAlign: 'left', padding: '0.6rem 1rem', fontSize: '0.75rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Estado</th>
+                  <th style={{ textAlign: 'left', padding: '0.6rem 1rem', fontSize: '0.75rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Tareas</th>
                 </tr></thead>
                 <tbody>
                   {loading ? Array.from({ length: 3 }).map((_, i) => (
