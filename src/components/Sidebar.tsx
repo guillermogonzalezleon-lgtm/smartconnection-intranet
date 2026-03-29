@@ -99,7 +99,8 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
       display: 'flex',
       alignItems: 'center',
       gap: 10,
-      padding: showExpanded ? '8px 10px' : '10px 0',
+      padding: showExpanded ? '10px 10px' : '12px 0',
+      minHeight: 44,
       borderRadius: 8,
       color: active ? '#00e5b0' : hovered ? (isDark ? '#cbd5e1' : '#1e293b') : textMuted,
       fontSize: '0.78rem',
@@ -334,7 +335,7 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
       {showExpanded && (
         <div style={{ padding: '0.5rem 0.75rem', borderTop: `1px solid ${borderColor}` }}>
           {statusItems.map(s => (
-            <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 6px', fontSize: '0.65rem', color: textMuted }}>
+            <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 6px', minHeight: 32, fontSize: '0.65rem', color: textMuted }}>
               <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e', flexShrink: 0 }}></span>
               {s.label} <span style={{ marginLeft: 'auto', fontSize: '0.6rem' }}>{s.status}</span>
             </div>
