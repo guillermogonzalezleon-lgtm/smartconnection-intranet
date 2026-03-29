@@ -85,7 +85,14 @@ export default function DebateView({ debate: initialDebate, onBack }: { debate: 
     try {
       const res = await fetch(`/api/debates/${debate.id}/stream`, { method: 'POST', signal: controller.signal });
       if (!res.ok || !res.body) {
-        setError('Error al conectar con el servidor de debate');
+        if (res.status === 401) {
+          setError('Sesión expirada — recarga la página para iniciar sesión nuevamente');
+        } else if (res.status === 404) {
+          setError('Debate no encontrado — puede haber sido eliminado');
+        } else {
+          const detail = await res.text().catch(() => '');
+          setError(`Error del servidor (${res.status})${detail ? ': ' + detail.slice(0, 120) : ''}`);
+        }
         streamingRef.current = false;
         setStreaming(false);
         return;
