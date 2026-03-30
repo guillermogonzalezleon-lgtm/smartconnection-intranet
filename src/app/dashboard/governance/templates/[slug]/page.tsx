@@ -1,7 +1,10 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
+
+const PipelineDashboard = lazy(() => import('@/components/governance/PipelineDashboard'));
+const AuditDashboard = lazy(() => import('@/components/governance/AuditDashboard'));
 
 interface GovernanceDoc {
   id: string;
@@ -81,7 +84,10 @@ export default function TemplateDocPage() {
     );
   }
 
-  if (!doc) {
+  // Slugs de dashboards dinámicos no necesitan doc de Drive
+  const DYNAMIC_DASHBOARDS = ['pipeline-winloss', 'audit-report'];
+
+  if (!doc && !DYNAMIC_DASHBOARDS.includes(slug)) {
     return (
       <div style={{ padding: '60px 0', textAlign: 'center', color: '#475569' }}>
         <i className="bi bi-file-earmark-x" style={{ fontSize: '2.5rem', display: 'block', marginBottom: 12 }}></i>
@@ -93,8 +99,179 @@ export default function TemplateDocPage() {
     );
   }
 
-  const st = STATUS_COLORS[doc.status] || STATUS_COLORS.active;
-  const placeholder = FORMAT_PLACEHOLDERS[doc.format] || FORMAT_PLACEHOLDERS.doc;
+  // Metadata fallback para dashboards dinámicos
+  const dynamicDocFallbacks: Record<string, GovernanceDoc> = {
+    'audit-report': {
+      id: 'dyn-2',
+      slug: 'audit-report',
+      title: 'Audit Report',
+      icon: '📊',
+      category: 'dashboard',
+      format: 'dashboard',
+      owner: 'Arielito',
+      ownerEmoji: '🔍',
+      status: 'active',
+      version: 'v1.0',
+      description: 'Scoring A-F por proyecto y área, deuda técnica y risk heatmap',
+      reads: ['PM', 'Guillermo', 'Todo el equipo'],
+      updated_at: '2026-03-30',
+    },
+    'pipeline-winloss': {
+      id: 'dyn-1',
+      slug: 'pipeline-winloss',
+      title: 'Pipeline & Win/Loss',
+      icon: '📊',
+      category: 'dashboard',
+      format: 'dashboard',
+      owner: 'Comercial',
+      ownerEmoji: '💼',
+      status: 'active',
+      version: 'v1.0',
+      description: 'Funnel de ventas, métricas de conversión y análisis win/loss',
+      reads: ['PM', 'Guillermo', 'Comercial'],
+      updated_at: '2026-03-30',
+    },
+  };
+
+  const resolvedDoc = doc ?? dynamicDocFallbacks[slug];
+
+  const st = STATUS_COLORS[resolvedDoc!.status] || STATUS_COLORS.active;
+  const placeholder = FORMAT_PLACEHOLDERS[resolvedDoc!.format] || FORMAT_PLACEHOLDERS.doc;
+
+  // Dashboards dinámicos por slug
+  if (slug === 'audit-report') {
+    return (
+      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 600px', minWidth: 0 }}>
+          <Suspense fallback={
+            <div style={{ padding: '48px 0', textAlign: 'center', color: '#475569' }}>
+              <div style={{ width: 32, height: 32, border: '2px solid rgba(167,139,250,0.3)', borderTopColor: '#a78bfa', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+              <p style={{ fontSize: '0.8rem' }}>Cargando dashboard...</p>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            </div>
+          }>
+            <AuditDashboard />
+          </Suspense>
+        </div>
+        <div style={{ flex: '0 0 260px', minWidth: 240 }}>
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 20, position: 'sticky', top: 24 }}>
+            <h3 style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 16px' }}>Metadata</h3>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Owner</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: '1rem' }}>{resolvedDoc!.ownerEmoji}</span>
+                <span style={{ fontSize: '0.8rem', color: '#e2e8f0', fontWeight: 500 }}>{resolvedDoc!.owner}</span>
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Estado</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: st.dot, boxShadow: `0 0 6px ${st.dot}` }} />
+                <span style={{ fontSize: '0.78rem', color: '#e2e8f0' }}>{st.label}</span>
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Version</div>
+              <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(167,139,250,0.12)', color: '#a78bfa', fontSize: '0.7rem', fontWeight: 600 }}>{resolvedDoc!.version}</span>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Formato</div>
+              <span style={{ fontSize: '0.78rem', color: '#94a3b8', textTransform: 'capitalize' }}>{resolvedDoc!.format}</span>
+            </div>
+            {resolvedDoc!.reads && resolvedDoc!.reads!.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 6, fontWeight: 600 }}>Consumido por</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {resolvedDoc!.reads!.map(r => (
+                    <span key={r} style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#94a3b8', fontSize: '0.62rem', fontWeight: 500 }}>{r}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {resolvedDoc!.updated_at && (
+              <div>
+                <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Actualizado</div>
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{resolvedDoc!.updated_at}</span>
+              </div>
+            )}
+          </div>
+        </div>
+        <style>{`@media (max-width: 768px) { div[style*="flex: 0 0 260px"] { flex: 1 1 100% !important; } }`}</style>
+      </div>
+    );
+  }
+
+  if (slug === 'pipeline-winloss') {
+    return (
+      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+        {/* Dashboard principal */}
+        <div style={{ flex: '1 1 600px', minWidth: 0 }}>
+          <Suspense fallback={
+            <div style={{ padding: '48px 0', textAlign: 'center', color: '#475569' }}>
+              <div style={{ width: 32, height: 32, border: '2px solid rgba(34,197,94,0.3)', borderTopColor: '#22c55e', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+              <p style={{ fontSize: '0.8rem' }}>Cargando dashboard...</p>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            </div>
+          }>
+            <PipelineDashboard />
+          </Suspense>
+        </div>
+
+        {/* Metadata sidebar */}
+        <div style={{ flex: '0 0 260px', minWidth: 240 }}>
+          <div style={{
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: 12,
+            padding: 20,
+            position: 'sticky',
+            top: 24,
+          }}>
+            <h3 style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 16px' }}>Metadata</h3>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Owner</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: '1rem' }}>{resolvedDoc!.ownerEmoji}</span>
+                <span style={{ fontSize: '0.8rem', color: '#e2e8f0', fontWeight: 500 }}>{resolvedDoc!.owner}</span>
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Estado</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: st.dot, boxShadow: `0 0 6px ${st.dot}` }} />
+                <span style={{ fontSize: '0.78rem', color: '#e2e8f0' }}>{st.label}</span>
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Version</div>
+              <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(167,139,250,0.12)', color: '#a78bfa', fontSize: '0.7rem', fontWeight: 600 }}>{resolvedDoc!.version}</span>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Formato</div>
+              <span style={{ fontSize: '0.78rem', color: '#94a3b8', textTransform: 'capitalize' }}>{resolvedDoc!.format}</span>
+            </div>
+            {resolvedDoc!.reads && resolvedDoc!.reads!.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 6, fontWeight: 600 }}>Consumido por</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {resolvedDoc!.reads!.map(r => (
+                    <span key={r} style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#94a3b8', fontSize: '0.62rem', fontWeight: 500 }}>{r}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {resolvedDoc!.updated_at && (
+              <div>
+                <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Actualizado</div>
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{resolvedDoc!.updated_at}</span>
+              </div>
+            )}
+          </div>
+        </div>
+        <style>{`@media (max-width: 768px) { div[style*="flex: 0 0 260px"] { flex: 1 1 100% !important; } }`}</style>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
@@ -103,10 +280,10 @@ export default function TemplateDocPage() {
         {/* Doc header */}
         <div style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-            <span style={{ fontSize: '2rem' }}>{doc.icon}</span>
-            <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f1f5f9', margin: 0 }}>{doc.title}</h1>
+            <span style={{ fontSize: '2rem' }}>{resolvedDoc!.icon}</span>
+            <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f1f5f9', margin: 0 }}>{resolvedDoc!.title}</h1>
           </div>
-          <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0, lineHeight: 1.5 }}>{doc.description}</p>
+          <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0, lineHeight: 1.5 }}>{resolvedDoc!.description}</p>
         </div>
 
         {/* Content placeholder */}
@@ -127,9 +304,9 @@ export default function TemplateDocPage() {
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#e2e8f0', margin: 0 }}>{placeholder.title}</h3>
           <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0, maxWidth: 400 }}>{placeholder.description}</p>
 
-          {doc.drive_url && (
+          {resolvedDoc!.drive_url && (
             <a
-              href={doc.drive_url}
+              href={resolvedDoc!.drive_url}
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -153,7 +330,7 @@ export default function TemplateDocPage() {
             </a>
           )}
 
-          {!doc.drive_url && (
+          {!resolvedDoc!.drive_url && (
             <div style={{
               marginTop: 16,
               display: 'inline-flex',
@@ -189,8 +366,8 @@ export default function TemplateDocPage() {
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Owner</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: '1rem' }}>{doc.ownerEmoji}</span>
-              <span style={{ fontSize: '0.8rem', color: '#e2e8f0', fontWeight: 500 }}>{doc.owner}</span>
+              <span style={{ fontSize: '1rem' }}>{resolvedDoc!.ownerEmoji}</span>
+              <span style={{ fontSize: '0.8rem', color: '#e2e8f0', fontWeight: 500 }}>{resolvedDoc!.owner}</span>
             </div>
           </div>
 
@@ -213,21 +390,21 @@ export default function TemplateDocPage() {
               color: '#a78bfa',
               fontSize: '0.7rem',
               fontWeight: 600,
-            }}>{doc.version}</span>
+            }}>{resolvedDoc!.version}</span>
           </div>
 
           {/* Format */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Formato</div>
-            <span style={{ fontSize: '0.78rem', color: '#94a3b8', textTransform: 'capitalize' }}>{doc.format}</span>
+            <span style={{ fontSize: '0.78rem', color: '#94a3b8', textTransform: 'capitalize' }}>{resolvedDoc!.format}</span>
           </div>
 
           {/* Reads */}
-          {doc.reads && doc.reads.length > 0 && (
+          {resolvedDoc!.reads && resolvedDoc!.reads.length > 0 && (
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 6, fontWeight: 600 }}>Consumido por</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                {doc.reads.map(r => (
+                {resolvedDoc!.reads.map(r => (
                   <span key={r} style={{
                     padding: '2px 8px',
                     borderRadius: 6,
@@ -243,10 +420,10 @@ export default function TemplateDocPage() {
           )}
 
           {/* Updated */}
-          {doc.updated_at && (
+          {resolvedDoc!.updated_at && (
             <div>
               <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Actualizado</div>
-              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{doc.updated_at}</span>
+              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{resolvedDoc!.updated_at}</span>
             </div>
           )}
         </div>
