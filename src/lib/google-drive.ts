@@ -1,7 +1,18 @@
 import crypto from 'crypto';
 
-const SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!;
-const PRIVATE_KEY = (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+// Soporta env vars individuales O JSON completo (GOOGLE_SERVICE_ACCOUNT_JSON en Amplify)
+function getCredentials() {
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    const sa = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+    return { email: sa.client_email, key: sa.private_key };
+  }
+  return {
+    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '',
+    key: (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+  };
+}
+
+const { email: SERVICE_ACCOUNT_EMAIL, key: PRIVATE_KEY } = getCredentials();
 const GOVERNANCE_FOLDER_ID = process.env.GOOGLE_DRIVE_GOVERNANCE_FOLDER_ID;
 
 const SCOPES = 'https://www.googleapis.com/auth/drive';
