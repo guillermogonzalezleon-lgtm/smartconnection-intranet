@@ -86,6 +86,10 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
     { href: '/dashboard/scan', icon: 'bi-shield-check', label: 'Scan', iconColor: '#1fd975' },
   ];
 
+  const governanceItems = [
+    { href: '/dashboard/governance', icon: 'bi-bank', label: 'Gobierno', iconColor: '#a78bfa' },
+  ];
+
   const statusItems = [
     { label: 'Amplify', status: 'Live' },
     { label: 'AWS', status: 'Active' },
@@ -316,6 +320,23 @@ export default function Sidebar({ user, role, 'aria-label': ariaLabel }: { user:
         <div style={{ height: 1, background: borderColor, margin: '8px 0' }}></div>
         {showExpanded && <div style={{ fontSize: '0.55rem', fontWeight: 700, color: textDimmed, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '0 8px', marginBottom: 6 }}>Infra</div>}
         {infraItems.map(item => (
+          <a
+            key={item.href}
+            href={item.href}
+            style={navLinkStyle(item.href)}
+            title={!showExpanded ? item.label : undefined}
+            onMouseEnter={() => setHoveredItem(item.href)}
+            onMouseLeave={() => setHoveredItem(null)}
+            onClick={() => isMobile && setMobileOpen(false)}
+          >
+            <i className={`bi ${item.icon}`} style={{ fontSize: '1.1rem', width: 22, textAlign: 'center', flexShrink: 0, color: isActive(item.href) ? '#00e5b0' : item.iconColor }}></i>
+            {showExpanded && <span>{item.label}</span>}
+          </a>
+        ))}
+
+        <div style={{ height: 1, background: borderColor, margin: '8px 0' }}></div>
+        {showExpanded && <div style={{ fontSize: '0.55rem', fontWeight: 700, color: textDimmed, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '0 8px', marginBottom: 6 }}>Gobierno</div>}
+        {governanceItems.map(item => (
           <a
             key={item.href}
             href={item.href}
