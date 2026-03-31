@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
+import { getSession } from '@/lib/auth';
 
-// Bedrock uses AWS Signature V4 — we call it via the Bedrock REST API
-// In Amplify, AWS credentials come from the runtime environment
 export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session.valid) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+
   const { prompt, system } = await request.json();
   if (!prompt) return NextResponse.json({ error: 'Prompt requerido' }, { status: 400 });
 
