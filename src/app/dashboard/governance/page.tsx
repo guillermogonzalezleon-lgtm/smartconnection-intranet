@@ -1,7 +1,31 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef, lazy, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+
+const PipelineDashboard = lazy(() => import('@/components/governance/PipelineDashboard'));
+const AuditDashboard = lazy(() => import('@/components/governance/AuditDashboard'));
+const IntegrationMapDashboard = lazy(() => import('@/components/governance/IntegrationMapDashboard'));
+const InfraCostsDashboard = lazy(() => import('@/components/governance/InfraCostsDashboard'));
+const BugTrackerDashboard = lazy(() => import('@/components/governance/BugTrackerDashboard'));
+const CustomerOpsDashboard = lazy(() => import('@/components/governance/CustomerOpsDashboard'));
+const SprintDashboard = lazy(() => import('@/components/governance/SprintDashboard'));
+const TechRadarDashboard = lazy(() => import('@/components/governance/TechRadarDashboard'));
+const DesignTokensDashboard = lazy(() => import('@/components/governance/DesignTokensDashboard'));
+const ProvidersIaDashboard = lazy(() => import('@/components/governance/ProvidersIaDashboard'));
+
+const DASHBOARD_COMPONENTS: Record<string, React.ReactNode> = {
+  'pipeline-winloss': <PipelineDashboard />,
+  'audit-report': <AuditDashboard />,
+  'integration-map': <IntegrationMapDashboard />,
+  'infra-deploy': <InfraCostsDashboard />,
+  'test-report': <BugTrackerDashboard />,
+  'customer-ops': <CustomerOpsDashboard />,
+  'sprint-report': <SprintDashboard />,
+  'tech-radar': <TechRadarDashboard />,
+  'design-tokens': <DesignTokensDashboard />,
+  'providers-ia': <ProvidersIaDashboard />,
+};
 
 interface GovernanceDoc {
   id: string;
@@ -104,6 +128,23 @@ export default function GovernancePage() {
   const [loading, setLoading] = useState(true);
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [openDashboard, setOpenDashboard] = useState<string | null>(null);
+  const triggerRef = useRef<HTMLDivElement | null>(null);
+
+  const openDoc = docs.find(d => d.slug === openDashboard) || null;
+
+  const closeModal = useCallback(() => {
+    setOpenDashboard(null);
+    setTimeout(() => triggerRef.current?.focus(), 50);
+  }, []);
+
+  useEffect(() => {
+    if (!openDashboard) return;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeModal(); };
+    window.addEventListener('keydown', onKey);
+    return () => { document.body.style.overflow = ''; window.removeEventListener('keydown', onKey); };
+  }, [openDashboard, closeModal]);
 
   useEffect(() => {
     fetch('/api/governance/documents')
@@ -246,14 +287,20 @@ export default function GovernancePage() {
             const fmt = FORMAT_LABELS[doc.format];
             const st = STATUS_COLORS[doc.status];
             const isHovered = hoveredCard === doc.id;
+            const isDashboard = doc.format === 'dashboard' && DASHBOARD_COMPONENTS[doc.slug];
+            const Wrapper = isDashboard ? 'div' : 'a';
+            const wrapperProps = isDashboard
+              ? { onClick: () => { triggerRef.current = document.activeElement as HTMLDivElement; setOpenDashboard(doc.slug); } }
+              : { href: `/dashboard/governance/${categoryPath(doc)}/${doc.slug}` };
             return (
-              <a
+              <Wrapper
                 key={doc.id}
-                href={`/dashboard/governance/${categoryPath(doc)}/${doc.slug}`}
+                {...wrapperProps as any}
                 style={{
                   textDecoration: 'none',
                   color: 'inherit',
                   display: 'block',
+                  cursor: 'pointer',
                 }}
                 onMouseEnter={() => setHoveredCard(doc.id)}
                 onMouseLeave={() => setHoveredCard(null)}
@@ -320,16 +367,98 @@ export default function GovernancePage() {
                     </span>
                   </div>
                 </div>
-              </a>
+              </Wrapper>
             );
           })}
         </div>
       )}
 
+      {/* Dashboard Modal */}
+      {openDashboard && openDoc && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            animation: 'modalFadeIn 0.2s ease-out',
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-title"
+        >
+          <div style={{
+            width: '90vw', maxWidth: 1200, height: '90vh',
+            background: '#0f172a',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 16,
+            display: 'flex', flexDirection: 'column',
+            boxShadow: '0 25px 80px rgba(0,0,0,0.5)',
+            animation: 'modalScaleIn 0.2s ease-out',
+            overflow: 'hidden',
+          }}>
+            {/* Header */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '12px 20px',
+              background: 'rgba(15,23,42,0.95)',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              flexShrink: 0,
+            }}>
+              <span style={{ fontSize: '1.2rem' }}>{openDoc.icon}</span>
+              <span id="modal-title" style={{ fontSize: '0.9rem', fontWeight: 600, color: '#f1f5f9', flex: 1 }}>{openDoc.title}</span>
+              <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(167,139,250,0.12)', color: '#a78bfa', fontSize: '0.62rem', fontWeight: 600 }}>
+                {openDoc.ownerEmoji} {openDoc.owner}
+              </span>
+              <button
+                onClick={closeModal}
+                aria-label="Cerrar"
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 8,
+                  color: '#94a3b8',
+                  width: 32, height: 32,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.15)'; e.currentTarget.style.color = '#f87171'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = '#94a3b8'; }}
+              >
+                <i className="bi bi-x-lg" style={{ fontSize: '0.75rem' }}></i>
+              </button>
+            </div>
+            {/* Content */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+              <Suspense fallback={
+                <div style={{ padding: '60px 0', textAlign: 'center', color: '#475569' }}>
+                  <div style={{ width: 32, height: 32, border: '2px solid rgba(167,139,250,0.3)', borderTopColor: '#a78bfa', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+                  <p style={{ fontSize: '0.8rem' }}>Cargando dashboard...</p>
+                </div>
+              }>
+                {DASHBOARD_COMPONENTS[openDashboard]}
+              </Suspense>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
+        @keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes modalScaleIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
         @media (max-width: 768px) {
           div[style*="gridTemplateColumns"] {
             grid-template-columns: 1fr !important;
+          }
+          div[role="dialog"] > div {
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: 100vw !important;
+            border-radius: 0 !important;
           }
         }
         @media (min-width: 769px) and (max-width: 1024px) {
