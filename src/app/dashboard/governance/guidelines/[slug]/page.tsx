@@ -2,6 +2,11 @@
 
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
+
+const DriveDocViewer = dynamic(() => import('@/components/governance/DriveDocViewer'), { ssr: false });
+const SheetViewer = dynamic(() => import('@/components/governance/SheetViewer'), { ssr: false });
+const SlidesEmbed = dynamic(() => import('@/components/governance/SlidesEmbed'), { ssr: false });
 
 interface GovernanceDoc {
   id: string;
@@ -16,6 +21,7 @@ interface GovernanceDoc {
   version: string;
   description: string;
   drive_url?: string;
+  drive_file_id?: string;
   reads?: string[];
   updated_at?: string;
 }
@@ -94,44 +100,52 @@ export default function GuidelineDocPage() {
           <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0, lineHeight: 1.5 }}>{doc.description}</p>
         </div>
 
-        <div style={{
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px dashed rgba(255,255,255,0.1)',
-          borderRadius: 12,
-          padding: '60px 40px',
-          textAlign: 'center',
-          minHeight: 300,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 12,
-        }}>
-          <span style={{ fontSize: '2.5rem' }}>{placeholder.icon}</span>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#e2e8f0', margin: 0 }}>{placeholder.title}</h3>
-          <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0, maxWidth: 400 }}>{placeholder.description}</p>
+        {doc.drive_file_id && doc.format === 'doc' ? (
+          <DriveDocViewer fileId={doc.drive_file_id} title={doc.title} driveUrl={doc.drive_url} />
+        ) : doc.drive_file_id && doc.format === 'sheet' ? (
+          <SheetViewer fileId={doc.drive_file_id} title={doc.title} driveUrl={doc.drive_url} />
+        ) : doc.drive_file_id && doc.format === 'slides' ? (
+          <SlidesEmbed fileId={doc.drive_file_id} title={doc.title} driveUrl={doc.drive_url} />
+        ) : (
+          <div style={{
+            background: 'rgba(255,255,255,0.02)',
+            border: '1px dashed rgba(255,255,255,0.1)',
+            borderRadius: 12,
+            padding: '60px 40px',
+            textAlign: 'center',
+            minHeight: 300,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 12,
+          }}>
+            <span style={{ fontSize: '2.5rem' }}>{placeholder.icon}</span>
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#e2e8f0', margin: 0 }}>{placeholder.title}</h3>
+            <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0, maxWidth: 400 }}>{placeholder.description}</p>
 
-          {doc.drive_url ? (
-            <a href={doc.drive_url} target="_blank" rel="noopener noreferrer" style={{
-              marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 20px', borderRadius: 8, background: 'rgba(167,139,250,0.15)',
-              border: '1px solid rgba(167,139,250,0.3)', color: '#c4b5fd',
-              fontSize: '0.78rem', fontWeight: 500, textDecoration: 'none', transition: 'all 0.15s ease',
-            }}>
-              <i className="bi bi-box-arrow-up-right" style={{ fontSize: '0.75rem' }}></i>
-              Abrir en Drive
-            </a>
-          ) : (
-            <div style={{
-              marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 20px', borderRadius: 8, background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.08)', color: '#475569', fontSize: '0.72rem',
-            }}>
-              <i className="bi bi-link-45deg"></i>
-              Drive URL pendiente de configurar
-            </div>
-          )}
-        </div>
+            {doc.drive_url ? (
+              <a href={doc.drive_url} target="_blank" rel="noopener noreferrer" style={{
+                marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '8px 20px', borderRadius: 8, background: 'rgba(167,139,250,0.15)',
+                border: '1px solid rgba(167,139,250,0.3)', color: '#c4b5fd',
+                fontSize: '0.78rem', fontWeight: 500, textDecoration: 'none', transition: 'all 0.15s ease',
+              }}>
+                <i className="bi bi-box-arrow-up-right" style={{ fontSize: '0.75rem' }}></i>
+                Abrir en Drive
+              </a>
+            ) : (
+              <div style={{
+                marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '8px 20px', borderRadius: 8, background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)', color: '#475569', fontSize: '0.72rem',
+              }}>
+                <i className="bi bi-link-45deg"></i>
+                Drive URL pendiente de configurar
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Metadata sidebar */}

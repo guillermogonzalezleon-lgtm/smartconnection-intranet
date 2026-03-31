@@ -4,6 +4,14 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 
+const DriveDocViewer = dynamic(() => import('@/components/governance/DriveDocViewer'), { ssr: false });
+const SheetViewer = dynamic(() => import('@/components/governance/SheetViewer'), { ssr: false });
+const SlidesEmbed = dynamic(() => import('@/components/governance/SlidesEmbed'), { ssr: false });
+
+const DesignTokensDashboard = dynamic(() => import('@/components/governance/DesignTokensDashboard'), { ssr: false });
+const ProvidersIaDashboard = dynamic(() => import('@/components/governance/ProvidersIaDashboard'), { ssr: false });
+const IntegrationMapDashboard = dynamic(() => import('@/components/governance/IntegrationMapDashboard'), { ssr: false });
+
 const TechRadarDashboard = dynamic(
   () => import('@/components/governance/TechRadarDashboard'),
   { ssr: false, loading: () => (
@@ -28,6 +36,7 @@ interface GovernanceDoc {
   version: string;
   description: string;
   drive_url?: string;
+  drive_file_id?: string;
   reads?: string[];
   updated_at?: string;
 }
@@ -81,7 +90,9 @@ export default function StandardDocPage() {
     );
   }
 
-  if (!doc) {
+  const DYNAMIC_STANDARDS = ['tech-radar', 'design-tokens', 'providers-ia', 'catalogo-integraciones'];
+
+  if (!doc && !DYNAMIC_STANDARDS.includes(slug)) {
     return (
       <div style={{ padding: '60px 0', textAlign: 'center', color: '#475569' }}>
         <i className="bi bi-file-earmark-x" style={{ fontSize: '2.5rem', display: 'block', marginBottom: 12 }}></i>
@@ -93,8 +104,16 @@ export default function StandardDocPage() {
     );
   }
 
-  const st = STATUS_COLORS[doc.status] || STATUS_COLORS.active;
-  const placeholder = FORMAT_PLACEHOLDERS[doc.format] || FORMAT_PLACEHOLDERS.doc;
+  const DYNAMIC_FALLBACK: Record<string, GovernanceDoc> = {
+    'design-tokens': { id: 'dt', slug: 'design-tokens', title: 'Design Tokens', icon: '🎨', category: 'standard', format: 'dashboard', owner: 'Fiori', ownerEmoji: '🎨', status: 'active', version: 'v1.0', description: 'Tokens de diseño: colores, tipografía, spacing, shadows' },
+    'providers-ia': { id: 'pi', slug: 'providers-ia', title: 'Providers IA', icon: '🤖', category: 'standard', format: 'dashboard', owner: 'Integrador', ownerEmoji: '🔌', status: 'active', version: 'v1.0', description: 'Catálogo de providers IA con benchmarks y costos' },
+    'catalogo-integraciones': { id: 'ci', slug: 'catalogo-integraciones', title: 'Catálogo de Integraciones', icon: '🔌', category: 'standard', format: 'dashboard', owner: 'Integrador', ownerEmoji: '🔌', status: 'active', version: 'v1.0', description: 'Inventario de todas las integraciones externas' },
+  };
+  const resolvedDoc = doc || DYNAMIC_FALLBACK[slug] || null;
+  if (!resolvedDoc) return null;
+
+  const st = STATUS_COLORS[resolvedDoc.status] || STATUS_COLORS.active;
+  const placeholder = FORMAT_PLACEHOLDERS[resolvedDoc.format] || FORMAT_PLACEHOLDERS.doc;
 
   return (
     <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
@@ -102,14 +121,26 @@ export default function StandardDocPage() {
       <div style={{ flex: '1 1 600px', minWidth: 0 }}>
         <div style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-            <span style={{ fontSize: '2rem' }}>{doc.icon}</span>
-            <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f1f5f9', margin: 0 }}>{doc.title}</h1>
+            <span style={{ fontSize: '2rem' }}>{resolvedDoc.icon}</span>
+            <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f1f5f9', margin: 0 }}>{resolvedDoc.title}</h1>
           </div>
-          <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0, lineHeight: 1.5 }}>{doc.description}</p>
+          <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0, lineHeight: 1.5 }}>{resolvedDoc.description}</p>
         </div>
 
         {slug === 'tech-radar' ? (
           <TechRadarDashboard />
+        ) : slug === 'design-tokens' ? (
+          <DesignTokensDashboard />
+        ) : slug === 'providers-ia' ? (
+          <ProvidersIaDashboard />
+        ) : slug === 'catalogo-integraciones' ? (
+          <IntegrationMapDashboard />
+        ) : resolvedDoc.drive_file_id && resolvedDoc.format === 'doc' ? (
+          <DriveDocViewer fileId={resolvedDoc.drive_file_id} title={resolvedDoc.title} driveUrl={resolvedDoc.drive_url} />
+        ) : resolvedDoc.drive_file_id && resolvedDoc.format === 'sheet' ? (
+          <SheetViewer fileId={resolvedDoc.drive_file_id} title={resolvedDoc.title} driveUrl={resolvedDoc.drive_url} />
+        ) : resolvedDoc.drive_file_id && resolvedDoc.format === 'slides' ? (
+          <SlidesEmbed fileId={resolvedDoc.drive_file_id} title={resolvedDoc.title} driveUrl={resolvedDoc.drive_url} />
         ) : (
           <div style={{
             background: 'rgba(255,255,255,0.02)',
@@ -128,8 +159,8 @@ export default function StandardDocPage() {
             <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#e2e8f0', margin: 0 }}>{placeholder.title}</h3>
             <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0, maxWidth: 400 }}>{placeholder.description}</p>
 
-            {doc.drive_url ? (
-              <a href={doc.drive_url} target="_blank" rel="noopener noreferrer" style={{
+            {resolvedDoc.drive_url ? (
+              <a href={resolvedDoc.drive_url} target="_blank" rel="noopener noreferrer" style={{
                 marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '8px 20px', borderRadius: 8, background: 'rgba(167,139,250,0.15)',
                 border: '1px solid rgba(167,139,250,0.3)', color: '#c4b5fd',
@@ -163,8 +194,8 @@ export default function StandardDocPage() {
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Owner</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: '1rem' }}>{doc.ownerEmoji}</span>
-              <span style={{ fontSize: '0.8rem', color: '#e2e8f0', fontWeight: 500 }}>{doc.owner}</span>
+              <span style={{ fontSize: '1rem' }}>{resolvedDoc.ownerEmoji}</span>
+              <span style={{ fontSize: '0.8rem', color: '#e2e8f0', fontWeight: 500 }}>{resolvedDoc.owner}</span>
             </div>
           </div>
 
@@ -178,29 +209,29 @@ export default function StandardDocPage() {
 
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Version</div>
-            <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(167,139,250,0.12)', color: '#a78bfa', fontSize: '0.7rem', fontWeight: 600 }}>{doc.version}</span>
+            <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(167,139,250,0.12)', color: '#a78bfa', fontSize: '0.7rem', fontWeight: 600 }}>{resolvedDoc.version}</span>
           </div>
 
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Formato</div>
-            <span style={{ fontSize: '0.78rem', color: '#94a3b8', textTransform: 'capitalize' }}>{doc.format}</span>
+            <span style={{ fontSize: '0.78rem', color: '#94a3b8', textTransform: 'capitalize' }}>{resolvedDoc.format}</span>
           </div>
 
-          {doc.reads && doc.reads.length > 0 && (
+          {resolvedDoc.reads && resolvedDoc.reads.length > 0 && (
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 6, fontWeight: 600 }}>Consumido por</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                {doc.reads.map(r => (
+                {resolvedDoc.reads?.map(r => (
                   <span key={r} style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#94a3b8', fontSize: '0.62rem', fontWeight: 500 }}>{r}</span>
                 ))}
               </div>
             </div>
           )}
 
-          {doc.updated_at && (
+          {resolvedDoc.updated_at && (
             <div>
               <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Actualizado</div>
-              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{doc.updated_at}</span>
+              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{resolvedDoc.updated_at}</span>
             </div>
           )}
         </div>

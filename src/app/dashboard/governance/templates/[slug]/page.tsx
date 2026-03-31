@@ -2,9 +2,19 @@
 
 import { useParams } from 'next/navigation';
 import { useEffect, useState, lazy, Suspense } from 'react';
+import dynamic from 'next/dynamic';
 
 const PipelineDashboard = lazy(() => import('@/components/governance/PipelineDashboard'));
 const AuditDashboard = lazy(() => import('@/components/governance/AuditDashboard'));
+const IntegrationMapDashboard = lazy(() => import('@/components/governance/IntegrationMapDashboard'));
+const InfraCostsDashboard = lazy(() => import('@/components/governance/InfraCostsDashboard'));
+const BugTrackerDashboard = lazy(() => import('@/components/governance/BugTrackerDashboard'));
+const CustomerOpsDashboard = lazy(() => import('@/components/governance/CustomerOpsDashboard'));
+const SprintDashboard = lazy(() => import('@/components/governance/SprintDashboard'));
+
+const DriveDocViewer = dynamic(() => import('@/components/governance/DriveDocViewer'), { ssr: false });
+const SheetViewer = dynamic(() => import('@/components/governance/SheetViewer'), { ssr: false });
+const SlidesEmbed = dynamic(() => import('@/components/governance/SlidesEmbed'), { ssr: false });
 
 interface GovernanceDoc {
   id: string;
@@ -19,6 +29,7 @@ interface GovernanceDoc {
   version: string;
   description: string;
   drive_url?: string;
+  drive_file_id?: string;
   reads?: string[];
   updated_at?: string;
 }
@@ -85,7 +96,7 @@ export default function TemplateDocPage() {
   }
 
   // Slugs de dashboards dinámicos no necesitan doc de Drive
-  const DYNAMIC_DASHBOARDS = ['pipeline-winloss', 'audit-report'];
+  const DYNAMIC_DASHBOARDS = ['pipeline-winloss', 'audit-report', 'integration-map', 'infra-deploy', 'test-report', 'customer-ops', 'sprint-report'];
 
   if (!doc && !DYNAMIC_DASHBOARDS.includes(slug)) {
     return (
@@ -102,34 +113,46 @@ export default function TemplateDocPage() {
   // Metadata fallback para dashboards dinámicos
   const dynamicDocFallbacks: Record<string, GovernanceDoc> = {
     'audit-report': {
-      id: 'dyn-2',
-      slug: 'audit-report',
-      title: 'Audit Report',
-      icon: '📊',
-      category: 'dashboard',
-      format: 'dashboard',
-      owner: 'Arielito',
-      ownerEmoji: '🔍',
-      status: 'active',
-      version: 'v1.0',
-      description: 'Scoring A-F por proyecto y área, deuda técnica y risk heatmap',
-      reads: ['PM', 'Guillermo', 'Todo el equipo'],
-      updated_at: '2026-03-30',
+      id: 'dyn-2', slug: 'audit-report', title: 'Audit Report', icon: '📊',
+      category: 'dashboard', format: 'dashboard', owner: 'Arielito', ownerEmoji: '🔍',
+      status: 'active', version: 'v1.0', description: 'Scoring A-F por proyecto y área, deuda técnica y risk heatmap',
+      reads: ['PM', 'Guillermo', 'Todo el equipo'], updated_at: '2026-03-30',
     },
     'pipeline-winloss': {
-      id: 'dyn-1',
-      slug: 'pipeline-winloss',
-      title: 'Pipeline & Win/Loss',
-      icon: '📊',
-      category: 'dashboard',
-      format: 'dashboard',
-      owner: 'Comercial',
-      ownerEmoji: '💼',
-      status: 'active',
-      version: 'v1.0',
-      description: 'Funnel de ventas, métricas de conversión y análisis win/loss',
-      reads: ['PM', 'Guillermo', 'Comercial'],
-      updated_at: '2026-03-30',
+      id: 'dyn-1', slug: 'pipeline-winloss', title: 'Pipeline & Win/Loss', icon: '📊',
+      category: 'dashboard', format: 'dashboard', owner: 'Comercial', ownerEmoji: '💼',
+      status: 'active', version: 'v1.0', description: 'Funnel de ventas, métricas de conversión y análisis win/loss',
+      reads: ['PM', 'Guillermo', 'Comercial'], updated_at: '2026-03-30',
+    },
+    'integration-map': {
+      id: 'dyn-3', slug: 'integration-map', title: 'Mapa de Integraciones', icon: '🔌',
+      category: 'dashboard', format: 'dashboard', owner: 'Integrador', ownerEmoji: '🔌',
+      status: 'active', version: 'v1.0', description: 'Catálogo de APIs, providers y conectores con semáforo de estado',
+      reads: ['Arielito', 'ABAP', 'Hoku'], updated_at: '2026-03-30',
+    },
+    'infra-deploy': {
+      id: 'dyn-4', slug: 'infra-deploy', title: 'Costos de Infra', icon: '💰',
+      category: 'dashboard', format: 'dashboard', owner: 'Pipeline', ownerEmoji: '🛠️',
+      status: 'active', version: 'v1.0', description: 'Desglose mensual de costos AWS, Vercel y Supabase',
+      reads: ['PM', 'Guillermo'], updated_at: '2026-03-30',
+    },
+    'test-report': {
+      id: 'dyn-5', slug: 'test-report', title: 'Bug Tracker', icon: '🐛',
+      category: 'dashboard', format: 'dashboard', owner: 'Camilita', ownerEmoji: '👩',
+      status: 'active', version: 'v1.0', description: 'Seguimiento de bugs por severidad, proyecto y estado',
+      reads: ['ABAP', 'Fiori', 'Hoku', 'PM'], updated_at: '2026-03-30',
+    },
+    'customer-ops': {
+      id: 'dyn-6', slug: 'customer-ops', title: 'Customer Ops', icon: '🎧',
+      category: 'dashboard', format: 'dashboard', owner: 'ClienteX', ownerEmoji: '🎧',
+      status: 'active', version: 'v1.0', description: 'Tickets de soporte, SLA y NPS de clientes',
+      reads: ['PM', 'Guillermo', 'Comercial'], updated_at: '2026-03-30',
+    },
+    'sprint-report': {
+      id: 'dyn-7', slug: 'sprint-report', title: 'Sprint Dashboard', icon: '🎯',
+      category: 'dashboard', format: 'dashboard', owner: 'PM', ownerEmoji: '👔',
+      status: 'active', version: 'v1.0', description: 'Sprint activo con tablero kanban, RICE scores y estado por agente',
+      reads: ['Todo el equipo'], updated_at: '2026-03-30',
     },
   };
 
@@ -273,6 +296,77 @@ export default function TemplateDocPage() {
     );
   }
 
+  // Helper para renderizar dashboards dinámicos con sidebar de metadata
+  const DYNAMIC_DASHBOARD_COMPONENTS: Record<string, React.ReactNode> = {
+    'integration-map': <IntegrationMapDashboard />,
+    'infra-deploy':    <InfraCostsDashboard />,
+    'test-report':     <BugTrackerDashboard />,
+    'customer-ops':    <CustomerOpsDashboard />,
+    'sprint-report':   <SprintDashboard />,
+  };
+
+  if (DYNAMIC_DASHBOARD_COMPONENTS[slug]) {
+    return (
+      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 600px', minWidth: 0 }}>
+          <Suspense fallback={
+            <div style={{ padding: '48px 0', textAlign: 'center', color: '#475569' }}>
+              <div style={{ width: 32, height: 32, border: '2px solid rgba(167,139,250,0.3)', borderTopColor: '#a78bfa', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+              <p style={{ fontSize: '0.8rem' }}>Cargando dashboard...</p>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            </div>
+          }>
+            {DYNAMIC_DASHBOARD_COMPONENTS[slug]}
+          </Suspense>
+        </div>
+        <div style={{ flex: '0 0 260px', minWidth: 240 }}>
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 20, position: 'sticky', top: 24 }}>
+            <h3 style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 16px' }}>Metadata</h3>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Owner</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: '1rem' }}>{resolvedDoc!.ownerEmoji}</span>
+                <span style={{ fontSize: '0.8rem', color: '#e2e8f0', fontWeight: 500 }}>{resolvedDoc!.owner}</span>
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Estado</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: st.dot, boxShadow: `0 0 6px ${st.dot}` }} />
+                <span style={{ fontSize: '0.78rem', color: '#e2e8f0' }}>{st.label}</span>
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Version</div>
+              <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(167,139,250,0.12)', color: '#a78bfa', fontSize: '0.7rem', fontWeight: 600 }}>{resolvedDoc!.version}</span>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Formato</div>
+              <span style={{ fontSize: '0.78rem', color: '#94a3b8', textTransform: 'capitalize' }}>{resolvedDoc!.format}</span>
+            </div>
+            {resolvedDoc!.reads && resolvedDoc!.reads!.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 6, fontWeight: 600 }}>Consumido por</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {resolvedDoc!.reads!.map(r => (
+                    <span key={r} style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#94a3b8', fontSize: '0.62rem', fontWeight: 500 }}>{r}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {resolvedDoc!.updated_at && (
+              <div>
+                <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 4, fontWeight: 600 }}>Actualizado</div>
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{resolvedDoc!.updated_at}</span>
+              </div>
+            )}
+          </div>
+        </div>
+        <style>{`@media (max-width: 768px) { div[style*="flex: 0 0 260px"] { flex: 1 1 100% !important; } }`}</style>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
       {/* Main content */}
@@ -286,68 +380,74 @@ export default function TemplateDocPage() {
           <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0, lineHeight: 1.5 }}>{resolvedDoc!.description}</p>
         </div>
 
-        {/* Content placeholder */}
-        <div style={{
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px dashed rgba(255,255,255,0.1)',
-          borderRadius: 12,
-          padding: '60px 40px',
-          textAlign: 'center',
-          minHeight: 300,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 12,
-        }}>
-          <span style={{ fontSize: '2.5rem' }}>{placeholder.icon}</span>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#e2e8f0', margin: 0 }}>{placeholder.title}</h3>
-          <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0, maxWidth: 400 }}>{placeholder.description}</p>
+        {/* Content: Drive viewer o placeholder */}
+        {resolvedDoc!.drive_file_id && resolvedDoc!.format === 'doc' ? (
+          <DriveDocViewer fileId={resolvedDoc!.drive_file_id} title={resolvedDoc!.title} driveUrl={resolvedDoc!.drive_url} />
+        ) : resolvedDoc!.drive_file_id && resolvedDoc!.format === 'sheet' ? (
+          <SheetViewer fileId={resolvedDoc!.drive_file_id} title={resolvedDoc!.title} driveUrl={resolvedDoc!.drive_url} />
+        ) : resolvedDoc!.drive_file_id && resolvedDoc!.format === 'slides' ? (
+          <SlidesEmbed fileId={resolvedDoc!.drive_file_id} title={resolvedDoc!.title} driveUrl={resolvedDoc!.drive_url} />
+        ) : (
+          <div style={{
+            background: 'rgba(255,255,255,0.02)',
+            border: '1px dashed rgba(255,255,255,0.1)',
+            borderRadius: 12,
+            padding: '60px 40px',
+            textAlign: 'center',
+            minHeight: 300,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 12,
+          }}>
+            <span style={{ fontSize: '2.5rem' }}>{placeholder.icon}</span>
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#e2e8f0', margin: 0 }}>{placeholder.title}</h3>
+            <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0, maxWidth: 400 }}>{placeholder.description}</p>
 
-          {resolvedDoc!.drive_url && (
-            <a
-              href={resolvedDoc!.drive_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
+            {resolvedDoc!.drive_url ? (
+              <a
+                href={resolvedDoc!.drive_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  marginTop: 16,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '8px 20px',
+                  borderRadius: 8,
+                  background: 'rgba(167,139,250,0.15)',
+                  border: '1px solid rgba(167,139,250,0.3)',
+                  color: '#c4b5fd',
+                  fontSize: '0.78rem',
+                  fontWeight: 500,
+                  textDecoration: 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <i className="bi bi-box-arrow-up-right" style={{ fontSize: '0.75rem' }}></i>
+                Abrir en Drive
+              </a>
+            ) : (
+              <div style={{
                 marginTop: 16,
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
                 padding: '8px 20px',
                 borderRadius: 8,
-                background: 'rgba(167,139,250,0.15)',
-                border: '1px solid rgba(167,139,250,0.3)',
-                color: '#c4b5fd',
-                fontSize: '0.78rem',
-                fontWeight: 500,
-                textDecoration: 'none',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <i className="bi bi-box-arrow-up-right" style={{ fontSize: '0.75rem' }}></i>
-              Abrir en Drive
-            </a>
-          )}
-
-          {!resolvedDoc!.drive_url && (
-            <div style={{
-              marginTop: 16,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '8px 20px',
-              borderRadius: 8,
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              color: '#475569',
-              fontSize: '0.72rem',
-            }}>
-              <i className="bi bi-link-45deg"></i>
-              Drive URL pendiente de configurar
-            </div>
-          )}
-        </div>
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: '#475569',
+                fontSize: '0.72rem',
+              }}>
+                <i className="bi bi-link-45deg"></i>
+                Drive URL pendiente de configurar
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Metadata sidebar */}
