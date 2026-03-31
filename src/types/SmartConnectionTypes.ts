@@ -1,8 +1,2 @@
-interface SmartConnectionProps {
-  dispositivo: string;
-  red: string;
-}
-
-interface EstadoConexión {
-  conectado: boolean;
-}
+// Re-export desde @smc/shared para backwards compatibility
+export * from '@smc/shared/types/smart-connection'

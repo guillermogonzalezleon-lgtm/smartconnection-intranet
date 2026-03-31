@@ -2,6 +2,7 @@
   "name": "smartconnection-intranet",
   "version": "0.1.0",
   "private": true,
+  "workspaces": ["packages/*"],
   "scripts": {
     "dev": "next dev",
     "build": "node write-env.mjs && next build",

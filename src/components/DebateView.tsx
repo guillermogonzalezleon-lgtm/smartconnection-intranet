@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect, useCallback, type MutableRefObject } from 'react';
-import type { Debate, DebateMessage, Tension, Thread, ThreadMessage } from '@/types/debates';
-import { AGENT_COLORS, AGENT_LIST, HORIZON_LABELS, HORIZON_OPTIONS, MODE_ICONS } from '@/types/debates';
+import type { Debate, DebateMessage, Tension, Thread, ThreadMessage } from '@smc/shared/types/debates';
+import { AGENT_COLORS, AGENT_LIST, HORIZON_LABELS, HORIZON_OPTIONS, MODE_ICONS } from '@smc/shared/types/debates';
 
 // Tooltip de info — icono ⓘ con hover
 function InfoTip({ text }: { text: string }) {

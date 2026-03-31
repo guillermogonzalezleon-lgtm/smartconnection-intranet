@@ -1,8 +1,8 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import DebateView from '@/components/DebateView';
-import type { Debate } from '@/types/debates';
-import { AGENT_COLORS, AGENT_LIST, HORIZON_OPTIONS, DEFAULT_TEMPORAL, MODE_ICONS } from '@/types/debates';
+import type { Debate } from '@smc/shared/types/debates';
+import { AGENT_COLORS, AGENT_LIST, HORIZON_OPTIONS, DEFAULT_TEMPORAL, MODE_ICONS } from '@smc/shared/types/debates';
 
 function InfoTip({ text }: { text: string }) {
   const [show, setShow] = useState(false);

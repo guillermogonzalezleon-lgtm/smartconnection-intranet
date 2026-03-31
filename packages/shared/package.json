@@ -1,0 +1,15 @@
+{
+  "name": "@smc/shared",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    "./types/*": "./src/types/*.ts",
+    "./types": "./src/types/index.ts"
+  },
+  "typesVersions": {
+    "*": {
+      "types/*": ["src/types/*.ts"],
+      "types": ["src/types/index.ts"]
+    }
+  }
+}
