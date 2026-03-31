@@ -21,7 +21,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@smc/shared/*": ["./packages/shared/src/*"],
-      "@smc/shared": ["./packages/shared/src/types/index.ts"]
+      "@smc/shared": ["./packages/shared/src/types/index.ts"],
+      "@smc/backend/*": ["./packages/backend/src/*"]
     }
   },
   "include": [

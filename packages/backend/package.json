@@ -1,0 +1,15 @@
+{
+  "name": "@smc/backend",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    "./*": "./src/*.ts",
+    "./agents/*": "./src/agents/*.ts"
+  },
+  "typesVersions": {
+    "*": {
+      "*": ["src/*.ts"],
+      "agents/*": ["src/agents/*.ts"]
+    }
+  }
+}
