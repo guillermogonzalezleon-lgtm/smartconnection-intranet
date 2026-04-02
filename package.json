@@ -2,7 +2,9 @@
   "name": "smartconnection-intranet",
   "version": "0.1.0",
   "private": true,
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "node write-env.mjs && next build",
@@ -15,6 +17,7 @@
     "@aws-sdk/client-sts": "^3.1014.0",
     "@hookform/resolvers": "^5.2.2",
     "@sentry/nextjs": "^10.46.0",
+    "@supabase/supabase-js": "^2.101.1",
     "axios": "^1.13.6",
     "framer-motion": "^12.38.0",
     "next": "16.2.0",
