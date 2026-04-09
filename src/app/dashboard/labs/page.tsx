@@ -240,6 +240,13 @@ export default function LabsPage() {
   const hoveredCard = useRef<string | null>(null);
   const [, forceRender] = useState(0);
 
+  // SMC Registry — conectores desde Supabase
+  const [registryConnectors, setRegistryConnectors] = useState<{
+    slug: string; display_name: string; category: string; type: string;
+    status: string; icon: string; color: string; description: string;
+    priority: number; env_var?: string; models?: string[];
+  }[]>([]);
+
   useEffect(() => {
     const timer = setTimeout(() => setSearchDebounced(search), 200);
     return () => clearTimeout(timer);
@@ -249,6 +256,10 @@ export default function LabsPage() {
   useEffect(() => {
     loadFlowExecs();
     loadMonitorLogs();
+    fetch('/api/labs/connectors')
+      .then(r => r.json())
+      .then(d => { if (d.connectors) setRegistryConnectors(d.connectors); })
+      .catch(() => {});
   }, []);
 
   const loadFlowExecs = useCallback(async () => {
@@ -624,6 +635,35 @@ export default function LabsPage() {
         </div>
 
         <div style={{ padding: '1.5rem 2rem', flex: 1 }}>
+
+          {/* SMC Registry — conectores desde Supabase */}
+          {registryConnectors.length > 0 && (
+            <div style={{ marginBottom: '1.5rem', background: 'rgba(0,229,176,0.03)', border: '1px solid rgba(0,229,176,0.1)', borderRadius: 12, padding: '1rem 1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.75rem' }}>
+                <span style={{ fontSize: 14 }}>🧪</span>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#00e5b0', letterSpacing: '-0.01em' }}>SMC Registry</span>
+                <span style={{ fontSize: '0.68rem', color: '#4a5568', marginLeft: 4 }}>{registryConnectors.length} conectores registrados</span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                {registryConnectors.map(c => (
+                  <div key={c.slug} style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    background: 'rgba(255,255,255,0.03)', border: `1px solid ${c.status === 'active' ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.06)'}`,
+                    borderRadius: 8, padding: '4px 10px', fontSize: '0.72rem',
+                  }}>
+                    <span>{c.icon}</span>
+                    <span style={{ color: '#94a3b8', fontWeight: 500 }}>{c.display_name}</span>
+                    <span style={{
+                      width: 5, height: 5, borderRadius: '50%',
+                      background: c.status === 'active' ? '#22c55e' : c.status === 'disabled' ? '#6b7280' : '#f59e0b',
+                      flexShrink: 0,
+                    }} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Counter resumen */}
           <div style={{ marginBottom: '1rem', fontSize: '0.75rem', color: '#6b7a90', fontWeight: 500, letterSpacing: '-0.01em' }}>
             <span style={{ color: '#22c55e', fontWeight: 700 }}>{stats.active}</span> instalados
