@@ -40,6 +40,18 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
 
+      - name: Lighthouse CI (solo develop)
+        if: github.ref == 'refs/heads/develop'
+        run: |
+          npm install -g @lhci/cli 2>/dev/null
+          lhci autorun \
+            --collect.url=https://qas.smconnection.cl \
+            --assert.preset=lighthouse:recommended \
+            --assert.assertions.categories:performance=warn \
+            --assert.assertions.categories:accessibility=error \
+            --assert.assertions.categories:best-practices=warn \
+            2>&1 | tail -15 || echo "⚠️ Lighthouse no bloqueante"
+
       - name: Tag deploy (solo main)
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
@@ -62,3 +74,11 @@ jobs:
             echo "🔴 Smoke test FALLÓ — status $STATUS"
             exit 1
           fi
+
+      - name: Deploy log (solo main)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          TAG="deploy-intranet-$(date +%Y.%m.%d)-$(printf '%03d' $GITHUB_RUN_NUMBER)"
+          echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"project\":\"intranet\",\"commit\":\"$GITHUB_SHA\",\"tag\":\"$TAG\",\"result\":\"success\",\"url\":\"https://intranet.smconnection.cl\",\"actor\":\"$GITHUB_ACTOR\"}" \
+            >> deploy-entries.json
+          echo "✅ Deploy log entry creada"
