@@ -246,6 +246,22 @@ export default function LabsPage() {
     status: string; icon: string; color: string; description: string;
     priority: number; env_var?: string; models?: string[];
   }[]>([]);
+  const [registryToggling, setRegistryToggling] = useState<string | null>(null);
+
+  const toggleRegistryConnector = useCallback(async (slug: string, currentStatus: string) => {
+    setRegistryToggling(slug);
+    const newStatus = currentStatus === 'active' ? 'disabled' : 'active';
+    try {
+      await fetch('/api/labs/connectors', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, status: newStatus }),
+      });
+      setRegistryConnectors(prev => prev.map(c => c.slug === slug ? { ...c, status: newStatus } : c));
+    } catch { /* silent */ } finally {
+      setRegistryToggling(null);
+    }
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearchDebounced(search), 200);
@@ -646,19 +662,29 @@ export default function LabsPage() {
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                 {registryConnectors.map(c => (
-                  <div key={c.slug} style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    background: 'rgba(255,255,255,0.03)', border: `1px solid ${c.status === 'active' ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.06)'}`,
-                    borderRadius: 8, padding: '4px 10px', fontSize: '0.72rem',
-                  }}>
+                  <button
+                    key={c.slug}
+                    onClick={() => toggleRegistryConnector(c.slug, c.status)}
+                    disabled={registryToggling === c.slug}
+                    title={`${c.display_name} — ${c.status === 'active' ? 'Activo (clic para desactivar)' : 'Inactivo (clic para activar)'}`}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      background: c.status === 'active' ? 'rgba(34,197,94,0.05)' : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${c.status === 'active' ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.06)'}`,
+                      borderRadius: 8, padding: '4px 10px', fontSize: '0.72rem',
+                      cursor: registryToggling === c.slug ? 'wait' : 'pointer',
+                      opacity: registryToggling === c.slug ? 0.5 : 1,
+                      fontFamily: "'Inter', system-ui", transition: 'all 0.15s',
+                    }}
+                  >
                     <span>{c.icon}</span>
-                    <span style={{ color: '#94a3b8', fontWeight: 500 }}>{c.display_name}</span>
+                    <span style={{ color: c.status === 'active' ? '#94a3b8' : '#4a5568', fontWeight: 500 }}>{c.display_name}</span>
                     <span style={{
                       width: 5, height: 5, borderRadius: '50%',
-                      background: c.status === 'active' ? '#22c55e' : c.status === 'disabled' ? '#6b7280' : '#f59e0b',
+                      background: c.status === 'active' ? '#22c55e' : '#475569',
                       flexShrink: 0,
                     }} />
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
