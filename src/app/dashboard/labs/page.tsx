@@ -247,6 +247,11 @@ export default function LabsPage() {
     priority: number; env_var?: string; models?: string[];
   }[]>([]);
   const [registryToggling, setRegistryToggling] = useState<string | null>(null);
+  const [usageStats, setUsageStats] = useState<{
+    slug: string; display_name: string; icon: string; color: string;
+    calls: number; errors: number; tokens: number; cost: number; avg_latency: number; last_used: string | null;
+  }[]>([]);
+  const [totalCalls, setTotalCalls] = useState(0);
 
   const toggleRegistryConnector = useCallback(async (slug: string, currentStatus: string) => {
     setRegistryToggling(slug);
@@ -275,6 +280,10 @@ export default function LabsPage() {
     fetch('/api/labs/connectors')
       .then(r => r.json())
       .then(d => { if (d.connectors) setRegistryConnectors(d.connectors); })
+      .catch(() => {});
+    fetch('/api/labs/connectors/usage')
+      .then(r => r.json())
+      .then(d => { if (d.stats) { setUsageStats(d.stats); setTotalCalls(d.total_calls ?? 0); } })
       .catch(() => {});
   }, []);
 
@@ -686,6 +695,37 @@ export default function LabsPage() {
                     }} />
                   </button>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* LLMOps — uso por conector */}
+          {usageStats.length > 0 && (
+            <div style={{ marginBottom: '1.5rem', background: 'rgba(99,102,241,0.03)', border: '1px solid rgba(99,102,241,0.12)', borderRadius: 12, padding: '1rem 1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.75rem' }}>
+                <span style={{ fontSize: 14 }}>📊</span>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#818cf8', letterSpacing: '-0.01em' }}>LLMOps</span>
+                <span style={{ fontSize: '0.68rem', color: '#4a5568', marginLeft: 4 }}>{totalCalls} llamadas registradas</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                {usageStats.slice(0, 5).map(u => {
+                  const errorRate = u.calls > 0 ? Math.round((u.errors / u.calls) * 100) : 0;
+                  const costStr = u.cost > 0 ? `$${u.cost.toFixed(4)}` : '$0';
+                  return (
+                    <div key={u.slug} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 12, width: 18, textAlign: 'center', flexShrink: 0 }}>{u.icon}</span>
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8', width: 110, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.display_name}</span>
+                      {/* barra proporcional */}
+                      <div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.05)', borderRadius: 2, overflow: 'hidden' }}>
+                        <div style={{ width: `${Math.min(100, (u.calls / (usageStats[0]?.calls || 1)) * 100)}%`, height: '100%', background: u.color, borderRadius: 2, transition: 'width 0.4s' }} />
+                      </div>
+                      <span style={{ fontSize: '0.68rem', color: '#475569', width: 30, textAlign: 'right', flexShrink: 0 }}>{u.calls}</span>
+                      <span style={{ fontSize: '0.65rem', color: errorRate > 10 ? '#ef4444' : '#4a5568', width: 36, textAlign: 'right', flexShrink: 0 }}>{errorRate}% err</span>
+                      <span style={{ fontSize: '0.65rem', color: '#4a5568', width: 48, textAlign: 'right', flexShrink: 0 }}>{u.avg_latency}ms</span>
+                      <span style={{ fontSize: '0.65rem', color: '#4a5568', width: 44, textAlign: 'right', flexShrink: 0 }}>{costStr}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
