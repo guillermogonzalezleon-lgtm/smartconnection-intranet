@@ -182,3 +182,52 @@ export async function createPresentation(name: string, folderId?: string): Promi
   });
   return res.json();
 }
+
+/**
+ * Sube un archivo con contenido usando multipart upload.
+ * Útil para subir .md, .txt, o cualquier blob a Drive.
+ */
+export async function uploadFile(
+  name: string,
+  content: string | Buffer,
+  mimeType: string,
+  folderId?: string,
+): Promise<DriveFile> {
+  const parent = folderId || GOVERNANCE_FOLDER_ID;
+  const token = await getAccessToken();
+
+  const boundary = `smc_boundary_${Date.now()}`;
+  const metadata = JSON.stringify({
+    name,
+    mimeType,
+    parents: parent ? [parent] : undefined,
+  });
+
+  const body = [
+    `--${boundary}`,
+    'Content-Type: application/json; charset=UTF-8',
+    '',
+    metadata,
+    `--${boundary}`,
+    `Content-Type: ${mimeType}`,
+    '',
+    typeof content === 'string' ? content : content.toString('utf8'),
+    `--${boundary}--`,
+  ].join('\r\n');
+
+  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,webViewLink', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': `multipart/related; boundary=${boundary}`,
+    },
+    body,
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`uploadFile error ${res.status}: ${err}`);
+  }
+
+  return res.json();
+}
