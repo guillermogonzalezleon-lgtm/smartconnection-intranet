@@ -41,3 +41,8 @@ yarn-error.log*
 next-env.d.ts
 .env.production
 supabase/.temp/
+
+# Scripts temporales de debugging
+mobile_*.js
+preview_*.js
+cpi-config.js
